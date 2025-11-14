@@ -61,11 +61,12 @@ Enable users to create dashboard components through natural language chat interf
 
 ## Project Overview
 
-**Monitoring Dashboard** - A full-stack application for monitoring distributed database clusters with dynamic component creation. The dashboard provides:
+**GiVi-Solution Dashboard** - A full-stack application for monitoring distributed database clusters with dynamic component creation. The dashboard provides:
 
 1. **Real-time Monitoring** - Multi-page dashboard for cluster health, node status, and query analytics
 2. **Dynamic Chart Builder** - Create and manage custom React components and visualizations through a web UI
-3. **File-Based Storage** - All components stored as JSON files in a hierarchical file system
+3. **Interactive Components** - Support for user controls (checkboxes, dropdowns, sliders) and timeline zoom
+4. **File-Based Storage** - All components stored as JSON files in a hierarchical file system
 
 ## Architecture Summary
 
@@ -129,21 +130,30 @@ Dynamic Component Loader
 - Path: `data/{system}/{source}/{component}.json`
 - Once created, system/source/name cannot be changed
 
-### 4. UI Framework: Carbon Design System
+### 4. UI Framework: Carbon Design System (g100 Dark Theme)
 - IBM's open-source design system
+- **Enforced Dark Mode**: g100 theme (`data-carbon-theme="g100"` on html element)
 - Professional component library with accessibility built-in
 - Consistent design language across all components
 - SCSS-based theming with CSS custom properties
 - Use Carbon components (Button, Tile, Tag, TextInput, etc.) - don't create custom components
 - Import styles: `@use '@carbon/react'` in SCSS files
-- Main theme: 'g100' (dark theme) - can be customized
+- **Branding**: "GiVi-Solution" prefix with "My Dashboard" name
+- **Header**: IBM Cloud-style with utility icons (Help, App Switcher, Notifications, User)
+- **Colors**: All text forced to light colors (#f4f4f4) for visibility on dark backgrounds
 
-### 5. Visualization: ECharts with Carbon Theme
+### 5. Visualization: ECharts with Carbon Dark Theme
 - Enterprise-grade charting library
 - Available in dynamic components via `echarts` and `ReactECharts`
-- Custom Carbon Design System theme (`carbonTheme`, `carbonDarkTheme`)
+- **Always use**: `theme="carbon-dark"` prop for all charts
+- Custom Carbon Design System themes (`carbonTheme`, `carbonDarkTheme`)
 - Theme location: `client/src/theme/carbonEchartsTheme.js`
 - Supports all ECharts chart types: line, bar, pie, scatter, gauge, sankey, etc.
+- **Interactive features**:
+  - Timeline zoom with `dataZoom` slider and mouse wheel
+  - Dynamic filtering with checkboxes/dropdowns
+  - Multi-series comparisons
+  - Real-time updates with auto-refresh
 - Use ReactECharts wrapper for easier integration
 - No manual cleanup needed with ReactECharts wrapper
 
@@ -367,7 +377,7 @@ const Component = () => {
     <ReactECharts
       option={option}
       style={{ height: '400px' }}
-      theme="carbon-light"
+      theme="carbon-dark"
     />
   );
 };
@@ -400,7 +410,7 @@ const Component = () => {
     ],
   };
 
-  return <ReactECharts option={option} theme="carbon-light" />;
+  return <ReactECharts option={option} theme="carbon-dark" />;
 };
 ```
 
@@ -420,7 +430,7 @@ const Component = () => {
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: '300px' }} theme="carbon-light" />;
+  return <ReactECharts option={option} style={{ height: '300px' }} theme="carbon-dark" />;
 };
 ```
 
@@ -448,6 +458,154 @@ await fileManager.deleteComponent(system, source, name);
 
 // Index is automatically updated
 ```
+
+## Interactive Component Patterns
+
+Dynamic components support full React interactivity with useState, useEffect, and user controls. See complete examples in `server/mcp/componentSpec.js` under `interactivePatterns`.
+
+### Pattern 1: Dynamic Filtering
+
+Filter chart data based on user selections. Automatically extract unique values from data and create checkboxes/dropdowns.
+
+```javascript
+const Component = () => {
+  const [data, setData] = useState([]);
+  const [facilities, setFacilities] = useState([]);
+  const [selectedFacilities, setSelectedFacilities] = useState([]);
+
+  useEffect(() => {
+    // Fetch data and extract unique facilities
+    const uniqueFacilities = [...new Set(data.map(d => d.facility))];
+    setFacilities(uniqueFacilities);
+    setSelectedFacilities(uniqueFacilities); // All selected by default
+  }, [data]);
+
+  // Filter series based on selections
+  const series = selectedFacilities.map(facility => ({
+    name: facility,
+    type: 'line',
+    data: data.filter(d => d.facility === facility).map(d => d.value)
+  }));
+
+  return (
+    <div>
+      {/* Dynamic checkboxes */}
+      {facilities.map(f => (
+        <label key={f}>
+          <input type="checkbox"
+            checked={selectedFacilities.includes(f)}
+            onChange={() => /* toggle */} />
+          {f}
+        </label>
+      ))}
+      <ReactECharts option={{series}} theme="carbon-dark" />
+    </div>
+  );
+};
+```
+
+### Pattern 2: Timeline Zoom Slider
+
+Add ECharts dataZoom for exploring large time-series datasets with slider and mouse wheel.
+
+```javascript
+const Component = () => {
+  const option = {
+    dataZoom: [
+      {
+        type: 'slider',
+        show: true,
+        start: 70,  // Show last 30% by default
+        end: 100,
+        backgroundColor: '#393939',
+        fillerColor: 'rgba(15, 98, 254, 0.2)',
+        borderColor: '#525252',
+        handleStyle: { color: '#0f62fe' },
+        textStyle: { color: '#c6c6c6' }
+      },
+      {
+        type: 'inside',  // Mouse wheel zoom
+        start: 70,
+        end: 100
+      }
+    ],
+    // ... rest of chart config
+  };
+
+  return <ReactECharts option={option} theme="carbon-dark" />;
+};
+```
+
+### Pattern 3: Real-time Updates
+
+Auto-refresh data at configurable intervals for live monitoring.
+
+```javascript
+const Component = () => {
+  const [refreshInterval, setRefreshInterval] = useState(5000);
+  const [data, setData] = useState([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      // Fetch from API
+      setData(result);
+    };
+
+    fetchData(); // Initial fetch
+    const interval = setInterval(fetchData, refreshInterval);
+    return () => clearInterval(interval);
+  }, [refreshInterval]);
+
+  return (
+    <div>
+      <select value={refreshInterval} onChange={e => setRefreshInterval(Number(e.target.value))}>
+        <option value={1000}>1s</option>
+        <option value={5000}>5s</option>
+        <option value={30000}>30s</option>
+      </select>
+      <ReactECharts option={chartOption} theme="carbon-dark" />
+    </div>
+  );
+};
+```
+
+### Pattern 4: Multi-series Comparison
+
+Compare multiple metrics/facilities in a single chart with dynamic series generation.
+
+```javascript
+const Component = () => {
+  // Extract unique dimensions from data
+  const servers = [...new Set(data.map(d => d.server))];
+  const times = [...new Set(data.map(d => d.time))];
+
+  // Build series for each server
+  const series = servers.flatMap(server => [
+    {
+      name: `${server} - CPU`,
+      type: 'line',
+      data: times.map(time => {
+        const point = data.find(d => d.server === server && d.time === time);
+        return point ? point.cpu : null;
+      }),
+      itemStyle: { color: '#0f62fe' }
+    },
+    {
+      name: `${server} - Memory`,
+      type: 'line',
+      data: times.map(time => {
+        const point = data.find(d => d.server === server && d.time === time);
+        return point ? point.memory : null;
+      }),
+      itemStyle: { color: '#24a148' }
+    }
+  ]);
+
+  return <ReactECharts option={{series, legend: {type: 'scroll'}}} theme="carbon-dark" />;
+};
+```
+
+**Full Examples**: See `server/mcp/componentSpec.js` → `interactivePatterns` for complete working code.
 
 ## Testing
 
@@ -580,7 +738,7 @@ curl http://localhost:3001/api/datasources
 
 ---
 
-**Last Updated**: 2025-11-13
+**Last Updated**: 2025-11-14
 
 For more details, see:
 - [README.md](README.md) - User documentation

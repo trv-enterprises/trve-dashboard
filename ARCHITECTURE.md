@@ -1,8 +1,8 @@
-# Monitoring Dashboard - Architecture & Design
+# GiVi-Solution Dashboard - Architecture & Design
 
-**Version**: 2.0
-**Last Updated**: 2025-11-13
-**Status**: Active Development - Data Layer & MCP Complete
+**Version**: 2.1
+**Last Updated**: 2025-11-14
+**Status**: Active Development - Data Layer, MCP, Interactive Patterns Complete
 
 ---
 
@@ -25,25 +25,28 @@
 
 ## Executive Summary
 
-The Monitoring Dashboard is a full-stack web application designed to monitor and manage distributed database clusters. It combines real-time monitoring capabilities with a dynamic component builder and an intelligent data layer, allowing users to:
+The GiVi-Solution Dashboard is a full-stack web application designed to monitor and manage distributed database clusters. It combines real-time monitoring capabilities with a dynamic component builder, interactive patterns, and an intelligent data layer, allowing users to:
 
-- **Monitor cluster health** - Track nodes, queries, storage, and performance metrics
+- **Monitor cluster health** - Track nodes, queries, storage, and performance metrics in dark mode
 - **Analyze queries** - View query history, execution times, and status
 - **Manage nodes** - Monitor individual node resources and health
-- **Build custom visualizations** - Create reusable dashboard components dynamically
+- **Build custom visualizations** - Create reusable dashboard components with full interactivity
+- **Add interactive controls** - Checkboxes, dropdowns, sliders, and timeline zoom
 - **Query data efficiently** - Intelligent caching with time-series gap detection
-- **Use AI assistants** - MCP server for component creation and datasource management
+- **Use AI assistants** - MCP server for component creation and data source management
 
 ### Key Features
 
-- **Multi-page dashboard** with Carbon Design System UI Shell
+- **Multi-page dashboard** with Carbon Design System UI Shell (g100 dark theme)
+- **IBM Cloud-style header** with utility icons and GiVi-Solution branding
 - **Real-time metrics** with auto-refresh capabilities and smart caching
-- **ECharts visualizations** themed to match Carbon Design
-- **Dynamic component builder** for custom widgets
-- **Intelligent data layer** with time-series caching and query optimization ⭐ NEW
-- **MCP Server** for AI assistant integration ⭐ NEW
-- **Component specification** for AI-generated components ⭐ NEW
-- **File-based storage** for components and datasources (no database required)
+- **ECharts visualizations** themed for Carbon dark mode with interactive patterns
+- **Dynamic component builder** for custom widgets with user controls
+- **Interactive patterns** - Dynamic filtering, timeline zoom, real-time updates, multi-series ⭐ NEW
+- **Intelligent data layer** with time-series caching and query optimization
+- **MCP Server** for AI assistant integration
+- **Component specification** with interactive pattern examples
+- **File-based storage** for components and data sources (no database required)
 - **RESTful API** for component and data management
 
 ---
