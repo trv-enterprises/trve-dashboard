@@ -8,18 +8,13 @@ body {
   background-color: var(--cds-background);
 }
 
-// Header styling
+// Header styling with visible outline
 .cds--header {
   position: relative;
-  border-bottom: 1px solid var(--cds-border-subtle-01);
+  border-bottom: 1px solid var(--cds-border-strong-01);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   z-index: 8000;
-}
-
-.header-subtitle {
-  font-size: 0.75rem;
-  color: var(--cds-text-secondary);
-  margin-left: 1rem;
-  line-height: 3rem;
+  background-color: var(--cds-layer-01);
 }
 
 .header-status {
@@ -34,10 +29,11 @@ body {
   }
 }
 
-// Side navigation
+// Side navigation with visible outline
 .cds--side-nav {
   background-color: var(--cds-layer-01);
-  border-right: 1px solid var(--cds-border-subtle-01);
+  border-right: 1px solid var(--cds-border-strong-01);
+  box-shadow: 1px 0 2px rgba(0, 0, 0, 0.3);
 }
 
 .cds--side-nav__link--current,

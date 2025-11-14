@@ -19,7 +19,11 @@ import {
   ChartLineSmooth,
   Add,
   Checkmark,
-  WarningAlt
+  WarningAlt,
+  Help,
+  Switcher,
+  Notification,
+  UserAvatar
 } from '@carbon/icons-react';
 import DashboardPage from './pages/DashboardPage';
 import NodesPage from './pages/NodesPage';
@@ -68,13 +72,10 @@ function AppContent() {
     <>
       <HeaderContainer
         render={() => (
-          <Header aria-label="Monitoring Dashboard">
-            <HeaderName prefix="">
-              data source Monitor
+          <Header aria-label="My Dashboard">
+            <HeaderName prefix="GiVi-Solution">
+              My Dashboard
             </HeaderName>
-            <div className="header-subtitle">
-              Distributed Database Cluster Monitoring
-            </div>
             <HeaderGlobalBar>
               <div className="header-status">
                 <Tag
@@ -101,6 +102,18 @@ function AppContent() {
                 disabled={serverStatus !== 'connected'}
               >
                 <Add size={20} />
+              </HeaderGlobalAction>
+              <HeaderGlobalAction aria-label="Help">
+                <Help size={20} />
+              </HeaderGlobalAction>
+              <HeaderGlobalAction aria-label="App Switcher">
+                <Switcher size={20} />
+              </HeaderGlobalAction>
+              <HeaderGlobalAction aria-label="Notifications">
+                <Notification size={20} />
+              </HeaderGlobalAction>
+              <HeaderGlobalAction aria-label="User Account">
+                <UserAvatar size={20} />
               </HeaderGlobalAction>
             </HeaderGlobalBar>
           </Header>
