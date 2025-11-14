@@ -1,6 +1,6 @@
 /* Dark mode base styles */
 html {
-  background-color: #161616;
+  background-color: #161616 !important;
 }
 
 body {
@@ -9,13 +9,13 @@ body {
   font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
     'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
     'Noto Color Emoji';
-  background-color: #161616;
-  color: #f4f4f4;
+  background-color: #161616 !important;
+  color: #f4f4f4 !important;
 }
 
 #root {
   min-height: 100vh;
-  background-color: #161616;
+  background-color: #161616 !important;
 }
 
 /* Component list hover effect - dark mode */
@@ -31,6 +31,83 @@ body {
 pre {
   margin: 0;
   font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+}
+
+/* DataTable dark mode */
+.cds--data-table-container,
+.cds--data-table-content {
+  background-color: #262626 !important;
+}
+
+.cds--data-table {
+  background-color: #262626 !important;
+  color: #f4f4f4 !important;
+}
+
+.cds--data-table thead,
+.cds--data-table thead tr,
+.cds--data-table-header {
+  background-color: #393939 !important;
+}
+
+.cds--data-table th,
+.cds--table-header-label,
+.cds--data-table thead th {
+  border-color: #525252 !important;
+  color: #f4f4f4 !important;
+  background-color: #393939 !important;
+}
+
+.cds--data-table td {
+  border-color: #525252 !important;
+  color: #f4f4f4 !important;
+  background-color: #262626 !important;
+}
+
+.cds--data-table tbody tr {
+  background-color: #262626 !important;
+}
+
+.cds--data-table tbody tr:hover td {
+  background-color: #353535 !important;
+}
+
+/* Force all table cells to be dark */
+table.cds--data-table th,
+table.cds--data-table thead th,
+table.cds--data-table thead tr th {
+  background-color: #393939 !important;
+  background: #393939 !important;
+}
+
+/* Force entire header row background */
+.cds--data-table thead tr,
+table.cds--data-table thead tr {
+  background-color: #393939 !important;
+  background: #393939 !important;
+}
+
+/* Also force the TableHead component */
+.cds--table-header,
+.cds--data-table-header-container {
+  background-color: #393939 !important;
+  background: #393939 !important;
+}
+
+/* Sortable table headers */
+.cds--table-sort__header,
+th.cds--table-sort__header {
+  background-color: #393939 !important;
+  background: #393939 !important;
+}
+
+.cds--table-sort {
+  background-color: #393939 !important;
+  color: #f4f4f4 !important;
+}
+
+.cds--table-sort:hover {
+  background-color: #525252 !important;
 }
 
 /* Scrollbar styling - dark mode */
