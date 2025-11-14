@@ -428,6 +428,358 @@ return <ReactECharts option={option} theme="carbon-light" />;`
   },
 
   /**
+   * Interactive Patterns
+   * Common interactive UI patterns for dynamic components
+   */
+  interactivePatterns: {
+    dynamicFiltering: {
+      description: 'Filter chart data based on user selections (checkboxes, dropdowns)',
+      useCase: 'Multi-facility dashboard where user selects which facilities to display',
+      code: `const Component = () => {
+  const [data, setData] = useState([]);
+  const [facilities, setFacilities] = useState([]);
+  const [selectedFacilities, setSelectedFacilities] = useState([]);
+
+  useEffect(() => {
+    // Fetch data from datasource
+    const fetchData = async () => {
+      // Your data fetch logic
+      const result = [
+        { facility: 'Facility A', time: '00:00', temp: 72 },
+        { facility: 'Facility B', time: '00:00', temp: 68 },
+        // ... more data
+      ];
+
+      setData(result);
+
+      // Extract unique facilities from data
+      const uniqueFacilities = [...new Set(result.map(d => d.facility))];
+      setFacilities(uniqueFacilities);
+      setSelectedFacilities(uniqueFacilities); // Select all by default
+    };
+    fetchData();
+  }, []);
+
+  const handleToggle = (facility) => {
+    setSelectedFacilities(prev =>
+      prev.includes(facility)
+        ? prev.filter(f => f !== facility)
+        : [...prev, facility]
+    );
+  };
+
+  // Build chart with filtered data
+  const series = selectedFacilities.map(facility => ({
+    name: facility,
+    type: 'line',
+    data: data.filter(d => d.facility === facility).map(d => d.temp)
+  }));
+
+  const option = {
+    legend: { data: selectedFacilities, textStyle: { color: '#f4f4f4' } },
+    series: series
+  };
+
+  return (
+    <div style={{ padding: '1rem' }}>
+      {/* Dynamic checkboxes */}
+      <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem' }}>
+        {facilities.map(facility => (
+          <label key={facility} style={{ color: '#f4f4f4', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={selectedFacilities.includes(facility)}
+              onChange={() => handleToggle(facility)}
+            />
+            {facility}
+          </label>
+        ))}
+      </div>
+      <ReactECharts option={option} theme="carbon-dark" />
+    </div>
+  );
+};`
+    },
+
+    timelineZoomSlider: {
+      description: 'Add timeline zoom/brush control to charts for exploring different time ranges',
+      useCase: 'Large datasets where users need to zoom into specific time periods',
+      code: `const Component = () => {
+  const { data, loading } = useData({
+    datasourceId: 'YOUR_DATASOURCE_ID',
+    query: {
+      table: 'metrics',
+      metric: 'cpu_usage',
+      aggregation: 'avg',
+      interval: '1m',
+      startTime: new Date(Date.now() - 86400000), // Last 24 hours
+      endTime: new Date()
+    }
+  });
+
+  if (loading) return <div style={{ color: '#f4f4f4' }}>Loading...</div>;
+
+  const times = data.map(d => d.timestamp);
+  const values = data.map(d => d.value);
+
+  const option = {
+    title: {
+      text: 'CPU Usage (24 Hours)',
+      textStyle: { color: '#f4f4f4' }
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#262626',
+      borderColor: '#393939',
+      textStyle: { color: '#f4f4f4' }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '15%', // Make room for dataZoom
+      top: '10%'
+    },
+    dataZoom: [
+      {
+        type: 'slider',
+        show: true,
+        xAxisIndex: [0],
+        start: 70, // Show last 30% by default
+        end: 100,
+        backgroundColor: '#393939',
+        fillerColor: 'rgba(15, 98, 254, 0.2)',
+        borderColor: '#525252',
+        handleStyle: {
+          color: '#0f62fe'
+        },
+        textStyle: {
+          color: '#c6c6c6'
+        }
+      },
+      {
+        type: 'inside', // Enable mouse wheel zoom
+        xAxisIndex: [0],
+        start: 70,
+        end: 100
+      }
+    ],
+    xAxis: {
+      type: 'category',
+      data: times,
+      axisLine: { lineStyle: { color: '#525252' } },
+      axisLabel: { color: '#c6c6c6' }
+    },
+    yAxis: {
+      type: 'value',
+      name: 'CPU %',
+      nameTextStyle: { color: '#c6c6c6' },
+      axisLine: { lineStyle: { color: '#525252' } },
+      axisLabel: { color: '#c6c6c6' },
+      splitLine: { lineStyle: { color: '#393939' } }
+    },
+    series: [{
+      name: 'CPU Usage',
+      type: 'line',
+      smooth: true,
+      data: values,
+      itemStyle: { color: '#0f62fe' },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(15, 98, 254, 0.3)' },
+            { offset: 1, color: 'rgba(15, 98, 254, 0)' }
+          ]
+        }
+      }
+    }]
+  };
+
+  return (
+    <ReactECharts
+      option={option}
+      style={{ height: '500px' }}
+      theme="carbon-dark"
+    />
+  );
+};`
+    },
+
+    realTimeUpdates: {
+      description: 'Auto-refresh data at regular intervals for real-time monitoring',
+      useCase: 'Live dashboards showing current system status',
+      code: `const Component = () => {
+  const [refreshInterval, setRefreshInterval] = useState(5000);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+
+  const { data, loading, error } = useData({
+    datasourceId: 'YOUR_DATASOURCE_ID',
+    query: {
+      table: 'metrics',
+      metric: 'active_connections',
+      aggregation: 'sum',
+      interval: '1m',
+      startTime: new Date(Date.now() - 3600000), // Last hour
+      endTime: new Date()
+    },
+    refreshInterval: refreshInterval // Auto-refresh every 5 seconds
+  });
+
+  // Update last refresh time when data changes
+  useEffect(() => {
+    if (data && data.length > 0) {
+      setLastUpdate(new Date());
+    }
+  }, [data]);
+
+  if (error) return <div style={{ color: '#da1e28' }}>Error: {error.message}</div>;
+
+  const option = {
+    title: {
+      text: 'Active Connections',
+      textStyle: { color: '#f4f4f4' }
+    },
+    xAxis: {
+      type: 'category',
+      data: data?.map(d => d.time) || []
+    },
+    yAxis: { type: 'value' },
+    series: [{
+      data: data?.map(d => d.value) || [],
+      type: 'line',
+      itemStyle: { color: '#0f62fe' }
+    }]
+  };
+
+  return (
+    <div>
+      {/* Refresh interval control */}
+      <div style={{ padding: '1rem', color: '#c6c6c6' }}>
+        <label>
+          Refresh Interval:
+          <select
+            value={refreshInterval}
+            onChange={(e) => setRefreshInterval(Number(e.target.value))}
+            style={{ marginLeft: '0.5rem', padding: '0.25rem' }}
+          >
+            <option value={1000}>1s</option>
+            <option value={5000}>5s</option>
+            <option value={10000}>10s</option>
+            <option value={30000}>30s</option>
+          </select>
+        </label>
+        <span style={{ marginLeft: '1rem', fontSize: '0.875rem' }}>
+          Last update: {lastUpdate.toLocaleTimeString()}
+        </span>
+      </div>
+
+      {loading && <div style={{ color: '#f4f4f4' }}>Refreshing...</div>}
+      <ReactECharts option={option} theme="carbon-dark" style={{ height: '400px' }} />
+    </div>
+  );
+};`
+    },
+
+    multiSeriesComparison: {
+      description: 'Display multiple metrics or data sources in a single chart for comparison',
+      useCase: 'Comparing performance across multiple servers, facilities, or metrics',
+      code: `const Component = () => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch data with groupBy to get multiple series
+    const fetchData = async () => {
+      // Simulated multi-series data
+      const result = [
+        { server: 'Server 1', time: '00:00', cpu: 45, memory: 62 },
+        { server: 'Server 1', time: '01:00', cpu: 48, memory: 65 },
+        { server: 'Server 2', time: '00:00', cpu: 52, memory: 58 },
+        { server: 'Server 2', time: '01:00', cpu: 55, memory: 60 },
+        // ... more data
+      ];
+      setData(result);
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return <div style={{ color: '#f4f4f4' }}>Loading...</div>;
+
+  // Extract unique servers and times
+  const servers = [...new Set(data.map(d => d.server))];
+  const times = [...new Set(data.map(d => d.time))];
+
+  // Build series for each server
+  const series = servers.flatMap(server => [
+    {
+      name: \`\${server} - CPU\`,
+      type: 'line',
+      smooth: true,
+      data: times.map(time => {
+        const point = data.find(d => d.server === server && d.time === time);
+        return point ? point.cpu : null;
+      }),
+      itemStyle: { color: '#0f62fe' }
+    },
+    {
+      name: \`\${server} - Memory\`,
+      type: 'line',
+      smooth: true,
+      data: times.map(time => {
+        const point = data.find(d => d.server === server && d.time === time);
+        return point ? point.memory : null;
+      }),
+      itemStyle: { color: '#24a148' }
+    }
+  ]);
+
+  const option = {
+    title: {
+      text: 'Multi-Server Resource Comparison',
+      textStyle: { color: '#f4f4f4' }
+    },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#262626',
+      borderColor: '#393939',
+      textStyle: { color: '#f4f4f4' }
+    },
+    legend: {
+      data: series.map(s => s.name),
+      textStyle: { color: '#f4f4f4' },
+      type: 'scroll' // Scrollable legend for many series
+    },
+    xAxis: {
+      type: 'category',
+      data: times,
+      axisLine: { lineStyle: { color: '#525252' } },
+      axisLabel: { color: '#c6c6c6' }
+    },
+    yAxis: {
+      type: 'value',
+      name: 'Usage %',
+      nameTextStyle: { color: '#c6c6c6' },
+      axisLine: { lineStyle: { color: '#525252' } },
+      axisLabel: { color: '#c6c6c6' },
+      splitLine: { lineStyle: { color: '#393939' } }
+    },
+    series: series
+  };
+
+  return (
+    <ReactECharts
+      option={option}
+      style={{ height: '500px' }}
+      theme="carbon-dark"
+    />
+  );
+};`
+    }
+  },
+
+  /**
    * Best Practices
    */
   bestPractices: {

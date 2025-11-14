@@ -17,6 +17,36 @@ body {
   background-color: var(--cds-layer-01);
 }
 
+.cds--header__name {
+  color: #f4f4f4 !important; // gray10 - light text
+}
+
+.cds--header__name--prefix {
+  color: #f4f4f4 !important; // gray10 - light text
+}
+
+.cds--header__action,
+button.cds--header__action {
+  color: #f4f4f4 !important; // gray10 - light text
+
+  svg {
+    fill: #f4f4f4 !important; // gray10 - light icons
+  }
+
+  &:hover {
+    background-color: #393939 !important;
+  }
+}
+
+// Force all header icons to be light
+.cds--header svg {
+  fill: #f4f4f4 !important;
+}
+
+.cds--header__global svg {
+  fill: #f4f4f4 !important;
+}
+
 .header-status {
   display: flex;
   align-items: center;
