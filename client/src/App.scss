@@ -1,0 +1,54 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+
+// Global app styling
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--cds-background);
+}
+
+// Header styling
+.cds--header {
+  position: relative;
+  border-bottom: 1px solid var(--cds-border-subtle-01);
+  z-index: 8000;
+}
+
+.header-subtitle {
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  margin-left: 1rem;
+  line-height: 3rem;
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  margin-right: 1rem;
+
+  .cds--tag {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+}
+
+// Side navigation
+.cds--side-nav {
+  background-color: var(--cds-layer-01);
+  border-right: 1px solid var(--cds-border-subtle-01);
+}
+
+.cds--side-nav__link--current,
+.cds--side-nav__link:hover {
+  background-color: var(--cds-layer-accent-01);
+}
+
+// Content area
+.app-content {
+  background-color: var(--cds-background);
+  margin-left: 256px; // Width of side nav
+  padding: 0;
+  min-height: calc(100vh - 48px); // Account for header height
+}

@@ -1,0 +1,93 @@
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+
+.component-editor {
+  padding: 1.5rem;
+  height: 100%;
+  overflow: auto;
+}
+
+.editor-tile {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.editor-title {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--cds-text-primary);
+}
+
+.editor-notification {
+  margin-bottom: 1.5rem;
+}
+
+.form-row-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.code-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.code-label {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--cds-text-secondary);
+  line-height: 1.125rem;
+}
+
+.code-textarea,
+.metadata-textarea {
+  font-family: 'IBM Plex Mono', 'Menlo', 'Courier New', monospace;
+  font-size: 0.8125rem;
+
+  textarea {
+    font-family: inherit;
+  }
+}
+
+.helper-text {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.75rem;
+  color: var(--cds-text-secondary);
+  line-height: 1.125rem;
+}
+
+.preview-tile {
+  background-color: var(--cds-layer-02);
+  margin-top: 1rem;
+}
+
+.preview-title {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--cds-text-primary);
+}
+
+.preview-content {
+  padding: 1rem 0;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--cds-border-subtle-01);
+}

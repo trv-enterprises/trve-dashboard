@@ -1,0 +1,20 @@
+**The ask:**
+"Extract Carbon Design System color tokens from `@carbon/colors` and `@carbon/themes`, then create an ECharts theme configuration object that matches Carbon's data visualization palette. Set up the theme so it works with both light and dark modes."
+
+**Packages to install:**
+```bash
+npm install @carbon/react @carbon/colors @carbon/themes
+npm install echarts echarts-for-react
+```
+
+**Key Carbon resources Claude Code should reference:**
+- Carbon data viz color guidelines: https://carbondesignsystem.com/data-visualization/color-palettes/
+- Carbon charts GitHub (for inspiration): https://github.com/carbon-design-system/carbon-charts
+
+The nice thing is Carbon's tokens are well-structured, so Claude Code should be able to programmatically generate the ECharts theme config without too much manual mapping.
+
+For your data source distributed database dashboard, you'll probably want:
+- Line charts for time-series metrics (node performance over time)
+- Gauge charts for resource utilization
+- Sankey/network graphs for data flow visualization between nodes
+- Data tables with Carbon components for node status
