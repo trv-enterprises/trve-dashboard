@@ -203,6 +203,7 @@ function DashboardPage() {
       <Tile className="chart-tile">
         <ReactECharts
           option={latencyChartOption}
+          theme="carbon-dark"
           style={{ height: '400px', width: '100%' }}
           opts={{ renderer: 'canvas' }}
         />

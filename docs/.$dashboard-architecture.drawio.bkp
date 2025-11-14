@@ -1,11 +1,11 @@
-<mxfile host="Electron" modified="2025-11-14T01:39:59.812Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/21.3.7 Chrome/112.0.5615.204 Electron/24.5.0 Safari/537.36" etag="Qq_RKHi3a2DJFlrDcQ9j" version="21.3.7" type="device">
+<mxfile host="Electron" modified="2025-11-14T03:31:42.875Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/21.3.7 Chrome/112.0.5615.204 Electron/24.5.0 Safari/537.36" etag="_pCt7-3j4jOeERl7BD6Q" version="21.3.7" type="device" pages="2">
   <diagram name="Page-1" id="m_-PFX6CMNEayMwjwl-U">
     <mxGraphModel dx="3473" dy="965" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1200" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="ZuxRl3zNeTZ23-iut1RS-1" value="&lt;font size=&quot;1&quot; style=&quot;&quot;&gt;&lt;b style=&quot;font-size: 30px;&quot;&gt;Dashboard&lt;/b&gt;&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;container=1;collapsible=0;recursiveResize=0;" parent="1" vertex="1">
-          <mxGeometry x="610" y="500" width="720" height="560" as="geometry" />
+          <mxGeometry x="600" y="500" width="720" height="560" as="geometry" />
         </mxCell>
         <mxCell id="JBGFYYkDI-QDcvwAwLyy-63" value="Component Viewer" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="ZuxRl3zNeTZ23-iut1RS-1">
           <mxGeometry x="80" y="190" width="160" height="30" as="geometry" />
@@ -17,10 +17,10 @@
           <mxGeometry x="80" y="85" width="160" height="30" as="geometry" />
         </mxCell>
         <mxCell id="JBGFYYkDI-QDcvwAwLyy-66" value="Realtime Widget Updater" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="ZuxRl3zNeTZ23-iut1RS-1">
-          <mxGeometry x="280" y="180" width="160" height="30" as="geometry" />
+          <mxGeometry x="390" y="85" width="160" height="30" as="geometry" />
         </mxCell>
         <mxCell id="JBGFYYkDI-QDcvwAwLyy-67" value="Click on widget , opne chat, tell caude what you want. New widget is created adddd ot&amp;nbsp; and then updated on desktop." style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="ZuxRl3zNeTZ23-iut1RS-1">
-          <mxGeometry x="220" y="400" width="160" height="90" as="geometry" />
+          <mxGeometry x="390" y="140" width="160" height="90" as="geometry" />
         </mxCell>
         <mxCell id="JBGFYYkDI-QDcvwAwLyy-2" value="&lt;font size=&quot;1&quot; style=&quot;&quot;&gt;&lt;b style=&quot;font-size: 30px;&quot;&gt;Server&lt;/b&gt;&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;container=1;collapsible=0;recursiveResize=0;" vertex="1" parent="1">
           <mxGeometry x="-200" y="500" width="760" height="570" as="geometry" />
@@ -139,6 +139,17 @@
         <mxCell id="JBGFYYkDI-QDcvwAwLyy-56" value="React Code Development" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="JBGFYYkDI-QDcvwAwLyy-53">
           <mxGeometry x="50" y="85" width="120" height="40" as="geometry" />
         </mxCell>
+        <mxCell id="JBGFYYkDI-QDcvwAwLyy-73" value="langflow" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="JBGFYYkDI-QDcvwAwLyy-50">
+          <mxGeometry x="70" y="170" width="120" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="8aa4ba-bHqD-Qmgr2xDs" name="Page-2">
+    <mxGraphModel dx="1242" dy="772" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
       </root>
     </mxGraphModel>
   </diagram>
