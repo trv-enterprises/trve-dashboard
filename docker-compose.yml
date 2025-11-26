@@ -1,0 +1,81 @@
+services:
+  # MongoDB
+  mongodb:
+    image: mongo:7
+    container_name: dashboard-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=dashboard
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dashboard-network
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: dashboard-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dashboard-network
+
+  # Go Server (for production/testing - commented out for local dev)
+  # server:
+  #   build:
+  #     context: ./server-go
+  #     dockerfile: Dockerfile
+  #   container_name: dashboard-server
+  #   ports:
+  #     - "3001:3001"
+  #   environment:
+  #     - ENV=development
+  #     - DASHBOARD_MONGODB_URI=mongodb://mongodb:27017
+  #     - DASHBOARD_REDIS_ADDR=redis:6379
+  #   depends_on:
+  #     mongodb:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - dashboard-network
+  #   volumes:
+  #     - ./server-go/config:/app/config:ro
+
+  # Asynq Monitor commented out - build issues on ARM
+  # asynqmon:
+  #   image: hibiken/asynqmon:latest
+  #   container_name: dashboard-asynqmon
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     - REDIS_ADDR=redis:6379
+  #     - REDIS_DB=0
+  #   depends_on:
+  #     - redis
+  #   networks:
+  #     - dashboard-network
+
+volumes:
+  mongodb-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  dashboard-network:
+    driver: bridge

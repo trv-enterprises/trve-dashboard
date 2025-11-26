@@ -1,12 +1,16 @@
 {
-  "name": "dashboard-server",
+  "name": "dashboard-mcp-server",
   "version": "1.0.0",
-  "description": "Node.js server for dynamic React dashboard",
+  "description": "MCP (Model Context Protocol) server for AI-powered dashboard component generation",
   "main": "server.js",
   "type": "module",
+  "bin": {
+    "dashboard-mcp": "./mcp/mcp-cli.js"
+  },
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "mcp": "node mcp/mcp-cli.js"
   },
   "dependencies": {
     "axios": "^1.13.2",

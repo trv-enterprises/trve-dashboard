@@ -1,0 +1,188 @@
+@use '@carbon/react/scss/spacing' as spacing;
+
+.dashboard-viewer-page {
+  background-color: #161616;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  &.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+
+    .viewer-toolbar {
+      padding: spacing.$spacing-03 spacing.$spacing-05;
+    }
+  }
+
+  .viewer-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: spacing.$spacing-03 spacing.$spacing-04;
+    background-color: #262626;
+    border-bottom: 1px solid #393939;
+    flex-shrink: 0;
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-03;
+
+      .dashboard-info {
+        h1 {
+          color: #f4f4f4;
+          font-size: 1.125rem;
+          font-weight: 600;
+          margin: 0;
+        }
+
+        p {
+          color: #c6c6c6;
+          font-size: 0.75rem;
+          margin: 0;
+        }
+      }
+    }
+
+    .toolbar-center {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-03;
+
+      .cds--tag {
+        display: flex;
+        align-items: center;
+        gap: spacing.$spacing-02;
+      }
+    }
+
+    .toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-03;
+
+      .last-refresh {
+        color: #6f6f6f;
+        font-size: 0.75rem;
+        font-family: 'IBM Plex Mono', monospace;
+      }
+
+      .cds--btn--icon-only {
+        color: #c6c6c6;
+
+        &:hover {
+          background-color: #393939;
+        }
+
+        svg {
+          fill: #c6c6c6;
+        }
+
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+      }
+    }
+  }
+
+  .dashboard-grid-container {
+    flex: 1;
+    padding: spacing.$spacing-04;
+    overflow: auto;
+    background-color: var(--cds-background);
+
+    .dashboard-grid {
+      display: grid;
+      gap: spacing.$spacing-03;
+      min-width: 800px;
+      position: relative;
+
+      .panel-container {
+        background-color: var(--cds-layer-01);
+        border-radius: 4px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+
+        &.has-component {
+          // Panels with components get subtle styling
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .component-wrapper {
+          flex: 1;
+          padding: spacing.$spacing-04;
+          overflow: auto;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+
+          // Ensure charts resize properly
+          > div {
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            height: 100%;
+          }
+
+          // ECharts specific sizing
+          .echarts-for-react {
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 200px;
+          }
+        }
+
+        // Hide empty panels in view mode (no component assigned)
+        .empty-panel {
+          display: none;
+        }
+      }
+    }
+  }
+
+  .error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: spacing.$spacing-09;
+    gap: spacing.$spacing-05;
+
+    .error-message {
+      padding: spacing.$spacing-05;
+      background-color: var(--cds-notification-error-background);
+      color: var(--cds-notification-error-text);
+      border-left: 3px solid var(--cds-danger-01);
+      border-radius: 4px;
+    }
+  }
+
+  .no-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: spacing.$spacing-09;
+    gap: spacing.$spacing-05;
+
+    p {
+      color: var(--cds-text-secondary);
+      font-size: 1rem;
+    }
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node increment-build.js && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -22,6 +22,7 @@
     "echarts-for-react": "^3.0.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-grid-layout": "^1.5.2",
     "react-router-dom": "^7.9.6"
   },
   "devDependencies": {

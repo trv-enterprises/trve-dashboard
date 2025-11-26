@@ -1,747 +1,337 @@
 # CLAUDE.md - AI Assistant Guide
 
-This file provides context and guidance for AI assistants (like Claude) working on this project.
+This file provides context and guidance for AI assistants working on this project.
 
-## TODO - Next Feature: AI-Generated Component Tiles
+## Development Rules
 
-**Priority**: High
-**Status**: Planning
+### 1. Build Number Increment
+- **CRITICAL**: After every code change that affects functionality, increment the build number in `/client/build.json`
+- Report the new build number to the user after incrementing
+- Build number helps track changes and ensures proper cache busting
+- Format: `{ "buildNumber": N }` where N is an integer
 
-### Feature Overview
-Enable users to create dashboard components through natural language chat interface with AI-generated code.
+### 2. Code Commit Standards
+- Don't mention "Claude" or "AI" in commit messages
+- Never include AI mentions in commits
 
-### Implementation Tasks
-
-1. **Blank Tile Selection**
-   - [ ] Add "Add Component" blank tile to dashboard
-   - [ ] Tile should be clickable and visually distinct (dashed border, plus icon)
-   - [ ] Position in component grid alongside existing components
-
-2. **Chat Dialog Interface**
-   - [ ] Create modal/dialog component for chat interaction
-   - [ ] Include text input for user requests
-   - [ ] Display conversation history (user messages + AI responses)
-   - [ ] Show "thinking" state while AI generates component
-   - [ ] Option to request "new component" or "variation of existing component"
-
-3. **AI Component Generation**
-   - [ ] Integrate with MCP server for component specification
-   - [ ] Send user request + context to AI (Claude via API)
-   - [ ] AI generates component code following spec
-   - [ ] Validate generated code before saving
-   - [ ] Create component with unique ID and metadata
-
-4. **Server Notification System**
-   - [ ] Implement WebSocket or Server-Sent Events (SSE) for real-time updates
-   - [ ] Server notifies client when component generation is complete
-   - [ ] Handle generation errors gracefully
-   - [ ] Show progress indicators during generation
-
-5. **Component Display**
-   - [ ] Auto-render new component in the tile position
-   - [ ] Show success notification
-   - [ ] Allow user to edit component after generation
-   - [ ] Option to regenerate if result is unsatisfactory
-
-### Technical Considerations
-
-- **Component ID Generation**: Use UUID for unique IDs (already implemented)
-- **Metadata**: Include `aiGenerated: true`, `prompt: "user request"`, `generatedAt: timestamp`
-- **Validation**: Ensure generated code includes required exports, handles errors
-- **Rate Limiting**: Prevent abuse of AI generation API
-- **Fallback**: Handle API failures gracefully with error messages
-
-### Related Files
-- `client/src/components/ComponentViewer.jsx` - May need blank tile support
-- `client/src/components/ComponentEditor.jsx` - For post-generation editing
-- `server/mcp/componentSpec.js` - Component specification for AI
-- `server/services/` - May need new service for AI integration
+### 3. Terminology
+- Don't mention "datasource" (single word) in code or documentation
+- Use "data source" (two words) or "source system" instead
 
 ---
 
 ## Project Overview
 
-**GiVi-Solution Dashboard** - A full-stack application for monitoring distributed database clusters with dynamic component creation. The dashboard provides:
+**GiVi-Solution Dashboard** - A full-stack application for creating, managing, and viewing dynamic data visualization dashboards. The application features:
 
-1. **Real-time Monitoring** - Multi-page dashboard for cluster health, node status, and query analytics
-2. **Dynamic Chart Builder** - Create and manage custom React components and visualizations through a web UI
-3. **Interactive Components** - Support for user controls (checkboxes, dropdowns, sliders) and timeline zoom
-4. **File-Based Storage** - All components stored as JSON files in a hierarchical file system
+1. **Three Operating Modes**: Design, View, and Manage
+2. **Dynamic Chart Builder**: Create React components with ECharts visualizations
+3. **Multi-Source Data**: Connect to SQL, API, CSV, and WebSocket data sources
+4. **Real-time Updates**: Auto-refresh dashboards with configurable intervals
 
 ## Architecture Summary
 
 ```
-Client (React + Vite + React Router)  →  Server (Node.js + Express)  →  File Storage (JSON)
-     ↓                                       ↓                              ↓
-Carbon UI Shell (4 pages)              REST API                    data/{system}/{source}/
-├─ Dashboard (metrics + charts)        File Manager                {component}.json
-├─ Nodes (cluster status)              CRUD Operations             index.json
-├─ Queries (query history)
-└─ Chart Design (component builder)
-
-ECharts Visualizations (Carbon themed)
-Dynamic Component Loader
-```
-
-### Key Components
-
-1. **Server** (`server/`)
-   - Express REST API
-   - File-based storage manager (`server/storage/fileManager.js`)
-   - No database - all data in JSON files
-   - Endpoints: `/api/components`, `/api/datasources`
-
-2. **Client** (`client/`)
-   - React 18 with Vite 5
-   - React Router for multi-page navigation
-   - Carbon Design System UI Shell with side navigation
-   - Four main pages: Dashboard, Nodes, Queries, Chart Design
-   - ECharts for data visualizations with Carbon theme
-   - Dynamic component loader (evaluates code at runtime)
-
-3. **Data Storage** (`data/`)
-   - Structure: `data/{system}/{source}/{component}.json`
-   - Master index: `data/index.json`
-   - Git-tracked, human-readable
-
-## Critical Design Decisions
-
-### 1. File-Based Storage (Not Database)
-- **Why**: Simplicity, no infrastructure, git-friendly, human-readable
-- **When to question**: If scaling beyond 1000s of components
-- Components stored as individual JSON files
-- Master index for fast lookups
-
-### 2. Dynamic Component Loading
-- **Location**: `client/src/components/DynamicComponentLoader.jsx`
-- **How**: Uses `new Function()` to evaluate component code at runtime
-- **Available in component scope**:
-  - React hooks: `useState`, `useEffect`, `useMemo`, `useCallback`, `useRef`, `useContext`
-  - echarts: ECharts core library for chart configurations
-  - ReactECharts: ECharts React wrapper component
-  - carbonTheme: Carbon Design System light theme for ECharts
-  - carbonDarkTheme: Carbon Design System dark theme for ECharts
-- **Security**: Components run in browser context with same origin policy
-
-### 3. System/Source Hierarchy
-- **System**: High-level category (e.g., "analytics", "datasource")
-- **Source**: Data source or subcategory (e.g., "cpu-metrics", "sales")
-- **Component**: Individual widget name (e.g., "usage-chart")
-- Path: `data/{system}/{source}/{component}.json`
-- Once created, system/source/name cannot be changed
-
-### 4. UI Framework: Carbon Design System (g100 Dark Theme)
-- IBM's open-source design system
-- **Enforced Dark Mode**: g100 theme (`data-carbon-theme="g100"` on html element)
-- Professional component library with accessibility built-in
-- Consistent design language across all components
-- SCSS-based theming with CSS custom properties
-- Use Carbon components (Button, Tile, Tag, TextInput, etc.) - don't create custom components
-- Import styles: `@use '@carbon/react'` in SCSS files
-- **Branding**: "GiVi-Solution" prefix with "My Dashboard" name
-- **Header**: IBM Cloud-style with utility icons (Help, App Switcher, Notifications, User)
-- **Colors**: All text forced to light colors (#f4f4f4) for visibility on dark backgrounds
-
-### 5. Visualization: ECharts with Carbon Dark Theme
-- Enterprise-grade charting library
-- Available in dynamic components via `echarts` and `ReactECharts`
-- **Always use**: `theme="carbon-dark"` prop for all charts
-- Custom Carbon Design System themes (`carbonTheme`, `carbonDarkTheme`)
-- Theme location: `client/src/theme/carbonEchartsTheme.js`
-- Supports all ECharts chart types: line, bar, pie, scatter, gauge, sankey, etc.
-- **Interactive features**:
-  - Timeline zoom with `dataZoom` slider and mouse wheel
-  - Dynamic filtering with checkboxes/dropdowns
-  - Multi-series comparisons
-  - Real-time updates with auto-refresh
-- Use ReactECharts wrapper for easier integration
-- No manual cleanup needed with ReactECharts wrapper
-
-### 6. Multi-Page Architecture (React Router)
-- **Dashboard Page** (`/dashboard`) - Default landing page
-  - 4 metric cards: Active Nodes, Queries/Sec, Storage, Uptime
-  - ECharts line chart: Query latency over last hour
-  - Carbon DataTable: Recent queries with status tags
-  - Auto-refreshes every 5 seconds
-- **Nodes Page** (`/nodes`)
-  - Grid view of all cluster nodes
-  - Node status (active/inactive) with visual indicators
-  - CPU and memory usage bars
-  - Total query count per node
-- **Queries Page** (`/queries`)
-  - Paginated query history table
-  - Search by query text
-  - Filter by status (completed/running/failed)
-  - Sortable columns
-- **Chart Design Page** (`/chart-design`)
-  - Original dynamic component builder
-  - Component selector sidebar
-  - Component viewer/editor
-  - Create/edit/delete components
-- **Navigation**: Carbon UI Shell with persistent side nav
-- **Header**: Global "+" button to create new components (navigates to Chart Design)
-
-## Component Structure
-
-```json
-{
-  "id": "unique-uuid",
-  "name": "component-name",
-  "system": "system-name",
-  "source": "source-name",
-  "description": "Brief description",
-  "component_code": "const Component = () => { ... };",
-  "metadata": {
-    "dataSource": { ... },
-    "tags": [],
-    "custom": "fields"
-  },
-  "created": "ISO-8601",
-  "updated": "ISO-8601"
-}
-```
-
-## Common Tasks
-
-### Adding a New Component Example
-
-1. Create JSON file in `data/{system}/{source}/{name}.json`
-2. Update `data/index.json` to include:
-   - Add to `systems.{system}.{source}` array
-   - Add entry to `components` array with id, name, system, source, path, updated
-3. Component code must export `Component` or `Widget`
-
-### Adding a New API Endpoint
-
-1. Add route to `server/api/components.js` or `server/api/datasources.js`
-2. Use fileManager for all file operations
-3. Follow REST conventions
-4. Return `{ success: true, data: ... }` format
-
-### Adding New Libraries to Dynamic Components
-
-1. Import library in `client/src/components/DynamicComponentLoader.jsx`
-2. Add to `new Function()` parameters
-3. Pass to function execution
-4. Document in README.md and CLAUDE.md
-
-### Updating UI Components
-
-- Use Carbon Design System components (Button, Tile, Form, Select, TextInput, etc.)
-- Check existing components for patterns
-- Use icons from `@carbon/icons-react`
-- Create accompanying SCSS files using `@use '@carbon/react'`
-- Use Carbon design tokens for colors, spacing, and typography
-- Maintain consistent styling across all components
-
-## File Locations Reference
-
-### Server
-- Main: `server/server.js`
-- File Manager: `server/storage/fileManager.js`
-- Components API: `server/api/components.js`
-- Data Sources API: `server/api/datasources.js`
-
-### Client
-- Main App: `client/src/App.jsx` (UI Shell + Routing)
-- **Pages**:
-  - Dashboard: `client/src/pages/DashboardPage.jsx` (metrics, latency chart, query table)
-  - Nodes: `client/src/pages/NodesPage.jsx` (cluster node status)
-  - Queries: `client/src/pages/QueriesPage.jsx` (query history with filters)
-  - Chart Design: `client/src/pages/ChartDesignPage.jsx` (component builder)
-- **Components**:
-  - Dynamic Loader: `client/src/components/DynamicComponentLoader.jsx`
-  - Component Selector: `client/src/components/ComponentSelector.jsx`
-  - Component Viewer: `client/src/components/ComponentViewer.jsx`
-  - Component Editor: `client/src/components/ComponentEditor.jsx`
-- **Utilities**:
-  - Mock Data: `client/src/utils/mockData.js` (generates sample metrics/queries)
-  - ECharts Theme: `client/src/theme/carbonEchartsTheme.js`
-  - API Client: `client/src/api/client.js`
-  - Hooks: `client/src/hooks/useComponents.js`, `useDataSources.js`
-- **Styles**: Page and component-level SCSS files (e.g., `DashboardPage.scss`)
-
-### Data
-- Master Index: `data/index.json`
-- Components: `data/{system}/{source}/{name}.json`
-- Sample Counter: `data/example/demo/counter.json`
-- Sample Charts: `data/visualization/charts/`
-
-## Development Workflow
-
-### Starting Development
-
-```bash
-# Terminal 1 - Server
-cd server && npm run dev
-
-# Terminal 2 - Client
-cd client && npm run dev
-```
-
-### Adding Dependencies
-
-```bash
-# Server dependencies
-cd server && npm install <package>
-
-# Client dependencies
-cd client && npm install <package>
-```
-
-### Testing Changes
-
-1. Create/modify component via UI
-2. Check browser console for errors
-3. Verify file system changes in `data/`
-4. Test component loading and rendering
-
-## Important Gotchas
-
-### 1. Dynamic Component Code Requirements
-- Must export `Component` or `Widget` (case-sensitive)
-- React hooks available without import
-- ECharts available via `echarts` and `ReactECharts`
-- ReactECharts wrapper handles cleanup automatically (no manual destroy needed)
-- Carbon themes available as `carbonTheme` and `carbonDarkTheme`
-
-### 2. File Manager Operations
-- Always use `fileManager` for file operations
-- Don't manipulate files directly
-- Updates both file AND index.json
-- Async operations - use await
-
-### 3. Component Editing Restrictions
-- System, source, and name are immutable after creation
-- ID is UUID, generated on creation
-- Can edit: description, component_code, metadata
-
-### 4. Index.json Consistency
-- Must stay in sync with actual files
-- Updated automatically by fileManager
-- Contains flat component list + hierarchical systems tree
-
-### 5. ECharts in Dynamic Components
-- Use ReactECharts wrapper component for easy integration
-- No manual cleanup required (handled by wrapper)
-- Specify theme using `theme="carbon-light"` prop
-- Configure charts using ECharts option object
-- All ECharts chart types supported (line, bar, pie, scatter, gauge, sankey, etc.)
-
-### 6. Carbon Design System Colors
-- **Primary Blue**: `#0f62fe` (blue60) - Primary actions, links
-- **Red**: `#da1e28` (red60) - Errors, destructive actions
-- **Green**: `#24a148` (green50) - Success states
-- **Purple**: `#8a3ffc` (purple60) - Secondary accent
-- **Cyan**: `#1192e8` (cyan50) - Info states
-- **Yellow**: `#f1c21b` (yellow30) - Warnings
-- **Gray Scale**: `#161616` (gray100) to `#f4f4f4` (gray10)
-- Use CSS custom properties: `var(--cds-text-primary)`, `var(--cds-background)`, etc.
-- Reference: `client/node_modules/@carbon/colors/lib/index.js`
-
-## Code Patterns
-
-### Dynamic Component with ECharts
-
-```javascript
-const Component = () => {
-  const data = [
-    { category: 'A', value: 120 },
-    { category: 'B', value: 200 },
-    { category: 'C', value: 150 },
-  ];
-
-  const option = {
-    title: {
-      text: 'Sample Chart',
-    },
-    tooltip: {
-      trigger: 'axis',
-    },
-    xAxis: {
-      type: 'category',
-      data: data.map(item => item.category),
-    },
-    yAxis: {
-      type: 'value',
-    },
-    series: [
-      {
-        data: data.map(item => item.value),
-        type: 'bar',
-      },
-    ],
-  };
-
-  return (
-    <ReactECharts
-      option={option}
-      style={{ height: '400px' }}
-      theme="carbon-dark"
-    />
-  );
-};
-```
-
-### Dynamic Component with Line Chart
-
-```javascript
-const Component = () => {
-  const [data, setData] = useState([
-    { date: '2024-01', value: 120 },
-    { date: '2024-02', value: 150 },
-    { date: '2024-03', value: 170 },
-  ]);
-
-  const option = {
-    xAxis: {
-      type: 'category',
-      data: data.map(d => d.date),
-    },
-    yAxis: {
-      type: 'value',
-    },
-    series: [
-      {
-        data: data.map(d => d.value),
-        type: 'line',
-        smooth: true,
-      },
-    ],
-  };
-
-  return <ReactECharts option={option} theme="carbon-dark" />;
-};
-```
-
-### Dynamic Component with Gauge
-
-```javascript
-const Component = () => {
-  const option = {
-    series: [
-      {
-        type: 'gauge',
-        detail: {
-          formatter: '{value}%',
-        },
-        data: [{ value: 75, name: 'Utilization' }],
-      },
-    ],
-  };
-
-  return <ReactECharts option={option} style={{ height: '300px' }} theme="carbon-dark" />;
-};
-```
-
-### API Call Pattern
-
-```javascript
-// In hooks
-const { components, loading, error } = useComponents({ system, source });
-
-// Direct API call
-const response = await apiClient.getComponents({ system: 'analytics' });
-```
-
-### File Manager Pattern
-
-```javascript
-// Save component
-await fileManager.saveComponent(component);
-
-// Get component
-const component = await fileManager.getComponent(system, source, name);
-
-// Delete component
-await fileManager.deleteComponent(system, source, name);
-
-// Index is automatically updated
-```
-
-## Interactive Component Patterns
-
-Dynamic components support full React interactivity with useState, useEffect, and user controls. See complete examples in `server/mcp/componentSpec.js` under `interactivePatterns`.
-
-### Pattern 1: Dynamic Filtering
-
-Filter chart data based on user selections. Automatically extract unique values from data and create checkboxes/dropdowns.
-
-```javascript
-const Component = () => {
-  const [data, setData] = useState([]);
-  const [facilities, setFacilities] = useState([]);
-  const [selectedFacilities, setSelectedFacilities] = useState([]);
-
-  useEffect(() => {
-    // Fetch data and extract unique facilities
-    const uniqueFacilities = [...new Set(data.map(d => d.facility))];
-    setFacilities(uniqueFacilities);
-    setSelectedFacilities(uniqueFacilities); // All selected by default
-  }, [data]);
-
-  // Filter series based on selections
-  const series = selectedFacilities.map(facility => ({
-    name: facility,
-    type: 'line',
-    data: data.filter(d => d.facility === facility).map(d => d.value)
-  }));
-
-  return (
-    <div>
-      {/* Dynamic checkboxes */}
-      {facilities.map(f => (
-        <label key={f}>
-          <input type="checkbox"
-            checked={selectedFacilities.includes(f)}
-            onChange={() => /* toggle */} />
-          {f}
-        </label>
-      ))}
-      <ReactECharts option={{series}} theme="carbon-dark" />
-    </div>
-  );
-};
-```
-
-### Pattern 2: Timeline Zoom Slider
-
-Add ECharts dataZoom for exploring large time-series datasets with slider and mouse wheel.
-
-```javascript
-const Component = () => {
-  const option = {
-    dataZoom: [
-      {
-        type: 'slider',
-        show: true,
-        start: 70,  // Show last 30% by default
-        end: 100,
-        backgroundColor: '#393939',
-        fillerColor: 'rgba(15, 98, 254, 0.2)',
-        borderColor: '#525252',
-        handleStyle: { color: '#0f62fe' },
-        textStyle: { color: '#c6c6c6' }
-      },
-      {
-        type: 'inside',  // Mouse wheel zoom
-        start: 70,
-        end: 100
-      }
-    ],
-    // ... rest of chart config
-  };
-
-  return <ReactECharts option={option} theme="carbon-dark" />;
-};
-```
-
-### Pattern 3: Real-time Updates
-
-Auto-refresh data at configurable intervals for live monitoring.
-
-```javascript
-const Component = () => {
-  const [refreshInterval, setRefreshInterval] = useState(5000);
-  const [data, setData] = useState([]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      // Fetch from API
-      setData(result);
-    };
-
-    fetchData(); // Initial fetch
-    const interval = setInterval(fetchData, refreshInterval);
-    return () => clearInterval(interval);
-  }, [refreshInterval]);
-
-  return (
-    <div>
-      <select value={refreshInterval} onChange={e => setRefreshInterval(Number(e.target.value))}>
-        <option value={1000}>1s</option>
-        <option value={5000}>5s</option>
-        <option value={30000}>30s</option>
-      </select>
-      <ReactECharts option={chartOption} theme="carbon-dark" />
-    </div>
-  );
-};
-```
-
-### Pattern 4: Multi-series Comparison
-
-Compare multiple metrics/facilities in a single chart with dynamic series generation.
-
-```javascript
-const Component = () => {
-  // Extract unique dimensions from data
-  const servers = [...new Set(data.map(d => d.server))];
-  const times = [...new Set(data.map(d => d.time))];
-
-  // Build series for each server
-  const series = servers.flatMap(server => [
-    {
-      name: `${server} - CPU`,
-      type: 'line',
-      data: times.map(time => {
-        const point = data.find(d => d.server === server && d.time === time);
-        return point ? point.cpu : null;
-      }),
-      itemStyle: { color: '#0f62fe' }
-    },
-    {
-      name: `${server} - Memory`,
-      type: 'line',
-      data: times.map(time => {
-        const point = data.find(d => d.server === server && d.time === time);
-        return point ? point.memory : null;
-      }),
-      itemStyle: { color: '#24a148' }
-    }
-  ]);
-
-  return <ReactECharts option={{series, legend: {type: 'scroll'}}} theme="carbon-dark" />;
-};
-```
-
-**Full Examples**: See `server/mcp/componentSpec.js` → `interactivePatterns` for complete working code.
-
-## Testing
-
-### Manual Testing Checklist
-
-- [ ] Create new component via UI
-- [ ] Edit existing component
-- [ ] Delete component
-- [ ] View component with code toggle
-- [ ] Filter by system/source
-- [ ] Create component with chart
-- [ ] Verify file system changes
-- [ ] Check index.json updated correctly
-
-### Common Test Scenarios
-
-1. **Counter Component** - Tests basic state management and Carbon styling
-2. **Chart Component** - Tests ECharts integration with Carbon theme
-3. **Multi-System** - Tests filtering and organization
-4. **Gauge Component** - Tests gauge charts for resource utilization
-5. **Line Chart Component** - Tests time-series data visualization
-
-## Future Enhancement Ideas
-
-- [ ] Component versioning
-- [ ] Real-time data source connections
-- [ ] Component templates library
-- [ ] Search functionality
-- [ ] Component sharing/export
-- [ ] Drag-and-drop dashboard builder
-- [ ] Component dependency management
-- [ ] Multi-dashboard support
-- [ ] User authentication
-- [ ] Component marketplace
-
-## When to Ask User
-
-- Adding database (challenges file-based architecture)
-- Changing component storage format
-- Adding authentication/authorization
-- Modifying dynamic component security model
-- Adding external data source connections
-- Changing URL structure or API contracts
-
-## Helpful Commands
-
-```bash
-# Install all dependencies
-npm run install:all
-
-# Start server (production)
-npm run server
-
-# Start server (development with nodemon)
-npm run server:dev
-
-# Start client
-npm run client
-
-# Test API health
-curl http://localhost:3001/health
-
-# List all components
-curl http://localhost:3001/api/components
-
-# Get systems
-curl http://localhost:3001/api/datasources
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (Port 5173)                                 │
+│                    React 18 + Vite + Carbon Design System                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Design Mode          │  View Mode            │  Manage Mode                │
+│  - Layouts            │  - Dashboard Viewer   │  - Settings (Future)        │
+│  - Data Sources       │  - Real-time Data     │  - User Config (Future)     │
+│  - Charts/Components  │  - Auto-refresh       │                             │
+│  - Dashboards         │  - Fullscreen         │                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │ REST API
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      GO BACKEND (Port 3001)                                  │
+│                    Gin + MongoDB + Redis + Swagger                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  /api/layouts    │  /api/datasources  │  /api/components  │  /api/dashboards│
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┼───────────────┐
+                    ▼               ▼               ▼
+              ┌──────────┐   ┌──────────┐   ┌───────────────┐
+              │ MongoDB  │   │  Redis   │   │ Data Sources  │
+              │   7.x    │   │   7.x    │   │ SQL/API/CSV/WS│
+              └──────────┘   └──────────┘   └───────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      MCP SERVER (Port 3002)                                  │
+│                    Node.js + Express (AI Integration)                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  /mcp/sse        │  /mcp/message       │  AI Component Generation           │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Technology Stack
 
-- **Backend**: Node.js 18+, Express 4, UUID
-- **Frontend**: React 18, Vite 5, React Router 6, Carbon Design System (@carbon/react), ECharts, echarts-for-react
-- **Design System**: Carbon Design System (IBM) - g100 theme (dark)
-- **Visualization**: ECharts 6.0 with custom Carbon theme
-- **Routing**: React Router DOM 6 (BrowserRouter)
-- **Styling**: SCSS with Carbon tokens and mixins
-- **Storage**: File system (JSON)
-- **Dev Tools**: Nodemon, ESLint
+### Frontend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| React | 18.x | UI Framework |
+| Vite | 5.x | Build Tool & Dev Server |
+| React Router | 6.x | Client-side Routing |
+| Carbon Design System | 11.x | UI Components (g100 dark theme) |
+| ECharts | 5.x | Data Visualization |
+| SCSS | - | Styling with Carbon tokens |
 
-## Key Files to Understand First
+### Backend (Go)
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Go | 1.23.x | Primary Language |
+| Gin | 1.x | HTTP Framework |
+| MongoDB | 7.x | Primary Database |
+| Redis | 7.x | Caching |
+| Swaggo | 1.8.x | API Documentation |
 
-1. `client/src/App.jsx` - UI Shell, routing, and navigation structure
-2. `client/src/pages/DashboardPage.jsx` - Main monitoring dashboard
-3. `client/src/utils/mockData.js` - Mock data generators for development
-4. `server/storage/fileManager.js` - All file operations
-5. `client/src/components/DynamicComponentLoader.jsx` - Component evaluation with ECharts
-6. `client/src/theme/carbonEchartsTheme.js` - Carbon theme for ECharts
-7. `data/index.json` - Component registry
-8. `server/api/components.js` - CRUD endpoints
+### MCP Server (Node.js)
+| Technology | Purpose |
+|------------|---------|
+| Express | HTTP Server for MCP |
+| SSE | Real-time communication |
 
-## Notes for Future Development
+## Application Modes
 
-- File storage is intentional - don't immediately suggest database
-- Component code security relies on browser sandbox
-- Keep dynamic component API minimal and stable
-- Carbon Design System updates may require theme adjustments
-- ECharts version updates should be tested with Carbon theme
-- Carbon theme uses design tokens for maintainability
-- Consider adding dark mode toggle in future (theme already supports it)
-- Sankey and network graphs available for data flow visualization
+### Design Mode (`/design/*`)
+Create and configure dashboard components:
+- **Layouts** (`/design/layouts`) - Define 12-column grid layouts with panels
+- **Data Sources** (`/design/datasources`) - Configure SQL, API, CSV, WebSocket connections
+- **Charts** (`/design/charts`) - Build React components with ECharts
+- **Dashboards** (`/design/dashboards`) - Combine layouts with components
 
----
+### View Mode (`/view/*`)
+End-user dashboard viewing:
+- **Dashboard Viewer** (`/view/dashboards/:id`) - View dashboards with real-time data
+- Sidebar shows selectable dashboard tiles
+- Auto-refresh based on dashboard settings
+- Fullscreen viewing capability
 
-## Current Status (2025-11-13)
+### Manage Mode (`/manage`) - Future
+System administration and user configuration.
+
+## File Structure
+
+```
+dashboard/
+├── client/                    # React Frontend
+│   ├── src/
+│   │   ├── api/              # API client
+│   │   ├── components/
+│   │   │   ├── mode/         # ModeToggle, ModeSelector
+│   │   │   ├── navigation/   # DesignModeNav, ViewModeNav, ManageModeNav
+│   │   │   └── ...           # DynamicComponentLoader, etc.
+│   │   ├── config/           # layoutConfig.js (MODES enum)
+│   │   ├── pages/            # All page components
+│   │   ├── theme/            # carbonEchartsTheme.js
+│   │   ├── App.jsx           # Main app with routing
+│   │   └── App.scss          # Global styles
+│   ├── build.json            # Build number tracker
+│   └── package.json
+│
+├── server-go/                 # Go Backend (Main API)
+│   ├── cmd/server/main.go    # Entry point
+│   ├── config/               # Configuration (Viper)
+│   ├── internal/
+│   │   ├── database/         # MongoDB, Redis connections
+│   │   ├── datasource/       # SQL, API, CSV, Socket adapters
+│   │   ├── handlers/         # HTTP handlers
+│   │   ├── models/           # Data models
+│   │   ├── repository/       # Database operations
+│   │   └── service/          # Business logic
+│   └── docs/                  # Swagger documentation
+│
+├── server/                    # MCP Server (AI Integration)
+│   ├── mcp/
+│   │   ├── componentSpec.js  # Component specification for AI
+│   │   ├── mcpServer.js      # MCP tools and handlers
+│   │   └── mcpSSE.js         # SSE transport
+│   └── server.js             # MCP server entry point
+│
+└── docs/                      # Documentation
+    ├── ARCHITECTURE.md
+    ├── TECH_STACK_SUMMARY.md
+    └── REFACTOR_PLAN.md
+```
+
+## API Endpoints
+
+### Go Backend (Port 3001)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| **Layouts** |||
+| GET | `/api/layouts` | List layouts (paginated) |
+| POST | `/api/layouts` | Create layout |
+| GET | `/api/layouts/:id` | Get layout |
+| PUT | `/api/layouts/:id` | Update layout |
+| DELETE | `/api/layouts/:id` | Delete layout |
+| **Data Sources** |||
+| GET | `/api/datasources` | List data sources |
+| POST | `/api/datasources` | Create data source |
+| GET | `/api/datasources/:id` | Get data source |
+| PUT | `/api/datasources/:id` | Update data source |
+| DELETE | `/api/datasources/:id` | Delete data source |
+| POST | `/api/datasources/test` | Test connection |
+| POST | `/api/datasources/:id/query` | Execute query |
+| **Components** |||
+| GET | `/api/components` | List components |
+| GET | `/api/components/systems` | Get system hierarchy |
+| POST | `/api/components` | Create component |
+| GET | `/api/components/:id` | Get component |
+| PUT | `/api/components/:id` | Update component |
+| DELETE | `/api/components/:id` | Delete component |
+| **Dashboards** |||
+| GET | `/api/dashboards` | List dashboards |
+| POST | `/api/dashboards` | Create dashboard |
+| GET | `/api/dashboards/:id` | Get dashboard |
+| GET | `/api/dashboards/:id/details` | Get with expanded data |
+| PUT | `/api/dashboards/:id` | Update dashboard |
+| DELETE | `/api/dashboards/:id` | Delete dashboard |
+
+### MCP Server (Port 3002)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/mcp/sse` | SSE connection for MCP |
+| POST | `/mcp/message` | Send MCP message |
+| GET | `/health` | Health check |
+
+## Development Setup
+
+### Prerequisites
+- Go 1.23+ (via Homebrew on macOS)
+- Node.js 18+
+- Docker & Docker Compose
+- MongoDB 7.x
+- Redis 7.x
+
+### Quick Start
+
+```bash
+# Start infrastructure
+docker compose up -d mongodb redis
+
+# Start Go backend (Terminal 1)
+cd server-go
+export PATH="/opt/homebrew/opt/go@1.23/bin:$PATH"
+go build -o bin/server cmd/server/main.go && ./bin/server
+
+# Start React frontend (Terminal 2)
+cd client
+npm install
+npm run dev
+
+# Optional: Start MCP server (Terminal 3)
+cd server
+npm install
+npm run dev
+```
+
+### URLs
+- Frontend: http://localhost:5173
+- Go API: http://localhost:3001
+- Swagger UI: http://localhost:3001/swagger/index.html
+- MCP Server: http://localhost:3002
+
+## UI Framework: Carbon Design System
+
+**Enforced Dark Mode**: g100 theme
+
+**CRITICAL**: Always use Carbon React components - never create custom UI components.
+
+### Common Components
+- Forms: `TextInput`, `Select`, `NumberInput`, `Checkbox`, `Toggle`
+- Buttons: `Button`, `IconButton`
+- Data: `DataTable`, `Tag`, `Tile`
+- Feedback: `Modal`, `Loading`, `InlineNotification`
+- Navigation: `Header`, `SideNav`, `SideNavLink`
+
+### Color Tokens
+- Primary Blue: `#0f62fe` (blue60)
+- Green: `#24a148` (green50)
+- Red: `#da1e28` (red60)
+- Gray: `#161616` to `#f4f4f4`
+
+Use CSS variables: `var(--cds-text-primary)`, `var(--cds-background)`, etc.
+
+## Dynamic Component Loading
+
+Components are stored as JavaScript code strings and evaluated at runtime.
+
+**Available in component scope:**
+- React hooks: `useState`, `useEffect`, `useMemo`, `useCallback`, `useRef`
+- ECharts: `echarts`, `ReactECharts`
+- Themes: `carbonTheme`, `carbonDarkTheme`
+
+**Example Component:**
+```javascript
+const Component = () => {
+  const option = {
+    xAxis: { type: 'category', data: ['A', 'B', 'C'] },
+    yAxis: { type: 'value' },
+    series: [{ data: [120, 200, 150], type: 'bar' }]
+  };
+  return <ReactECharts option={option} theme="carbon-dark" />;
+};
+```
+
+## Grid System
+
+12-column grid with 32px row height (based on Carbon $spacing-08):
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  1   2   3   4   5   6   7   8   9  10  11  12                │
+├────────────────────────────────────────────────────────────────┤
+│ Panel A (x:0, y:0, w:6, h:8)  │  Panel B (x:6, y:0, w:6, h:4) │
+│                               ├────────────────────────────────┤
+│                               │  Panel C (x:6, y:4, w:6, h:4) │
+└───────────────────────────────┴────────────────────────────────┘
+```
+
+## Current Status (2025-11-25)
 
 ### ✅ Completed
-- Multi-page dashboard with Carbon UI Shell and side navigation
-- Dashboard page with 4 metric cards, ECharts line chart, and query table
-- Nodes page with cluster status and resource utilization
-- Queries page with search, filtering, and pagination
-- Chart Design page integrating original component builder
-- Mock data utilities for development and testing
-- React Router integration with 4 routes
+- Go backend with MongoDB (layouts, data sources, components, dashboards)
+- React frontend with three modes (Design, View, Manage placeholder)
+- Design Mode: All CRUD pages for layouts, data sources, charts, dashboards
+- View Mode: Dashboard viewer with real-time refresh, sidebar tiles
+- MCP Server for AI component generation
 - Carbon Design System theming throughout
-- ECharts with Carbon blue color palette
+- Auto-redirect to first dashboard on app load
 
 ### 🚧 In Progress
-- None
+- Config API for user/system settings
 
-### 📋 Next Steps
-1. Install `react-router-dom` dependency (requires network access)
-2. Connect Dashboard to real data source API endpoints (replace mock data)
-3. Implement real-time data updates via WebSocket or polling
-4. Add node detail view (drill-down from Nodes page)
-5. Add query detail view (drill-down from Queries page)
-6. Implement query execution interface
-7. Add error handling and loading states
-8. Add user preferences/settings page
+### 📋 Planned
+- Manage Mode implementation
+- AI chat integration for component generation
+- User authentication
+- EdgeLake integration
 
 ---
 
-**Last Updated**: 2025-11-14
+## Key Files to Understand
 
-For more details, see:
-- [README.md](README.md) - User documentation
-- [QUICKSTART.md](QUICKSTART.md) - Quick start guide
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and design
-- don't mention datasource in the code or documentation . we will use data source or source system
+1. `client/src/App.jsx` - Main app with routing and mode switching
+2. `client/src/pages/DashboardViewerPage.jsx` - Dashboard rendering in View Mode
+3. `client/src/components/DynamicComponentLoader.jsx` - Runtime component evaluation
+4. `server-go/cmd/server/main.go` - Go backend entry point
+5. `server-go/internal/handlers/` - API request handlers
+6. `server/mcp/componentSpec.js` - AI component specification
+
+## Documentation
+
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
+- [TECH_STACK_SUMMARY.md](docs/TECH_STACK_SUMMARY.md) - Technology decisions
+- [REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md) - Refactoring roadmap
+- Swagger UI: http://localhost:3001/swagger/index.html
+
+---
+
+**Last Updated**: 2025-11-25
+**Build**: 27

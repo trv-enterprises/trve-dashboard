@@ -1,0 +1,314 @@
+package datasource
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/tviviano/dashboard/internal/models"
+)
+
+// APIDataSource implements the DataSource interface for REST APIs
+type APIDataSource struct {
+	config *models.APIConfig
+	client *http.Client
+}
+
+// NewAPIDataSource creates a new API datasource
+func NewAPIDataSource(config *models.APIConfig) (*APIDataSource, error) {
+	timeout := 30 * time.Second
+	if config.Timeout > 0 {
+		timeout = time.Duration(config.Timeout) * time.Second
+	}
+
+	client := &http.Client{
+		Timeout: timeout,
+	}
+
+	return &APIDataSource{
+		config: config,
+		client: client,
+	}, nil
+}
+
+// Query executes an API request and returns normalized results
+func (a *APIDataSource) Query(ctx context.Context, query models.Query) (*models.ResultSet, error) {
+	// Build request
+	req, err := a.buildRequest(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build request: %w", err)
+	}
+
+	// Execute request with retries
+	var resp *http.Response
+	var lastErr error
+
+	maxRetries := a.config.RetryCount
+	if maxRetries <= 0 {
+		maxRetries = 1 // At least one attempt
+	}
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			// Wait before retry
+			retryDelay := a.config.RetryDelay
+			if retryDelay <= 0 {
+				retryDelay = 1000 // default 1 second
+			}
+			time.Sleep(time.Duration(retryDelay) * time.Millisecond)
+		}
+
+		resp, lastErr = a.client.Do(req)
+		if lastErr == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			break
+		}
+
+		if resp != nil {
+			resp.Body.Close()
+		}
+	}
+
+	if lastErr != nil {
+		return nil, fmt.Errorf("request failed after %d attempts: %w", maxRetries, lastErr)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Parse response and normalize
+	return a.parseResponse(body, resp.Header.Get("Content-Type"))
+}
+
+// Stream is not typically used for API datasources
+// But can be implemented for polling-based streaming
+func (a *APIDataSource) Stream(ctx context.Context, query models.Query) (<-chan models.Record, error) {
+	recordChan := make(chan models.Record, 100)
+
+	go func() {
+		defer close(recordChan)
+
+		// Poll API at regular intervals
+		ticker := time.NewTicker(5 * time.Second) // TODO: Make configurable
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				resultSet, err := a.Query(ctx, query)
+				if err != nil {
+					continue
+				}
+
+				// Convert result set to records
+				for _, row := range resultSet.Rows {
+					record := make(models.Record)
+					for i, col := range resultSet.Columns {
+						if i < len(row) {
+							record[col] = row[i]
+						}
+					}
+
+					select {
+					case recordChan <- record:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}
+		}
+	}()
+
+	return recordChan, nil
+}
+
+// buildRequest creates an HTTP request with all configured options
+func (a *APIDataSource) buildRequest(ctx context.Context, query models.Query) (*http.Request, error) {
+	// Use config URL or override from query
+	url := a.config.URL
+	if query.Raw != "" {
+		url = query.Raw
+	}
+
+	// Create request body
+	var bodyReader io.Reader
+	if a.config.Body != "" {
+		bodyReader = strings.NewReader(a.config.Body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, a.config.Method, url, bodyReader)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add headers
+	for key, value := range a.config.Headers {
+		req.Header.Set(key, value)
+	}
+
+	// Add query parameters
+	if len(a.config.QueryParams) > 0 {
+		q := req.URL.Query()
+		for key, value := range a.config.QueryParams {
+			q.Add(key, value)
+		}
+		req.URL.RawQuery = q.Encode()
+	}
+
+	// Add query params from Query object
+	if len(query.Params) > 0 {
+		q := req.URL.Query()
+		for key, value := range query.Params {
+			q.Add(key, fmt.Sprintf("%v", value))
+		}
+		req.URL.RawQuery = q.Encode()
+	}
+
+	// Add authentication
+	switch a.config.AuthType {
+	case "bearer":
+		if token := a.config.AuthCredentials["token"]; token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+	case "basic":
+		username := a.config.AuthCredentials["username"]
+		password := a.config.AuthCredentials["password"]
+		if username != "" || password != "" {
+			req.SetBasicAuth(username, password)
+		}
+	case "api-key":
+		if key := a.config.AuthCredentials["key"]; key != "" {
+			headerName := a.config.AuthCredentials["header"]
+			if headerName == "" {
+				headerName = "X-API-Key"
+			}
+			req.Header.Set(headerName, key)
+		}
+	}
+
+	return req, nil
+}
+
+// parseResponse parses API response and converts to ResultSet
+func (a *APIDataSource) parseResponse(body []byte, contentType string) (*models.ResultSet, error) {
+	// Try to parse as JSON
+	if strings.Contains(contentType, "json") || strings.HasPrefix(string(body), "{") || strings.HasPrefix(string(body), "[") {
+		var data interface{}
+		if err := json.Unmarshal(body, &data); err != nil {
+			// Fallback to text
+			return a.parseAsText(body), nil
+		}
+
+		// Handle different JSON structures
+		switch v := data.(type) {
+		case []interface{}:
+			// Array of objects
+			return a.parseJSONArray(v), nil
+		case map[string]interface{}:
+			// Single object or nested structure
+			return a.parseJSONObject(v), nil
+		default:
+			// Primitive value
+			return a.parseAsPrimitive(v), nil
+		}
+	}
+
+	// Default to text
+	return a.parseAsText(body), nil
+}
+
+// parseJSONArray converts JSON array to ResultSet
+func (a *APIDataSource) parseJSONArray(data []interface{}) *models.ResultSet {
+	resultSet := &models.ResultSet{
+		Rows:     make([][]interface{}, 0),
+		Metadata: make(map[string]interface{}),
+	}
+
+	if len(data) == 0 {
+		return resultSet
+	}
+
+	// Extract columns from first object
+	if first, ok := data[0].(map[string]interface{}); ok {
+		columns := make([]string, 0, len(first))
+		for key := range first {
+			columns = append(columns, key)
+		}
+		resultSet.Columns = columns
+
+		// Convert each object to row
+		for _, item := range data {
+			if obj, ok := item.(map[string]interface{}); ok {
+				row := make([]interface{}, len(columns))
+				for i, col := range columns {
+					row[i] = obj[col]
+				}
+				resultSet.Rows = append(resultSet.Rows, row)
+			}
+		}
+	}
+
+	resultSet.Metadata["row_count"] = len(resultSet.Rows)
+	return resultSet
+}
+
+// parseJSONObject converts JSON object to ResultSet
+func (a *APIDataSource) parseJSONObject(data map[string]interface{}) *models.ResultSet {
+	resultSet := &models.ResultSet{
+		Columns:  []string{"key", "value"},
+		Rows:     make([][]interface{}, 0),
+		Metadata: make(map[string]interface{}),
+	}
+
+	for key, value := range data {
+		row := []interface{}{key, value}
+		resultSet.Rows = append(resultSet.Rows, row)
+	}
+
+	resultSet.Metadata["row_count"] = len(resultSet.Rows)
+	return resultSet
+}
+
+// parseAsText converts plain text to ResultSet
+func (a *APIDataSource) parseAsText(body []byte) *models.ResultSet {
+	return &models.ResultSet{
+		Columns: []string{"data"},
+		Rows:    [][]interface{}{{string(body)}},
+		Metadata: map[string]interface{}{
+			"row_count": 1,
+			"format":    "text",
+		},
+	}
+}
+
+// parseAsPrimitive converts primitive value to ResultSet
+func (a *APIDataSource) parseAsPrimitive(value interface{}) *models.ResultSet {
+	return &models.ResultSet{
+		Columns: []string{"value"},
+		Rows:    [][]interface{}{{value}},
+		Metadata: map[string]interface{}{
+			"row_count": 1,
+			"format":    "primitive",
+		},
+	}
+}
+
+// Close closes any open resources
+func (a *APIDataSource) Close() error {
+	// HTTP client doesn't require explicit closing
+	a.client.CloseIdleConnections()
+	return nil
+}

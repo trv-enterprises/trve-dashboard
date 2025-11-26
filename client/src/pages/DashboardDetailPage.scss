@@ -1,0 +1,384 @@
+@use '@carbon/react/scss/spacing' as spacing;
+
+.dashboard-detail-page {
+  padding: spacing.$spacing-05;
+  background-color: var(--cds-background);
+  min-height: 100%;
+  position: relative;
+
+  .page-actions {
+    position: absolute;
+    top: spacing.$spacing-05;
+    right: spacing.$spacing-05;
+    display: flex;
+    gap: spacing.$spacing-03;
+    z-index: 10;
+  }
+
+  .page-header {
+    margin-bottom: spacing.$spacing-03;
+    margin-left: spacing.$spacing-04;
+    padding-right: 300px;
+
+    .cds--text-input-wrapper {
+      max-width: 600px;
+    }
+
+    .cds--label {
+      color: #c6c6c6 !important;
+      margin-bottom: spacing.$spacing-02;
+      font-weight: 600;
+      font-size: 0.875rem;
+      display: block;
+    }
+
+    .cds--text-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+
+    .cds--text-input__field-wrapper {
+      &:focus-within {
+        outline: none;
+      }
+    }
+  }
+
+  .description-row {
+    margin-bottom: spacing.$spacing-02;
+    margin-left: spacing.$spacing-04;
+
+    .cds--text-input-wrapper {
+      max-width: 800px;
+    }
+
+    .cds--label {
+      color: #c6c6c6 !important;
+      margin-bottom: spacing.$spacing-02;
+      font-weight: 400;
+      font-size: 0.875rem;
+      display: block;
+    }
+
+    .cds--text-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+
+    .cds--text-input__field-wrapper {
+      &:focus-within {
+        outline: none;
+      }
+    }
+  }
+
+  .settings-row {
+    display: flex;
+    gap: spacing.$spacing-03;
+    margin-bottom: spacing.$spacing-03;
+    margin-left: spacing.$spacing-04;
+    align-items: flex-end;
+
+    .cds--select {
+      width: 120px;
+    }
+
+    .cds--number-input-wrapper {
+      width: 120px;
+    }
+
+    .cds--label {
+      color: #c6c6c6 !important;
+      margin-bottom: spacing.$spacing-02;
+      font-weight: 600;
+      font-size: 0.875rem;
+      display: block;
+    }
+
+    .cds--select-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+
+    // Number input styling
+    .cds--number-input,
+    .cds--number {
+      input[type="number"] {
+        background-color: #262626 !important;
+        color: #f4f4f4 !important;
+        border: none !important;
+        border-bottom: 1px solid #525252 !important;
+
+        &:focus {
+          outline: 2px solid var(--cds-focus);
+          outline-offset: -2px;
+        }
+      }
+    }
+
+    .cds--number__controls,
+    .cds--number-input__controls {
+      button {
+        background-color: #393939 !important;
+        border-left: 1px solid #525252 !important;
+        color: #f4f4f4 !important;
+
+        &:hover {
+          background-color: #525252 !important;
+        }
+
+        svg {
+          fill: #f4f4f4 !important;
+        }
+      }
+    }
+  }
+
+  .layout-row {
+    margin-bottom: spacing.$spacing-05;
+    margin-left: spacing.$spacing-04;
+
+    .cds--select {
+      max-width: 400px;
+    }
+
+    .cds--label {
+      color: #c6c6c6 !important;
+      margin-bottom: spacing.$spacing-02;
+      font-weight: 600;
+      font-size: 0.875rem;
+      display: block;
+    }
+
+    .cds--select-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+  }
+
+  .components-section {
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
+    padding: spacing.$spacing-05;
+    margin-left: spacing.$spacing-04;
+    margin-bottom: spacing.$spacing-05;
+    max-width: none; // Allow full width for grid
+
+    h3 {
+      color: var(--cds-text-primary);
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: spacing.$spacing-02;
+    }
+
+    .section-help {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      margin-bottom: spacing.$spacing-05;
+    }
+
+    .grid-info {
+      display: flex;
+      gap: spacing.$spacing-06;
+      padding: spacing.$spacing-04;
+      background-color: #1a1a1a;
+      border-radius: 4px;
+      margin-bottom: spacing.$spacing-04;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.875rem;
+
+      span {
+        color: #c6c6c6;
+      }
+    }
+
+    .panel-grid-container {
+      background-color: #1a1a1a;
+      border-radius: 4px;
+      padding: spacing.$spacing-05;
+      overflow-x: auto;
+      max-height: 800px;
+      overflow-y: auto;
+
+      .panel-grid {
+        display: grid;
+        background-color: #262626;
+        background-image:
+          repeating-linear-gradient(
+            0deg,
+            rgba(255, 255, 255, 0.05) 0px,
+            rgba(255, 255, 255, 0.05) 1px,
+            transparent 1px,
+            transparent 32px
+          ),
+          repeating-linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.05) 0px,
+            rgba(255, 255, 255, 0.05) 1px,
+            transparent 1px,
+            transparent calc(100% / 12)
+          );
+        gap: 0;
+        min-width: 800px;
+        position: relative;
+
+        .panel-item {
+          background-color: rgba(15, 98, 254, 0.15);
+          border: 2px solid #0f62fe;
+          border-radius: 4px;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          overflow: hidden;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background-color: rgba(15, 98, 254, 0.25);
+            border-color: #78a9ff;
+            z-index: 1;
+          }
+
+          .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: spacing.$spacing-02 spacing.$spacing-03;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+            .panel-id {
+              color: #78a9ff;
+              font-size: 0.75rem;
+              font-weight: 600;
+              font-family: 'IBM Plex Mono', monospace;
+            }
+
+            .panel-size {
+              color: #c6c6c6;
+              font-size: 0.75rem;
+              font-family: 'IBM Plex Mono', monospace;
+            }
+          }
+
+          .panel-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: spacing.$spacing-03;
+            position: relative;
+
+            .assigned-component {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: spacing.$spacing-02;
+              margin-bottom: spacing.$spacing-03;
+              text-align: center;
+
+              .component-name {
+                color: #f4f4f4;
+                font-size: 0.875rem;
+                font-weight: 600;
+              }
+
+              .component-source {
+                color: #c6c6c6;
+                font-size: 0.75rem;
+                font-family: 'IBM Plex Mono', monospace;
+              }
+            }
+
+            .panel-selector {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+
+              // Style the overflow menu button
+              .cds--overflow-menu {
+                background-color: rgba(0, 0, 0, 0.4);
+                border: 1px solid #525252;
+                border-radius: 4px;
+
+                &:hover {
+                  background-color: rgba(0, 0, 0, 0.6);
+                  border-color: #78a9ff;
+                }
+
+                svg {
+                  fill: #78a9ff;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .additional-settings {
+    display: flex;
+    gap: spacing.$spacing-05;
+    margin-left: spacing.$spacing-04;
+    margin-top: spacing.$spacing-05;
+    padding: spacing.$spacing-04;
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
+    max-width: fit-content;
+
+    .cds--checkbox-label {
+      color: #c6c6c6;
+    }
+  }
+
+  .error-message {
+    padding: spacing.$spacing-05;
+    background-color: var(--cds-notification-error-background);
+    color: var(--cds-notification-error-text);
+    border-left: 3px solid var(--cds-danger-01);
+    border-radius: 4px;
+    margin-bottom: spacing.$spacing-05;
+  }
+}
+
+// Modal overrides for dark theme
+.cds--modal-container {
+  background-color: var(--cds-layer-01);
+}
+
+.cds--modal-header__heading {
+  color: var(--cds-text-primary);
+}
+
+.cds--modal-content {
+  color: var(--cds-text-primary);
+}

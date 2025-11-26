@@ -1,0 +1,1577 @@
+basePath: /api
+definitions:
+  models.APIConfig:
+    properties:
+      auth_credentials:
+        additionalProperties:
+          type: string
+        type: object
+      auth_type:
+        description: none, bearer, basic, api-key
+        type: string
+      body:
+        type: string
+      headers:
+        additionalProperties:
+          type: string
+        type: object
+      method:
+        enum:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        type: string
+      query_params:
+        additionalProperties:
+          type: string
+        type: object
+      retry_count:
+        type: integer
+      retry_delay:
+        description: milliseconds
+        type: integer
+      timeout:
+        description: seconds
+        type: integer
+      url:
+        type: string
+    required:
+    - method
+    - url
+    type: object
+  models.CSVConfig:
+    properties:
+      columns:
+        description: explicit column names
+        items:
+          type: string
+        type: array
+      delimiter:
+        description: 'default: ","'
+        type: string
+      encoding:
+        description: utf-8, ascii, etc.
+        type: string
+      has_header:
+        description: 'default: true'
+        type: boolean
+      path:
+        type: string
+      watch_changes:
+        type: boolean
+    required:
+    - path
+    type: object
+  models.Component:
+    description: Component model for dashboard charts and widgets
+    properties:
+      component_code:
+        type: string
+      created:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      metadata:
+        $ref: '#/definitions/models.ComponentMetadata'
+      name:
+        type: string
+      source:
+        type: string
+      system:
+        type: string
+      updated:
+        type: string
+    required:
+    - component_code
+    - name
+    - source
+    - system
+    type: object
+  models.ComponentListResponse:
+    description: Response containing a list of components with pagination
+    properties:
+      components:
+        items:
+          $ref: '#/definitions/models.Component'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  models.ComponentMetadata:
+    description: Metadata for component categorization and configuration
+    properties:
+      category:
+        type: string
+      custom:
+        additionalProperties: true
+        type: object
+      datasourceType:
+        type: string
+      refreshInterval:
+        type: integer
+      requiredApis:
+        items:
+          type: string
+        type: array
+      tags:
+        items:
+          type: string
+        type: array
+      visualization:
+        $ref: '#/definitions/models.VisualizationConfig'
+    type: object
+  models.ComponentSource:
+    description: Source category containing component count
+    properties:
+      component_count:
+        type: integer
+      name:
+        type: string
+    type: object
+  models.ComponentSystem:
+    description: System category containing multiple sources
+    properties:
+      name:
+        type: string
+      sources:
+        additionalProperties:
+          $ref: '#/definitions/models.ComponentSource'
+        type: object
+    type: object
+  models.ComponentSystemsResponse:
+    description: Response containing component organization hierarchy
+    properties:
+      systems:
+        additionalProperties:
+          $ref: '#/definitions/models.ComponentSystem'
+        type: object
+    type: object
+  models.CreateComponentRequest:
+    description: Request body for creating a new component
+    properties:
+      component_code:
+        type: string
+      description:
+        type: string
+      metadata:
+        $ref: '#/definitions/models.ComponentMetadata'
+      name:
+        type: string
+      source:
+        type: string
+      system:
+        type: string
+    required:
+    - component_code
+    - name
+    - source
+    - system
+    type: object
+  models.CreateDashboardRequest:
+    description: Request body for creating a new dashboard
+    properties:
+      components:
+        items:
+          $ref: '#/definitions/models.DashboardComponent'
+        type: array
+      description:
+        type: string
+      layout_id:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      settings:
+        $ref: '#/definitions/models.DashboardSettings'
+    required:
+    - layout_id
+    - name
+    type: object
+  models.CreateDatasourceRequest:
+    properties:
+      config:
+        $ref: '#/definitions/models.DatasourceConfig'
+      description:
+        type: string
+      name:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      type:
+        allOf:
+        - $ref: '#/definitions/models.DatasourceType'
+        enum:
+        - sql
+        - csv
+        - socket
+        - api
+    required:
+    - config
+    - name
+    - type
+    type: object
+  models.CreateLayoutRequest:
+    properties:
+      description:
+        type: string
+      grid:
+        $ref: '#/definitions/models.GridConfig'
+      name:
+        type: string
+      panels:
+        items:
+          $ref: '#/definitions/models.Panel'
+        type: array
+    required:
+    - name
+    type: object
+  models.Dashboard:
+    description: Dashboard model combining layout and components
+    properties:
+      components:
+        items:
+          $ref: '#/definitions/models.DashboardComponent'
+        type: array
+      created:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      layout_id:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      settings:
+        $ref: '#/definitions/models.DashboardSettings'
+      updated:
+        type: string
+    required:
+    - layout_id
+    - name
+    type: object
+  models.DashboardComponent:
+    description: Component placement within a dashboard
+    properties:
+      component_id:
+        description: Reference to Component
+        type: string
+      config:
+        additionalProperties: true
+        description: Component-specific config
+        type: object
+      id:
+        description: Unique ID for this placement
+        type: string
+      panel_id:
+        description: Reference to Layout Panel
+        type: string
+      props:
+        additionalProperties: true
+        description: Runtime props
+        type: object
+    type: object
+  models.DashboardListResponse:
+    description: Response containing a list of dashboards with pagination
+    properties:
+      dashboards:
+        items:
+          $ref: '#/definitions/models.Dashboard'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  models.DashboardSettings:
+    description: Dashboard settings and preferences
+    properties:
+      allow_export:
+        type: boolean
+      default_view:
+        type: string
+      is_public:
+        type: boolean
+      refresh_interval:
+        description: Auto-refresh interval in ms
+        type: integer
+      theme:
+        description: '"light", "dark", "auto"'
+        type: string
+      timezone:
+        type: string
+    type: object
+  models.DashboardWithDetails:
+    description: Dashboard with full layout and component information
+    properties:
+      component_details:
+        items:
+          $ref: '#/definitions/models.Component'
+        type: array
+      components:
+        items:
+          $ref: '#/definitions/models.DashboardComponent'
+        type: array
+      created:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      layout:
+        $ref: '#/definitions/models.Layout'
+      layout_id:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      settings:
+        $ref: '#/definitions/models.DashboardSettings'
+      updated:
+        type: string
+    required:
+    - layout_id
+    - name
+    type: object
+  models.Datasource:
+    properties:
+      config:
+        $ref: '#/definitions/models.DatasourceConfig'
+      created_at:
+        type: string
+      description:
+        type: string
+      health:
+        $ref: '#/definitions/models.HealthInfo'
+      id:
+        type: string
+      name:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      type:
+        allOf:
+        - $ref: '#/definitions/models.DatasourceType'
+        enum:
+        - sql
+        - csv
+        - socket
+        - api
+      updated_at:
+        type: string
+    required:
+    - config
+    - name
+    - type
+    type: object
+  models.DatasourceConfig:
+    properties:
+      api:
+        $ref: '#/definitions/models.APIConfig'
+      csv:
+        $ref: '#/definitions/models.CSVConfig'
+      socket:
+        $ref: '#/definitions/models.SocketConfig'
+      sql:
+        $ref: '#/definitions/models.SQLConfig'
+    type: object
+  models.DatasourceType:
+    enum:
+    - sql
+    - csv
+    - socket
+    - api
+    type: string
+    x-enum-varnames:
+    - DatasourceTypeSQL
+    - DatasourceTypeCSV
+    - DatasourceTypeSocket
+    - DatasourceTypeAPI
+  models.GridConfig:
+    properties:
+      columns:
+        description: Number of columns (e.g., 12)
+        type: integer
+      compact_type:
+        description: '"vertical", "horizontal", or null'
+        type: string
+      grid_unit:
+        description: Base spacing unit (32px = $spacing-08)
+        type: integer
+      max_rows:
+        description: Maximum number of rows
+        type: integer
+      row_height:
+        description: Height of each row in pixels
+        type: integer
+    type: object
+  models.HealthInfo:
+    properties:
+      error_message:
+        type: string
+      last_check:
+        type: string
+      last_success:
+        type: string
+      response_time:
+        description: milliseconds
+        type: integer
+      status:
+        $ref: '#/definitions/models.HealthStatus'
+    type: object
+  models.HealthStatus:
+    enum:
+    - unknown
+    - healthy
+    - unhealthy
+    - degraded
+    type: string
+    x-enum-varnames:
+    - HealthStatusUnknown
+    - HealthStatusHealthy
+    - HealthStatusUnhealthy
+    - HealthStatusDegraded
+  models.Layout:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      grid:
+        $ref: '#/definitions/models.GridConfig'
+      id:
+        type: string
+      name:
+        type: string
+      panels:
+        items:
+          $ref: '#/definitions/models.Panel'
+        type: array
+      updated_at:
+        type: string
+    required:
+    - name
+    type: object
+  models.Panel:
+    properties:
+      content:
+        allOf:
+        - $ref: '#/definitions/models.PanelContent'
+        description: Panel content reference
+      h:
+        description: Height in rows
+        minimum: 1
+        type: integer
+      id:
+        description: Unique panel identifier
+        type: string
+      max_h:
+        description: Maximum height
+        type: integer
+      max_w:
+        description: Maximum width
+        type: integer
+      min_h:
+        description: Minimum height
+        type: integer
+      min_w:
+        description: Minimum width
+        type: integer
+      static:
+        description: Cannot be moved/resized
+        type: boolean
+      w:
+        description: Width in columns
+        minimum: 1
+        type: integer
+      x:
+        description: Column position (0-indexed)
+        type: integer
+      "y":
+        description: Row position (0-indexed)
+        type: integer
+    required:
+    - h
+    - id
+    - w
+    - x
+    - "y"
+    type: object
+  models.PanelContent:
+    properties:
+      chart_id:
+        description: Reference to chart component
+        type: string
+      component_id:
+        description: Reference to custom component
+        type: string
+      config:
+        additionalProperties: true
+        description: Panel-specific configuration
+        type: object
+      type:
+        description: '"chart", "text", "image", "custom"'
+        type: string
+    type: object
+  models.Query:
+    properties:
+      params:
+        additionalProperties: true
+        description: Query parameters
+        type: object
+      raw:
+        description: Raw query string (SQL, filter expression, etc.)
+        type: string
+      type:
+        allOf:
+        - $ref: '#/definitions/models.QueryType'
+        description: Query type
+    type: object
+  models.QueryRequest:
+    properties:
+      query:
+        $ref: '#/definitions/models.Query'
+    required:
+    - query
+    type: object
+  models.QueryResponse:
+    properties:
+      duration:
+        description: milliseconds
+        type: integer
+      error:
+        type: string
+      result_set:
+        $ref: '#/definitions/models.ResultSet'
+      success:
+        type: boolean
+    type: object
+  models.QueryType:
+    enum:
+    - sql
+    - csv_filter
+    - stream_filter
+    - api
+    type: string
+    x-enum-varnames:
+    - QueryTypeSQL
+    - QueryTypeCSVFilter
+    - QueryTypeStreamFilter
+    - QueryTypeAPI
+  models.ResultSet:
+    properties:
+      columns:
+        description: Column names
+        items:
+          type: string
+        type: array
+      metadata:
+        additionalProperties: true
+        description: Additional metadata
+        type: object
+      rows:
+        description: Data rows
+        items:
+          items: {}
+          type: array
+        type: array
+    type: object
+  models.SQLConfig:
+    properties:
+      connection_string:
+        type: string
+      database:
+        type: string
+      driver:
+        enum:
+        - postgres
+        - mysql
+        - sqlite
+        - mssql
+        - oracle
+        type: string
+      host:
+        type: string
+      max_connections:
+        type: integer
+      options:
+        additionalProperties:
+          type: string
+        type: object
+      password:
+        type: string
+      port:
+        type: integer
+      ssl:
+        type: boolean
+      timeout:
+        description: seconds
+        type: integer
+      username:
+        type: string
+    required:
+    - connection_string
+    - driver
+    type: object
+  models.SocketConfig:
+    properties:
+      buffer_size:
+        description: number of messages to buffer
+        type: integer
+      headers:
+        additionalProperties:
+          type: string
+        type: object
+      message_format:
+        description: json, text, binary
+        type: string
+      ping_interval:
+        description: seconds
+        type: integer
+      protocol:
+        enum:
+        - tcp
+        - udp
+        - websocket
+        type: string
+      reconnect_delay:
+        description: milliseconds
+        type: integer
+      reconnect_on_error:
+        type: boolean
+      url:
+        type: string
+    required:
+    - protocol
+    - url
+    type: object
+  models.TestDatasourceRequest:
+    properties:
+      config:
+        $ref: '#/definitions/models.DatasourceConfig'
+      type:
+        allOf:
+        - $ref: '#/definitions/models.DatasourceType'
+        enum:
+        - sql
+        - csv
+        - socket
+        - api
+    required:
+    - config
+    - type
+    type: object
+  models.TestDatasourceResponse:
+    properties:
+      data: {}
+      message:
+        type: string
+      response_time:
+        description: milliseconds
+        type: integer
+      status:
+        $ref: '#/definitions/models.HealthStatus'
+      success:
+        type: boolean
+    type: object
+  models.UpdateComponentRequest:
+    description: Request body for updating an existing component
+    properties:
+      component_code:
+        type: string
+      description:
+        type: string
+      metadata:
+        $ref: '#/definitions/models.ComponentMetadata'
+    type: object
+  models.UpdateDashboardRequest:
+    description: Request body for updating an existing dashboard
+    properties:
+      components:
+        items:
+          $ref: '#/definitions/models.DashboardComponent'
+        type: array
+      description:
+        type: string
+      layout_id:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      settings:
+        $ref: '#/definitions/models.DashboardSettings'
+    type: object
+  models.UpdateDatasourceRequest:
+    properties:
+      config:
+        $ref: '#/definitions/models.DatasourceConfig'
+      description:
+        type: string
+      name:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+    type: object
+  models.UpdateLayoutRequest:
+    properties:
+      description:
+        type: string
+      grid:
+        $ref: '#/definitions/models.GridConfig'
+      name:
+        type: string
+      panels:
+        items:
+          $ref: '#/definitions/models.Panel'
+        type: array
+    type: object
+  models.VisualizationConfig:
+    description: Configuration for visualization components
+    properties:
+      library:
+        description: echarts, d3, custom
+        type: string
+      type:
+        description: bar, line, pie, gauge, etc.
+        type: string
+    type: object
+host: localhost:3001
+info:
+  contact:
+    email: support@example.com
+    name: Dashboard Team
+  description: Dashboard system with AI-powered chart generation
+  title: GiVi-Solution Dashboard API
+  version: "1.0"
+paths:
+  /components:
+    get:
+      description: Get a paginated list of components with optional filtering
+      parameters:
+      - description: Filter by system
+        in: query
+        name: system
+        type: string
+      - description: Filter by source
+        in: query
+        name: source
+        type: string
+      - description: Filter by category
+        in: query
+        name: category
+        type: string
+      - description: Filter by tag
+        in: query
+        name: tag
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ComponentListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List components
+      tags:
+      - components
+    post:
+      consumes:
+      - application/json
+      description: Create a new dashboard component or chart
+      parameters:
+      - description: Component data
+        in: body
+        name: component
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateComponentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Component'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a new component
+      tags:
+      - components
+  /components/{id}:
+    delete:
+      description: Delete a component by ID
+      parameters:
+      - description: Component ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a component
+      tags:
+      - components
+    get:
+      description: Get a component by ID
+      parameters:
+      - description: Component ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Component'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get a component
+      tags:
+      - components
+    put:
+      consumes:
+      - application/json
+      description: Update an existing component
+      parameters:
+      - description: Component ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Component update data
+        in: body
+        name: component
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateComponentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Component'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update a component
+      tags:
+      - components
+  /components/systems:
+    get:
+      description: Get all component systems and sources with counts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ComponentSystemsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get component systems
+      tags:
+      - components
+  /dashboards:
+    get:
+      description: Get a paginated list of dashboards with optional filtering
+      parameters:
+      - description: Filter by name (partial match)
+        in: query
+        name: name
+        type: string
+      - description: Filter by public status
+        in: query
+        name: is_public
+        type: boolean
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.DashboardListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List dashboards
+      tags:
+      - dashboards
+    post:
+      consumes:
+      - application/json
+      description: Create a new dashboard combining layout and components
+      parameters:
+      - description: Dashboard data
+        in: body
+        name: dashboard
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateDashboardRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Dashboard'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a new dashboard
+      tags:
+      - dashboards
+  /dashboards/{id}:
+    delete:
+      description: Delete a dashboard by ID
+      parameters:
+      - description: Dashboard ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a dashboard
+      tags:
+      - dashboards
+    get:
+      description: Get a dashboard by ID
+      parameters:
+      - description: Dashboard ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Dashboard'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get a dashboard
+      tags:
+      - dashboards
+    put:
+      consumes:
+      - application/json
+      description: Update an existing dashboard
+      parameters:
+      - description: Dashboard ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Dashboard update data
+        in: body
+        name: dashboard
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateDashboardRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Dashboard'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update a dashboard
+      tags:
+      - dashboards
+  /dashboards/{id}/details:
+    get:
+      description: Get a dashboard with expanded layout and component information
+      parameters:
+      - description: Dashboard ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.DashboardWithDetails'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get a dashboard with details
+      tags:
+      - dashboards
+  /datasources:
+    get:
+      description: Retrieve all datasources with pagination and optional type filter
+      parameters:
+      - default: 20
+        description: Number of items per page
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of items to skip
+        in: query
+        name: offset
+        type: integer
+      - description: Filter by datasource type (api, websocket, file)
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List all datasources
+      tags:
+      - datasources
+    post:
+      consumes:
+      - application/json
+      description: Create a new data source (API, WebSocket, or File)
+      parameters:
+      - description: Datasource to create
+        in: body
+        name: datasource
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateDatasourceRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Datasource'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a new datasource
+      tags:
+      - datasources
+  /datasources/{id}:
+    delete:
+      description: Delete a datasource by ID
+      parameters:
+      - description: Datasource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a datasource
+      tags:
+      - datasources
+    get:
+      description: Retrieve a single datasource by its ID
+      parameters:
+      - description: Datasource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Datasource'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get a datasource by ID
+      tags:
+      - datasources
+    put:
+      consumes:
+      - application/json
+      description: Update an existing datasource by ID
+      parameters:
+      - description: Datasource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datasource updates
+        in: body
+        name: datasource
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateDatasourceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Datasource'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update a datasource
+      tags:
+      - datasources
+  /datasources/{id}/health:
+    post:
+      description: Check the health of a specific datasource and update its status
+      parameters:
+      - description: Datasource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.HealthInfo'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Check datasource health
+      tags:
+      - datasources
+  /datasources/{id}/query:
+    post:
+      consumes:
+      - application/json
+      description: Execute a query and return normalized results
+      parameters:
+      - description: Datasource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Query to execute
+        in: body
+        name: query
+        required: true
+        schema:
+          $ref: '#/definitions/models.QueryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.QueryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Execute a query against a datasource
+      tags:
+      - datasources
+  /datasources/test:
+    post:
+      consumes:
+      - application/json
+      description: Test a datasource connection without saving it
+      parameters:
+      - description: Datasource configuration to test
+        in: body
+        name: datasource
+        required: true
+        schema:
+          $ref: '#/definitions/models.TestDatasourceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TestDatasourceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Test a datasource connection
+      tags:
+      - datasources
+  /health:
+    get:
+      description: Check if the server and dependencies are healthy
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Health check
+      tags:
+      - System
+  /layouts:
+    get:
+      description: Retrieve all layouts with pagination
+      parameters:
+      - default: 20
+        description: Number of items per page
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of items to skip
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List all layouts
+      tags:
+      - layouts
+    post:
+      consumes:
+      - application/json
+      description: Create a new dashboard layout with grid configuration and panels
+      parameters:
+      - description: Layout to create
+        in: body
+        name: layout
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateLayoutRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Layout'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a new layout
+      tags:
+      - layouts
+  /layouts/{id}:
+    delete:
+      description: Delete a layout by ID
+      parameters:
+      - description: Layout ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a layout
+      tags:
+      - layouts
+    get:
+      description: Retrieve a single layout by its ID
+      parameters:
+      - description: Layout ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Layout'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get a layout by ID
+      tags:
+      - layouts
+    put:
+      consumes:
+      - application/json
+      description: Update an existing layout by ID
+      parameters:
+      - description: Layout ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Layout updates
+        in: body
+        name: layout
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateLayoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Layout'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update a layout
+      tags:
+      - layouts
+swagger: "2.0"

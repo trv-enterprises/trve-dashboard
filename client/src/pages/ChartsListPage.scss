@@ -1,0 +1,64 @@
+@use '@carbon/react/scss/spacing' as spacing;
+
+.charts-list-page {
+  padding: spacing.$spacing-06;
+  background-color: var(--cds-background);
+  min-height: 100%;
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: spacing.$spacing-06;
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 400;
+      color: var(--cds-text-primary);
+      margin: 0;
+    }
+  }
+
+  .error-message {
+    padding: spacing.$spacing-05;
+    background-color: var(--cds-notification-error-background);
+    color: var(--cds-notification-error-text);
+    border-left: 3px solid var(--cds-danger-01);
+    border-radius: 4px;
+  }
+
+  // DataTable styling
+  .cds--data-table-container {
+    background-color: var(--cds-layer-01);
+  }
+
+  .cds--data-table {
+    background-color: var(--cds-layer-01);
+    color: var(--cds-text-primary);
+  }
+
+  .cds--data-table thead {
+    background-color: var(--cds-layer-02);
+  }
+
+  .cds--data-table th {
+    color: var(--cds-text-primary);
+    background-color: var(--cds-layer-02);
+    border-bottom: 1px solid var(--cds-border-strong-01);
+  }
+
+  .cds--data-table td {
+    color: var(--cds-text-primary);
+    background-color: var(--cds-layer-01);
+    border-bottom: 1px solid var(--cds-border-subtle-01);
+  }
+
+  .cds--data-table tbody tr:hover td {
+    background-color: var(--cds-layer-hover-01);
+  }
+
+  // Tags styling
+  .cds--tag {
+    margin: 0;
+  }
+}

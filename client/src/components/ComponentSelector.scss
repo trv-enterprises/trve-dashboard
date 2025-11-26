@@ -40,6 +40,40 @@
   font-weight: 400;
 }
 
+// Force dark theme for Select components
+.selector-filters {
+  .cds--select {
+    background-color: var(--cds-field-01);
+  }
+
+  .cds--select-input {
+    background-color: var(--cds-field-01);
+    color: var(--cds-text-primary);
+    border-bottom: 1px solid var(--cds-border-strong-01);
+  }
+
+  .cds--select-input:hover {
+    background-color: var(--cds-field-hover-01);
+  }
+
+  .cds--select-input:focus {
+    border-bottom-color: var(--cds-focus);
+    outline: 2px solid var(--cds-focus);
+    outline-offset: -2px;
+  }
+
+  // Style dropdown options for dark theme
+  .cds--select-input option {
+    background-color: var(--cds-layer-01);
+    color: var(--cds-text-primary);
+  }
+
+  // Ensure chevron icon is visible
+  .cds--select-input__wrapper svg {
+    fill: var(--cds-icon-primary);
+  }
+}
+
 .component-list {
   flex: 1;
   overflow: auto;

@@ -1,0 +1,117 @@
+# Base configuration - defaults for development
+server:
+  port: 3001
+  host: 0.0.0.0
+  mode: debug  # debug, release
+  read_timeout: 30s
+  write_timeout: 30s
+  shutdown_timeout: 10s
+
+mongodb:
+  uri: mongodb://localhost:27017
+  database: dashboard
+  connection_timeout: 10s
+  max_pool_size: 100
+  min_pool_size: 10
+
+redis:
+  addr: localhost:6379
+  password: ""
+  db: 0
+  max_retries: 3
+  pool_size: 10
+  min_idle_conns: 5
+
+asynq:
+  concurrency: 10
+  queues:
+    critical: 6
+    default: 3
+    low: 1
+  retry_max_attempts: 3
+  shutdown_timeout: 10s
+
+websocket:
+  read_buffer_size: 1024
+  write_buffer_size: 1024
+  ping_interval: 30s
+  pong_wait: 60s
+  write_wait: 10s
+
+llm:
+  provider: anthropic  # anthropic, openai
+  api_key: ""  # Set via DASHBOARD_LLM_API_KEY
+  model: claude-sonnet-4-5
+  max_tokens: 4096
+  temperature: 0.7
+  timeout: 120s
+  base_url: https://api.anthropic.com/v1
+
+validation:
+  max_code_size: 100000  # bytes
+  dangerous_patterns:
+    - eval
+    - Function
+    - innerHTML
+    - dangerouslySetInnerHTML
+    - import.*http
+    - require\(
+    - process\.
+    - __dirname
+    - __filename
+  allowed_imports:
+    - react
+    - echarts
+    - echarts-for-react
+    - "@carbon/react"
+    - "@carbon/icons-react"
+
+layout:
+  spacing: 32  # pixels - $spacing-08
+  max_width: 1920
+  max_height: 1080
+  default_panel_width: 320
+  default_panel_height: 256
+  min_panel_width: 160
+  min_panel_height: 160
+  max_panel_width: 1280
+  max_panel_height: 1280
+
+logging:
+  level: debug  # debug, info, warn, error
+  format: text  # text, json
+  output: stdout  # stdout, file
+  file_path: /var/log/dashboard/app.log
+
+cors:
+  allowed_origins:
+    - http://localhost:5173
+    - http://localhost:3000
+  allowed_methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+    - PATCH
+  allowed_headers:
+    - Origin
+    - Content-Type
+    - Authorization
+    - Accept
+  expose_headers:
+    - Content-Length
+  allow_credentials: true
+  max_age: 3600
+
+swagger:
+  enabled: true
+  title: GiVi-Solution Dashboard API
+  version: 1.0.0
+  description: Dashboard system with AI-powered chart generation
+  host: localhost:3001
+  base_path: /api
+  schemes:
+    - http
+  contact_name: Dashboard Team
+  contact_email: support@example.com

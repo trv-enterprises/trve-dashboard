@@ -4,9 +4,11 @@
  * Exposes datasource and component management tools
  */
 
-const datasourceService = require('../services/datasourceService');
-const dataLayerService = require('../services/dataLayerService');
-const fileManager = require('../storage/fileManager');
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const datasourceService = require('../services/datasourceService.js');
+const dataLayerService = require('../services/dataLayerService.js');
+const fileManager = require('../storage/fileManager.js');
 
 class MCPServer {
   constructor() {
@@ -420,4 +422,5 @@ class MCPServer {
   }
 }
 
-module.exports = new MCPServer();
+const mcpServer = new MCPServer();
+export default mcpServer;

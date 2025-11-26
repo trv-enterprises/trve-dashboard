@@ -1,0 +1,274 @@
+@use '@carbon/react/scss/spacing' as spacing;
+
+.chart-detail-page {
+  padding: spacing.$spacing-05;
+  background-color: var(--cds-background);
+  min-height: 100%;
+  position: relative;
+
+  .page-actions {
+    position: absolute;
+    top: spacing.$spacing-05;
+    right: spacing.$spacing-05;
+    display: flex;
+    gap: spacing.$spacing-03;
+    z-index: 10;
+  }
+
+  .page-header {
+    margin-bottom: spacing.$spacing-03;
+    margin-left: spacing.$spacing-04;
+    padding-right: 300px;
+
+    .cds--text-input-wrapper {
+      max-width: 600px;
+    }
+
+    .cds--label {
+      color: #c6c6c6 !important;
+      margin-bottom: spacing.$spacing-02;
+      font-weight: 600;
+      font-size: 0.875rem;
+      display: block;
+    }
+
+    .cds--text-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+
+    .cds--text-input__field-wrapper {
+      &:focus-within {
+        outline: none;
+      }
+    }
+  }
+
+  .system-source-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: spacing.$spacing-04;
+    margin-bottom: spacing.$spacing-03;
+    margin-left: spacing.$spacing-04;
+
+    .cds--text-input-wrapper {
+      width: 100%;
+    }
+
+    .cds--label {
+      color: #c6c6c6 !important;
+      margin-bottom: spacing.$spacing-02;
+      font-weight: 600;
+      font-size: 0.875rem;
+      display: block;
+    }
+
+    .cds--text-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+
+      &:disabled {
+        background-color: #393939 !important;
+        color: #8d8d8d !important;
+        cursor: not-allowed;
+      }
+    }
+
+    .cds--text-input__field-wrapper {
+      &:focus-within {
+        outline: none;
+      }
+    }
+  }
+
+  .description-row {
+    margin-bottom: spacing.$spacing-02;
+    margin-left: spacing.$spacing-04;
+
+    .cds--text-input-wrapper {
+      max-width: 800px;
+    }
+
+    .cds--label {
+      color: #c6c6c6 !important;
+      margin-bottom: spacing.$spacing-02;
+      font-weight: 400;
+      font-size: 0.875rem;
+      display: block;
+    }
+
+    .cds--text-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+
+    .cds--text-input__field-wrapper {
+      &:focus-within {
+        outline: none;
+      }
+    }
+  }
+
+  .metadata-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: spacing.$spacing-04;
+    margin-bottom: spacing.$spacing-05;
+    margin-left: spacing.$spacing-04;
+
+    .cds--text-input-wrapper {
+      width: 100%;
+    }
+
+    .cds--label {
+      color: #c6c6c6 !important;
+      margin-bottom: spacing.$spacing-02;
+      font-weight: 400;
+      font-size: 0.875rem;
+      display: block;
+    }
+
+    .cds--text-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+
+    .cds--text-input__field-wrapper {
+      &:focus-within {
+        outline: none;
+      }
+    }
+
+    .tags-input {
+      .tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: spacing.$spacing-02;
+        align-items: center;
+        padding: spacing.$spacing-03;
+        background-color: #262626;
+        border-bottom: 1px solid #525252;
+        min-height: 44px;
+
+        .cds--tag {
+          margin: 0;
+        }
+
+        .cds--text-input-wrapper {
+          flex: 1;
+          min-width: 150px;
+
+          .cds--text-input {
+            background-color: transparent !important;
+            border: none !important;
+            border-bottom: none !important;
+            padding-left: 0 !important;
+          }
+        }
+      }
+    }
+  }
+
+  .code-editor-section {
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
+    padding: spacing.$spacing-05;
+    margin-left: spacing.$spacing-04;
+    max-width: 1200px;
+
+    h3 {
+      color: var(--cds-text-primary);
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: spacing.$spacing-02;
+    }
+
+    .code-help {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      margin-bottom: spacing.$spacing-04;
+      line-height: 1.4;
+    }
+
+    .code-textarea {
+      font-family: 'IBM Plex Mono', 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      background-color: #1a1a1a !important;
+      color: #f4f4f4 !important;
+      border: 1px solid #525252 !important;
+      border-radius: 4px;
+      padding: spacing.$spacing-04;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+        border-color: var(--cds-focus) !important;
+      }
+    }
+
+    .cds--text-area {
+      background-color: #1a1a1a !important;
+      color: #f4f4f4 !important;
+      border: 1px solid #525252 !important;
+      font-family: 'IBM Plex Mono', 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+      font-size: 0.875rem;
+      line-height: 1.5;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+  }
+
+  .error-message {
+    padding: spacing.$spacing-05;
+    background-color: var(--cds-notification-error-background);
+    color: var(--cds-notification-error-text);
+    border-left: 3px solid var(--cds-danger-01);
+    border-radius: 4px;
+    margin-bottom: spacing.$spacing-05;
+  }
+}
+
+// Modal overrides for dark theme
+.cds--modal-container {
+  background-color: var(--cds-layer-01);
+}
+
+.cds--modal-header__heading {
+  color: var(--cds-text-primary);
+}
+
+.cds--modal-content {
+  color: var(--cds-text-primary);
+}

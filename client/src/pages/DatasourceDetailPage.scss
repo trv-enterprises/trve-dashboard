@@ -1,0 +1,237 @@
+@use '@carbon/react/scss/spacing' as spacing;
+
+.datasource-detail-page {
+  padding: spacing.$spacing-05;
+  background-color: var(--cds-background);
+  min-height: 100%;
+  position: relative;
+
+  .page-actions {
+    position: absolute;
+    top: spacing.$spacing-05;
+    right: spacing.$spacing-05;
+    display: flex;
+    gap: spacing.$spacing-03;
+    z-index: 10;
+  }
+
+  .page-header {
+    margin-bottom: spacing.$spacing-03;
+    margin-left: spacing.$spacing-04;
+    padding-right: 300px; // Space for action buttons
+
+    .cds--text-input-wrapper {
+      max-width: 600px;
+    }
+
+    .cds--label {
+      color: #c6c6c6 !important;
+      margin-bottom: spacing.$spacing-02;
+      font-weight: 600;
+      font-size: 0.875rem;
+      display: block;
+    }
+
+    .cds--text-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+
+    .cds--text-input__field-wrapper {
+      &:focus-within {
+        outline: none;
+      }
+    }
+  }
+
+  .description-row {
+    margin-bottom: spacing.$spacing-02;
+    margin-left: spacing.$spacing-04;
+
+    .cds--text-input-wrapper {
+      max-width: 800px;
+    }
+
+    .cds--label {
+      color: #c6c6c6 !important;
+      margin-bottom: spacing.$spacing-02;
+      font-weight: 400;
+      font-size: 0.875rem;
+      display: block;
+    }
+
+    .cds--text-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+
+    .cds--text-input__field-wrapper {
+      &:focus-within {
+        outline: none;
+      }
+    }
+  }
+
+  .type-row {
+    margin-bottom: spacing.$spacing-05;
+    margin-left: spacing.$spacing-04;
+
+    .cds--select {
+      max-width: 400px;
+    }
+
+    .cds--label {
+      color: #c6c6c6 !important;
+      margin-bottom: spacing.$spacing-02;
+      font-weight: 600;
+      font-size: 0.875rem;
+      display: block;
+    }
+
+    .cds--select-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+  }
+
+  .config-section {
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
+    padding: spacing.$spacing-05;
+    margin-left: spacing.$spacing-04;
+    max-width: 900px;
+
+    h3 {
+      color: var(--cds-text-primary);
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: spacing.$spacing-04;
+    }
+
+    .config-form {
+      display: flex;
+      flex-direction: column;
+      gap: spacing.$spacing-04;
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: spacing.$spacing-04;
+
+        .cds--number-input,
+        .cds--text-input-wrapper {
+          width: 100%;
+        }
+      }
+
+      .cds--label {
+        color: #c6c6c6 !important;
+        margin-bottom: spacing.$spacing-02;
+        font-weight: 400;
+        font-size: 0.875rem;
+        display: block;
+      }
+
+      .cds--text-input,
+      .cds--text-area,
+      .cds--select-input {
+        background-color: #262626 !important;
+        color: #f4f4f4 !important;
+        border: none !important;
+        border-bottom: 1px solid #525252 !important;
+
+        &:focus {
+          outline: 2px solid var(--cds-focus);
+          outline-offset: -2px;
+        }
+      }
+
+      // Number input specific styling
+      .cds--number-input,
+      .cds--number {
+        input[type="number"] {
+          background-color: #262626 !important;
+          color: #f4f4f4 !important;
+          border: none !important;
+          border-bottom: 1px solid #525252 !important;
+
+          &:focus {
+            outline: 2px solid var(--cds-focus);
+            outline-offset: -2px;
+          }
+        }
+      }
+
+      .cds--number__controls,
+      .cds--number-input__controls {
+        button {
+          background-color: #393939 !important;
+          border-left: 1px solid #525252 !important;
+          color: #f4f4f4 !important;
+
+          &:hover {
+            background-color: #525252 !important;
+          }
+
+          svg {
+            fill: #f4f4f4 !important;
+          }
+        }
+      }
+
+      .cds--text-input__field-wrapper,
+      .cds--text-area__wrapper {
+        &:focus-within {
+          outline: none;
+        }
+      }
+
+      .cds--checkbox-label {
+        color: #c6c6c6;
+      }
+    }
+  }
+
+  .error-message {
+    padding: spacing.$spacing-05;
+    background-color: var(--cds-notification-error-background);
+    color: var(--cds-notification-error-text);
+    border-left: 3px solid var(--cds-danger-01);
+    border-radius: 4px;
+    margin-bottom: spacing.$spacing-05;
+  }
+}
+
+// Modal overrides for dark theme
+.cds--modal-container {
+  background-color: var(--cds-layer-01);
+}
+
+.cds--modal-header__heading {
+  color: var(--cds-text-primary);
+}
+
+.cds--modal-content {
+  color: var(--cds-text-primary);
+}

@@ -1,0 +1,31 @@
+# Production overrides
+server:
+  mode: release
+  host: 0.0.0.0
+
+mongodb:
+  uri: ${DASHBOARD_MONGODB_URI}  # From environment
+  max_pool_size: 200
+
+redis:
+  addr: ${DASHBOARD_REDIS_ADDR}
+  password: ${DASHBOARD_REDIS_PASSWORD}
+
+llm:
+  api_key: ${DASHBOARD_LLM_API_KEY}
+
+logging:
+  level: info
+  format: json
+  output: file
+  file_path: /var/log/dashboard/app.log
+
+cors:
+  allowed_origins:
+    - https://dashboard.example.com
+
+swagger:
+  enabled: false  # Disable in production
+  host: dashboard.example.com
+  schemes:
+    - https

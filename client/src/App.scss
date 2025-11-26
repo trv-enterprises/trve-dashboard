@@ -1,4 +1,4 @@
-@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/spacing' as spacing;
 @use '@carbon/react/scss/theme' as *;
 
 // Global app styling
@@ -10,7 +10,10 @@ body {
 
 // Header styling with visible outline
 .cds--header {
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   border-bottom: 1px solid var(--cds-border-strong-01);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   z-index: 8000;
@@ -47,6 +50,29 @@ button.cds--header__action {
   fill: #f4f4f4 !important;
 }
 
+// Header layout groups
+.header-mode-group {
+  display: flex;
+  align-items: center;
+  margin-left: spacing.$spacing-08; // 2rem gap after header name
+}
+
+.header-title {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  h2 {
+    margin: 0;
+    padding: 0;
+    font-size: 1.125rem;
+    font-weight: 400;
+    color: #f4f4f4;
+    letter-spacing: 0.16px;
+  }
+}
+
 .header-status {
   display: flex;
   align-items: center;
@@ -61,9 +87,14 @@ button.cds--header__action {
 
 // Side navigation with visible outline
 .cds--side-nav {
+  position: fixed;
+  top: 48px; // Height of header
+  left: 0;
+  bottom: 0;
   background-color: var(--cds-layer-01);
   border-right: 1px solid var(--cds-border-strong-01);
   box-shadow: 1px 0 2px rgba(0, 0, 0, 0.3);
+  overflow-y: auto;
 }
 
 .cds--side-nav__link {
@@ -97,6 +128,32 @@ button.cds--header__action {
 .app-content {
   background-color: var(--cds-background);
   margin-left: 256px; // Width of side nav
+  margin-top: 48px; // Height of header
   padding: 0;
   min-height: calc(100vh - 48px); // Account for header height
+  overflow-y: auto;
+}
+
+// View Mode welcome screen
+.view-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - 48px);
+  color: var(--cds-text-secondary);
+  text-align: center;
+
+  h2 {
+    color: var(--cds-text-primary);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 spacing.$spacing-03 0;
+  }
+
+  p {
+    color: #6f6f6f;
+    font-size: 0.875rem;
+    margin: 0;
+  }
 }

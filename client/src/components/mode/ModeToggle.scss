@@ -1,0 +1,66 @@
+@use '@carbon/react';
+
+// Pill-style mode selector with rounded buttons and text labels
+.mode-selector {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  margin-right: 1rem;
+  background: #262626;
+  border-radius: 18px;
+  padding: 3px;
+  height: 40px;
+}
+
+.mode-selector .cds--btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  min-height: 34px;
+  min-width: fit-content;
+  border-radius: 17px;
+  padding: 0 12px;
+  white-space: nowrap;
+
+  svg {
+    margin-right: 6px;
+  }
+
+  span {
+    font-size: 13px;
+    line-height: 1;
+  }
+}
+
+.mode-selector .cds--btn--ghost {
+  background: transparent;
+  color: #c6c6c6;
+
+  svg {
+    fill: #c6c6c6;
+  }
+}
+
+.mode-selector .cds--btn--ghost:hover {
+  background: #393939;
+  color: #f4f4f4;
+
+  svg {
+    fill: #f4f4f4;
+  }
+}
+
+.mode-selector .cds--btn--primary {
+  background: #0f62fe;
+  color: #ffffff;
+  font-weight: 600;
+
+  svg {
+    fill: #ffffff;
+  }
+}
+
+.mode-selector .cds--btn--primary:hover {
+  background: #0353e9;
+}
