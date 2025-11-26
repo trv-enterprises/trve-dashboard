@@ -124,9 +124,11 @@ function DatasourcesPage() {
     name: datasource.name,
     type: datasource.type,
     description: datasource.description || 'No description',
-    updated: formatDate(datasource.updated),
-    datasource: datasource // Store full object for actions
+    updated: formatDate(datasource.updated)
   }));
+
+  // Helper to find original datasource by row id
+  const getDatasourceById = (id) => datasources.find(d => d.id === id);
 
   if (loading) {
     return (
@@ -184,21 +186,23 @@ function DatasourcesPage() {
                         );
                       }
                       if (cell.info.header === 'actions') {
+                        const datasource = getDatasourceById(row.id);
                         return (
                           <TableCell key={cell.id}>
                             <OverflowMenu flipped size="sm">
                               <OverflowMenuItem
                                 itemText="View"
-                                onClick={() => handleView(row.datasource)}
+                                onClick={() => handleView(datasource)}
                               />
                               <OverflowMenuItem
                                 itemText="Edit"
-                                onClick={() => handleEdit(row.datasource)}
+                                onClick={() => handleEdit(datasource)}
                               />
                               <OverflowMenuItem
                                 itemText="Delete"
+                                hasDivider
                                 isDelete
-                                onClick={() => handleDelete(row.datasource)}
+                                onClick={() => handleDelete(datasource)}
                               />
                             </OverflowMenu>
                           </TableCell>

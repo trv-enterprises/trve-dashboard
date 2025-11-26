@@ -131,9 +131,11 @@ function DashboardsListPage() {
     name: dashboard.name,
     description: dashboard.description || 'No description',
     datasources: getDatasources(dashboard),
-    updated: formatDate(dashboard.updated),
-    dashboard: dashboard // Store full object for actions
+    updated: formatDate(dashboard.updated)
   }));
+
+  // Helper to find original dashboard by row id
+  const getDashboardById = (id) => dashboards.find(d => d.id === id);
 
   if (loading) {
     return (
@@ -182,21 +184,23 @@ function DashboardsListPage() {
                   <TableRow {...getRowProps({ row })} key={row.id}>
                     {row.cells.map((cell) => {
                       if (cell.info.header === 'actions') {
+                        const dashboard = getDashboardById(row.id);
                         return (
                           <TableCell key={cell.id}>
                             <OverflowMenu flipped size="sm">
                               <OverflowMenuItem
                                 itemText="View"
-                                onClick={() => handleView(row.dashboard)}
+                                onClick={() => handleView(dashboard)}
                               />
                               <OverflowMenuItem
                                 itemText="Edit"
-                                onClick={() => handleEdit(row.dashboard)}
+                                onClick={() => handleEdit(dashboard)}
                               />
                               <OverflowMenuItem
                                 itemText="Delete"
+                                hasDivider
                                 isDelete
-                                onClick={() => handleDelete(row.dashboard)}
+                                onClick={() => handleDelete(dashboard)}
                               />
                             </OverflowMenu>
                           </TableCell>

@@ -113,9 +113,11 @@ function LayoutsPage() {
     id: layout.id,
     name: layout.name,
     description: layout.description || 'No description',
-    updated: formatDate(layout.updated),
-    layout: layout // Store full object for actions
+    updated: formatDate(layout.updated)
   }));
+
+  // Helper to find original layout by row id
+  const getLayoutById = (id) => layouts.find(l => l.id === id);
 
   if (loading) {
     return (
@@ -164,21 +166,23 @@ function LayoutsPage() {
                   <TableRow {...getRowProps({ row })} key={row.id}>
                     {row.cells.map((cell) => {
                       if (cell.info.header === 'actions') {
+                        const layout = getLayoutById(row.id);
                         return (
                           <TableCell key={cell.id}>
                             <OverflowMenu flipped size="sm">
                               <OverflowMenuItem
                                 itemText="View"
-                                onClick={() => handleView(row.layout)}
+                                onClick={() => handleView(layout)}
                               />
                               <OverflowMenuItem
                                 itemText="Edit"
-                                onClick={() => handleEdit(row.layout)}
+                                onClick={() => handleEdit(layout)}
                               />
                               <OverflowMenuItem
                                 itemText="Delete"
+                                hasDivider
                                 isDelete
-                                onClick={() => handleDelete(row.layout)}
+                                onClick={() => handleDelete(layout)}
                               />
                             </OverflowMenu>
                           </TableCell>

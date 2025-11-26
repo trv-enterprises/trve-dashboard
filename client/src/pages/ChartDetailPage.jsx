@@ -7,9 +7,11 @@ import {
   TextInput,
   TextArea,
   Tag,
-  TagSkeleton
+  TagSkeleton,
+  Toggle
 } from '@carbon/react';
-import { Save, Close } from '@carbon/icons-react';
+import { Save, Close, View, ViewOff } from '@carbon/icons-react';
+import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import './ChartDetailPage.scss';
 
 /**
@@ -38,6 +40,7 @@ function ChartDetailPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
 
   useEffect(() => {
     if (!isCreateMode) {
@@ -306,25 +309,55 @@ function ChartDetailPage() {
         </div>
       </div>
 
-      {/* Code editor */}
-      <div className="code-editor-section">
-        <h3>Component Code</h3>
-        <p className="code-help">
-          Write your React component code. Must export a `Component` or `Widget` variable.
-          Available: useState, useEffect, useMemo, useCallback, useRef, useContext, echarts, ReactECharts
-        </p>
-        <TextArea
-          id="component-code"
-          labelText=""
-          value={componentCode}
-          onChange={(e) => {
-            setComponentCode(e.target.value);
-            setHasChanges(true);
-          }}
-          placeholder="const Component = () => { ... };"
-          rows={20}
-          className="code-textarea"
-        />
+      {/* Code editor with live preview */}
+      <div className="code-preview-container">
+        <div className={`code-editor-section ${showPreview ? 'with-preview' : 'full-width'}`}>
+          <div className="section-header">
+            <h3>Component Code</h3>
+            <Toggle
+              id="preview-toggle"
+              labelText=""
+              labelA="Preview Off"
+              labelB="Preview On"
+              toggled={showPreview}
+              onToggle={() => setShowPreview(!showPreview)}
+              size="sm"
+            />
+          </div>
+          <p className="code-help">
+            Write your React component code. Must export a `Component` or `Widget` variable.
+            Available: useState, useEffect, useMemo, useCallback, useRef, useContext, echarts, ReactECharts
+          </p>
+          <TextArea
+            id="component-code"
+            labelText=""
+            value={componentCode}
+            onChange={(e) => {
+              setComponentCode(e.target.value);
+              setHasChanges(true);
+            }}
+            placeholder="const Component = () => { ... };"
+            rows={20}
+            className="code-textarea"
+          />
+        </div>
+
+        {showPreview && (
+          <div className="preview-section">
+            <div className="section-header">
+              <h3>Live Preview</h3>
+            </div>
+            <div className="preview-container">
+              {componentCode ? (
+                <DynamicComponentLoader code={componentCode} props={{}} />
+              ) : (
+                <div className="preview-placeholder">
+                  <p>Write component code to see preview</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Cancel confirmation modal */}

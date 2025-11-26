@@ -10,9 +10,11 @@ import {
   Checkbox,
   NumberInput,
   OverflowMenu,
-  OverflowMenuItem
+  OverflowMenuItem,
+  Toggle
 } from '@carbon/react';
 import { Save, Close, Add, TrashCan, Settings } from '@carbon/icons-react';
+import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import './DashboardDetailPage.scss';
 
 /**
@@ -46,6 +48,7 @@ function DashboardDetailPage() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showComponentSelector, setShowComponentSelector] = useState(null); // Track which panel's selector is open
+  const [showLivePreview, setShowLivePreview] = useState(true);
 
   useEffect(() => {
     fetchLayouts();
@@ -340,10 +343,23 @@ function DashboardDetailPage() {
       {/* Component assignments - Visual Grid Layout */}
       {selectedLayout && (
         <div className="components-section">
-          <h3>Assign Components to Panels</h3>
-          <p className="section-help">
-            Click the settings icon in each panel to assign a component.
-          </p>
+          <div className="section-header">
+            <div>
+              <h3>Assign Components to Panels</h3>
+              <p className="section-help">
+                Click the settings icon in each panel to assign a component.
+              </p>
+            </div>
+            <Toggle
+              id="live-preview-toggle"
+              labelText=""
+              labelA="Preview Off"
+              labelB="Preview On"
+              toggled={showLivePreview}
+              onToggle={() => setShowLivePreview(!showLivePreview)}
+              size="sm"
+            />
+          </div>
 
           {/* Grid info */}
           <div className="grid-info">
@@ -369,7 +385,7 @@ function DashboardDetailPage() {
                 return (
                   <div
                     key={panel.id}
-                    className="panel-item"
+                    className={`panel-item ${showLivePreview && assignedComponent ? 'live-preview' : ''}`}
                     style={{
                       gridColumn: `${panel.x + 1} / span ${panel.w}`,
                       gridRow: `${panel.y + 1} / span ${panel.h}`
@@ -377,39 +393,53 @@ function DashboardDetailPage() {
                   >
                     <div className="panel-header">
                       <span className="panel-id">{panel.id}</span>
-                      <span className="panel-size">{panel.w} × {panel.h}</span>
+                      <div className="panel-header-right">
+                        <span className="panel-size">{panel.w} × {panel.h}</span>
+                        <div className="panel-selector">
+                          <OverflowMenu
+                            renderIcon={Settings}
+                            iconDescription="Assign component"
+                            flipped
+                            size="sm"
+                          >
+                            <OverflowMenuItem
+                              itemText="No component"
+                              onClick={() => handleComponentChange(panel.id, '')}
+                            />
+                            {availableComponents.map((comp) => (
+                              <OverflowMenuItem
+                                key={comp.id}
+                                itemText={`${comp.name} (${comp.system}/${comp.source})`}
+                                onClick={() => handleComponentChange(panel.id, comp.id)}
+                              />
+                            ))}
+                          </OverflowMenu>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="panel-body">
-                      {assignedComponent && (
-                        <div className="assigned-component">
-                          <span className="component-name">{assignedComponent.name}</span>
-                          <span className="component-source">
-                            {assignedComponent.system}/{assignedComponent.source}
-                          </span>
+                      {assignedComponent ? (
+                        showLivePreview ? (
+                          <div className="component-preview">
+                            <DynamicComponentLoader
+                              code={assignedComponent.component_code}
+                              props={{}}
+                            />
+                          </div>
+                        ) : (
+                          <div className="assigned-component">
+                            <span className="component-name">{assignedComponent.name}</span>
+                            <span className="component-source">
+                              {assignedComponent.system}/{assignedComponent.source}
+                            </span>
+                          </div>
+                        )
+                      ) : (
+                        <div className="empty-panel">
+                          <span>No component assigned</span>
                         </div>
                       )}
-
-                      <div className="panel-selector">
-                        <OverflowMenu
-                          renderIcon={Settings}
-                          iconDescription="Assign component"
-                          flipped
-                          size="lg"
-                        >
-                          <OverflowMenuItem
-                            itemText="No component"
-                            onClick={() => handleComponentChange(panel.id, '')}
-                          />
-                          {availableComponents.map((comp) => (
-                            <OverflowMenuItem
-                              key={comp.id}
-                              itemText={`${comp.name} (${comp.system}/${comp.source})`}
-                              onClick={() => handleComponentChange(panel.id, comp.id)}
-                            />
-                          ))}
-                        </OverflowMenu>
-                      </div>
                     </div>
                   </div>
                 );

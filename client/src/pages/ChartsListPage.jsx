@@ -126,9 +126,11 @@ function ChartsListPage() {
     system: component.system,
     source: component.source,
     description: component.description || 'No description',
-    updated: formatDate(component.updated),
-    component: component // Store full object for actions
+    updated: formatDate(component.updated)
   }));
+
+  // Helper to find original component by row id
+  const getComponentById = (id) => components.find(c => c.id === id);
 
   if (loading) {
     return (
@@ -186,21 +188,23 @@ function ChartsListPage() {
                         );
                       }
                       if (cell.info.header === 'actions') {
+                        const component = getComponentById(row.id);
                         return (
                           <TableCell key={cell.id}>
                             <OverflowMenu flipped size="sm">
                               <OverflowMenuItem
                                 itemText="View"
-                                onClick={() => handleView(row.component)}
+                                onClick={() => handleView(component)}
                               />
                               <OverflowMenuItem
                                 itemText="Edit"
-                                onClick={() => handleEdit(row.component)}
+                                onClick={() => handleEdit(component)}
                               />
                               <OverflowMenuItem
                                 itemText="Delete"
+                                hasDivider
                                 isDelete
-                                onClick={() => handleDelete(row.component)}
+                                onClick={() => handleDelete(component)}
                               />
                             </OverflowMenu>
                           </TableCell>

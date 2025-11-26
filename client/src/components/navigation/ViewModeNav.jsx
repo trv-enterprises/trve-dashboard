@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { SideNavItems, Tag } from '@carbon/react';
+import { SideNavItems, Tag, Tooltip } from '@carbon/react';
 import { Dashboard } from '@carbon/icons-react';
 import './ViewModeNav.scss';
 
@@ -58,25 +58,30 @@ function ViewModeNav({ location, navigate }) {
         ) : (
           <div className="dashboard-tiles">
             {dashboards.map((dashboard) => (
-              <div
+              <Tooltip
                 key={dashboard.id}
-                className={`dashboard-tile ${currentDashboardId === dashboard.id ? 'selected' : ''}`}
-                onClick={() => handleSelect(dashboard.id)}
-                title={dashboard.description || dashboard.name}
+                label={dashboard.description || dashboard.name}
+                align="right"
+                enterDelayMs={100}
               >
-                <div className="tile-name">{dashboard.name}</div>
-                <div className="tile-description">
-                  {dashboard.description || 'No description'}
+                <div
+                  className={`dashboard-tile ${currentDashboardId === dashboard.id ? 'selected' : ''}`}
+                  onClick={() => handleSelect(dashboard.id)}
+                >
+                  <div className="tile-name">{dashboard.name}</div>
+                  <div className="tile-description">
+                    {dashboard.description || 'No description'}
+                  </div>
+                  <div className="tile-tags">
+                    {dashboard.settings?.theme && (
+                      <Tag type="blue" size="sm">{dashboard.settings.theme}</Tag>
+                    )}
+                    {dashboard.settings?.refresh_interval > 0 && (
+                      <Tag type="green" size="sm">{dashboard.settings.refresh_interval}s</Tag>
+                    )}
+                  </div>
                 </div>
-                <div className="tile-tags">
-                  {dashboard.settings?.theme && (
-                    <Tag type="blue" size="sm">{dashboard.settings.theme}</Tag>
-                  )}
-                  {dashboard.settings?.refresh_interval > 0 && (
-                    <Tag type="green" size="sm">{dashboard.settings.refresh_interval}s</Tag>
-                  )}
-                </div>
-              </div>
+              </Tooltip>
             ))}
           </div>
         )}

@@ -157,3 +157,87 @@ button.cds--header__action {
     margin: 0;
   }
 }
+
+// OverflowMenu (three-dot menu) dark theme styling
+.cds--overflow-menu,
+button.cds--overflow-menu {
+  background-color: transparent !important;
+
+  &:hover {
+    background-color: #4c4c4c !important;
+  }
+
+  &:focus {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: -2px;
+  }
+
+  // The three dots icon - force light color
+  svg {
+    fill: #c6c6c6 !important;
+  }
+
+  &:hover svg {
+    fill: #f4f4f4 !important;
+  }
+}
+
+// Also target when inside a table cell
+.cds--data-table td .cds--overflow-menu,
+.cds--data-table td button.cds--overflow-menu {
+  background-color: transparent !important;
+
+  &:hover {
+    background-color: #4c4c4c !important;
+  }
+
+  svg {
+    fill: #c6c6c6 !important;
+  }
+
+  &:hover svg {
+    fill: #f4f4f4 !important;
+  }
+}
+
+// OverflowMenu dropdown options
+.cds--overflow-menu-options {
+  background-color: var(--cds-layer-02, #393939);
+  border: 1px solid var(--cds-border-subtle-01, #525252);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+
+  &::after {
+    display: none; // Hide the arrow if any
+  }
+}
+
+.cds--overflow-menu-options__btn {
+  background-color: transparent;
+  color: var(--cds-text-primary, #f4f4f4);
+
+  &:hover {
+    background-color: var(--cds-layer-hover-02, #4c4c4c);
+  }
+
+  &:focus {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: -2px;
+  }
+}
+
+// Delete item styling (red text)
+.cds--overflow-menu-options__option--danger {
+  .cds--overflow-menu-options__btn {
+    color: var(--cds-text-error, #ff8389);
+
+    &:hover {
+      background-color: var(--cds-button-danger-hover, #ba1b23);
+      color: #ffffff;
+    }
+  }
+}
+
+// Divider between menu items
+.cds--overflow-menu-options__option--divider {
+  border-top: 1px solid var(--cds-border-subtle-01, #525252);
+}

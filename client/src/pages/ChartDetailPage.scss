@@ -197,18 +197,41 @@
     }
   }
 
+  .code-preview-container {
+    display: flex;
+    gap: spacing.$spacing-05;
+    margin-left: spacing.$spacing-04;
+    min-height: 500px;
+  }
+
   .code-editor-section {
     background-color: var(--cds-layer-01);
     border-radius: 4px;
     padding: spacing.$spacing-05;
-    margin-left: spacing.$spacing-04;
-    max-width: 1200px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 
-    h3 {
-      color: var(--cds-text-primary);
-      font-size: 1rem;
-      font-weight: 600;
+    &.with-preview {
+      max-width: 50%;
+    }
+
+    &.full-width {
+      max-width: 1200px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: spacing.$spacing-02;
+
+      h3 {
+        color: var(--cds-text-primary);
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0;
+      }
     }
 
     .code-help {
@@ -227,6 +250,8 @@
       border: 1px solid #525252 !important;
       border-radius: 4px;
       padding: spacing.$spacing-04;
+      flex: 1;
+      min-height: 400px;
 
       &:focus {
         outline: 2px solid var(--cds-focus);
@@ -242,10 +267,59 @@
       font-family: 'IBM Plex Mono', 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
       font-size: 0.875rem;
       line-height: 1.5;
+      flex: 1;
+      min-height: 400px;
 
       &:focus {
         outline: 2px solid var(--cds-focus);
         outline-offset: -2px;
+      }
+    }
+  }
+
+  .preview-section {
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
+    padding: spacing.$spacing-05;
+    flex: 1;
+    max-width: 50%;
+    display: flex;
+    flex-direction: column;
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: spacing.$spacing-04;
+
+      h3 {
+        color: var(--cds-text-primary);
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0;
+      }
+    }
+
+    .preview-container {
+      flex: 1;
+      background-color: var(--cds-background);
+      border: 1px solid var(--cds-border-subtle-01);
+      border-radius: 4px;
+      padding: spacing.$spacing-04;
+      overflow: auto;
+      min-height: 400px;
+    }
+
+    .preview-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--cds-text-secondary);
+
+      p {
+        margin: 0;
+        font-size: 0.875rem;
       }
     }
   }
