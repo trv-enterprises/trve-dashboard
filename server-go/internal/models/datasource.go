@@ -121,16 +121,24 @@ type SocketConfig struct {
 
 // APIConfig represents configuration for REST API data sources
 type APIConfig struct {
-	URL             string            `json:"url" bson:"url" binding:"required,url"`
-	Method          string            `json:"method" bson:"method" binding:"required,oneof=GET POST PUT DELETE PATCH"`
-	Headers         map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`
-	QueryParams     map[string]string `json:"query_params,omitempty" bson:"query_params,omitempty"`
-	Body            string            `json:"body,omitempty" bson:"body,omitempty"`
-	AuthType        string            `json:"auth_type,omitempty" bson:"auth_type,omitempty"` // none, bearer, basic, api-key
-	AuthCredentials map[string]string `json:"auth_credentials,omitempty" bson:"auth_credentials,omitempty"`
-	Timeout         int               `json:"timeout,omitempty" bson:"timeout,omitempty"` // seconds
-	RetryCount      int               `json:"retry_count,omitempty" bson:"retry_count,omitempty"`
-	RetryDelay      int               `json:"retry_delay,omitempty" bson:"retry_delay,omitempty"` // milliseconds
+	URL             string             `json:"url" bson:"url" binding:"required,url"`
+	Method          string             `json:"method" bson:"method" binding:"required,oneof=GET POST PUT DELETE PATCH"`
+	Headers         map[string]string  `json:"headers,omitempty" bson:"headers,omitempty"`
+	QueryParams     map[string]string  `json:"query_params,omitempty" bson:"query_params,omitempty"`
+	Body            string             `json:"body,omitempty" bson:"body,omitempty"`
+	AuthType        string             `json:"auth_type,omitempty" bson:"auth_type,omitempty"` // none, bearer, basic, api-key
+	AuthCredentials map[string]string  `json:"auth_credentials,omitempty" bson:"auth_credentials,omitempty"`
+	Timeout         int                `json:"timeout,omitempty" bson:"timeout,omitempty"` // seconds
+	RetryCount      int                `json:"retry_count,omitempty" bson:"retry_count,omitempty"`
+	RetryDelay      int                `json:"retry_delay,omitempty" bson:"retry_delay,omitempty"` // milliseconds
+	ResponseConfig  *APIResponseConfig `json:"response_config,omitempty" bson:"response_config,omitempty"`
+}
+
+// APIResponseConfig specifies how to parse API responses
+type APIResponseConfig struct {
+	// DataPath is the JSON path to the array of records (e.g., "data", "results", "items")
+	// If empty, assumes response is already an array or will be parsed as key-value pairs
+	DataPath string `json:"data_path,omitempty" bson:"data_path,omitempty"`
 }
 
 // HealthInfo represents health check information

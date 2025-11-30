@@ -305,6 +305,8 @@ const Component = () => {
 - Auto-redirect to first dashboard on app load
 
 ### 🚧 In Progress
+- Chart building pipeline and rendering in chart design tool, dashboard designer, and viewer
+- Fix three-dot overflow menu in list views (not currently functional)
 - Config API for user/system settings
 
 ### 📋 Planned

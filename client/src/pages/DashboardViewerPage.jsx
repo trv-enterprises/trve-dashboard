@@ -25,20 +25,22 @@ import './DashboardViewerPage.scss';
  * - Auto-refresh based on dashboard settings
  * - Fullscreen mode
  * - Real-time component rendering
+ *
+ * Dashboard structure (self-contained):
+ * - panels: Array of {id, x, y, w, h} - panel positions
+ * - charts: Object keyed by panel_id with embedded chart data
  */
 function DashboardViewerPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [dashboard, setDashboard] = useState(null);
-  const [layout, setLayout] = useState(null);
-  const [components, setComponents] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  // Fetch dashboard data
+  // Fetch dashboard data (self-contained with panels and charts)
   const fetchDashboard = useCallback(async () => {
     try {
       const response = await fetch(`http://localhost:3001/api/dashboards/${id}`);
@@ -47,41 +49,6 @@ function DashboardViewerPage() {
       }
       const data = await response.json();
       setDashboard(data);
-
-      // Fetch layout details
-      if (data.layout_id) {
-        const layoutResponse = await fetch(`http://localhost:3001/api/layouts/${data.layout_id}`);
-        if (layoutResponse.ok) {
-          const layoutData = await layoutResponse.json();
-          setLayout(layoutData);
-        }
-      }
-
-      // Fetch component details for each assigned component
-      if (data.components && data.components.length > 0) {
-        const componentPromises = data.components
-          .filter(c => c.component_id)
-          .map(async (placement) => {
-            try {
-              const compResponse = await fetch(`http://localhost:3001/api/components/${placement.component_id}`);
-              if (compResponse.ok) {
-                const compData = await compResponse.json();
-                return { panelId: placement.panel_id, component: compData };
-              }
-            } catch (err) {
-              console.error(`Failed to fetch component ${placement.component_id}:`, err);
-            }
-            return null;
-          });
-
-        const results = await Promise.all(componentPromises);
-        const componentMap = {};
-        results.filter(Boolean).forEach(({ panelId, component }) => {
-          componentMap[panelId] = component;
-        });
-        setComponents(componentMap);
-      }
-
       setLastRefresh(new Date());
     } catch (err) {
       setError(err.message);
@@ -220,37 +187,41 @@ function DashboardViewerPage() {
       </div>
 
       {/* Dashboard grid */}
-      {layout ? (
+      {dashboard?.panels && dashboard.panels.length > 0 ? (
         <div className="dashboard-grid-container">
           <div
             className="dashboard-grid"
             style={{
               gridTemplateColumns: 'repeat(12, 1fr)',
-              gridTemplateRows: `repeat(${layout.rows || 50}, 32px)`,
-              minHeight: `${(layout.rows || 50) * 32}px`
+              gridTemplateRows: 'repeat(50, 32px)',
+              minHeight: '1600px'
             }}
           >
-            {layout.panels?.map((panel) => {
-              const component = components[panel.id];
-
-              // Only render panels that have components assigned
-              if (!component) return null;
+            {dashboard.panels.map((panel) => {
+              const chart = dashboard.charts?.[panel.id];
+              const hasChart = !!chart?.component_code;
 
               return (
                 <div
                   key={panel.id}
-                  className="panel-container has-component"
+                  className={`panel-container ${hasChart ? 'has-component' : 'empty-panel'}`}
                   style={{
                     gridColumn: `${panel.x + 1} / span ${panel.w}`,
                     gridRow: `${panel.y + 1} / span ${panel.h}`
                   }}
                 >
-                  <div className="component-wrapper">
-                    <DynamicComponentLoader
-                      code={component.component_code}
-                      props={component.props || {}}
-                    />
-                  </div>
+                  {hasChart ? (
+                    <div className="component-wrapper">
+                      <DynamicComponentLoader
+                        code={chart.component_code}
+                        props={{}}
+                      />
+                    </div>
+                  ) : (
+                    <div className="empty-panel-placeholder">
+                      <span>No chart</span>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -258,7 +229,7 @@ function DashboardViewerPage() {
         </div>
       ) : (
         <div className="no-layout">
-          <p>No layout assigned to this dashboard.</p>
+          <p>No panels configured for this dashboard.</p>
           <Button onClick={() => navigate(`/design/dashboards/${id}`)}>
             Configure Dashboard
           </Button>

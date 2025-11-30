@@ -26,20 +26,24 @@ func NewDashboardRepository(db *mongo.Database) *DashboardRepository {
 
 // Create creates a new dashboard
 func (r *DashboardRepository) Create(ctx context.Context, req *models.CreateDashboardRequest) (*models.Dashboard, error) {
-	// Generate unique IDs for dashboard components
-	components := req.Components
-	for i := range components {
-		if components[i].ID == "" {
-			components[i].ID = uuid.New().String()
-		}
+	// Initialize charts map if nil
+	charts := req.Charts
+	if charts == nil {
+		charts = make(map[string]models.EmbeddedChart)
+	}
+
+	// Initialize panels if nil
+	panels := req.Panels
+	if panels == nil {
+		panels = []models.DashboardPanel{}
 	}
 
 	dashboard := &models.Dashboard{
 		ID:          uuid.New().String(),
 		Name:        req.Name,
 		Description: req.Description,
-		LayoutID:    req.LayoutID,
-		Components:  components,
+		Panels:      panels,
+		Charts:      charts,
 		Settings:    req.Settings,
 		Metadata:    req.Metadata,
 		Created:     time.Now(),
@@ -149,18 +153,11 @@ func (r *DashboardRepository) Update(ctx context.Context, id string, req *models
 	if req.Description != nil {
 		setFields["description"] = *req.Description
 	}
-	if req.LayoutID != nil {
-		setFields["layout_id"] = *req.LayoutID
+	if req.Panels != nil {
+		setFields["panels"] = *req.Panels
 	}
-	if req.Components != nil {
-		// Ensure all components have IDs
-		components := *req.Components
-		for i := range components {
-			if components[i].ID == "" {
-				components[i].ID = uuid.New().String()
-			}
-		}
-		setFields["components"] = components
+	if req.Charts != nil {
+		setFields["charts"] = *req.Charts
 	}
 	if req.Settings != nil {
 		setFields["settings"] = *req.Settings

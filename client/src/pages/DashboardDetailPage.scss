@@ -88,13 +88,14 @@
 
   .settings-row {
     display: flex;
-    gap: spacing.$spacing-03;
-    margin-bottom: spacing.$spacing-03;
+    gap: spacing.$spacing-04;
+    margin-bottom: spacing.$spacing-04;
     margin-left: spacing.$spacing-04;
     align-items: flex-end;
+    flex-wrap: wrap;
 
     .cds--select {
-      width: 120px;
+      width: 140px;
     }
 
     .cds--number-input-wrapper {
@@ -119,6 +120,26 @@
         outline: 2px solid var(--cds-focus);
         outline-offset: -2px;
       }
+
+      &:disabled {
+        background-color: #1a1a1a !important;
+        color: #6f6f6f !important;
+        cursor: not-allowed;
+      }
+    }
+
+    .layout-disabled {
+      opacity: 0.6;
+    }
+
+    .custom-layout-badge {
+      background-color: #24a148;
+      color: #ffffff;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 12px;
+      margin-bottom: 6px;
     }
 
     // Number input styling
@@ -155,32 +176,77 @@
     }
   }
 
-  .layout-row {
-    margin-bottom: spacing.$spacing-05;
+  // Editor mode toolbar
+  .editor-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-left: spacing.$spacing-04;
+    margin-bottom: spacing.$spacing-04;
+    padding: spacing.$spacing-03 spacing.$spacing-04;
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
 
-    .cds--select {
-      max-width: 400px;
-    }
+    .editor-mode-selector {
+      display: flex;
+      gap: 3px;
+      background: #262626;
+      border-radius: 18px;
+      padding: 3px;
 
-    .cds--label {
-      color: #c6c6c6 !important;
-      margin-bottom: spacing.$spacing-02;
-      font-weight: 600;
-      font-size: 0.875rem;
-      display: block;
-    }
+      .cds--btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 32px;
+        min-height: 32px;
+        border-radius: 16px;
+        padding: 0 12px;
+        white-space: nowrap;
+        font-size: 0.8125rem;
 
-    .cds--select-input {
-      background-color: #262626 !important;
-      color: #f4f4f4 !important;
-      border: none !important;
-      border-bottom: 1px solid #525252 !important;
-
-      &:focus {
-        outline: 2px solid var(--cds-focus);
-        outline-offset: -2px;
+        svg {
+          margin-right: 6px;
+        }
       }
+
+      .cds--btn--ghost {
+        background: transparent;
+        color: #c6c6c6;
+
+        svg {
+          fill: #c6c6c6;
+        }
+
+        &:hover {
+          background: #393939;
+          color: #f4f4f4;
+
+          svg {
+            fill: #f4f4f4;
+          }
+        }
+      }
+
+      .cds--btn--primary {
+        background: #0f62fe;
+        color: #ffffff;
+        font-weight: 600;
+
+        svg {
+          fill: #ffffff;
+        }
+
+        &:hover {
+          background: #0353e9;
+        }
+      }
+    }
+
+    .editor-mode-help {
+      color: #c6c6c6;
+      font-size: 0.8125rem;
+      font-style: italic;
     }
   }
 
@@ -190,40 +256,7 @@
     padding: spacing.$spacing-05;
     margin-left: spacing.$spacing-04;
     margin-bottom: spacing.$spacing-05;
-    max-width: none; // Allow full width for grid
-
-    .section-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: spacing.$spacing-04;
-
-      h3 {
-        color: var(--cds-text-primary);
-        font-size: 1rem;
-        font-weight: 600;
-        margin: 0 0 spacing.$spacing-02 0;
-      }
-
-      .section-help {
-        color: var(--cds-text-secondary);
-        font-size: 0.875rem;
-        margin: 0;
-      }
-    }
-
-    h3 {
-      color: var(--cds-text-primary);
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: spacing.$spacing-02;
-    }
-
-    .section-help {
-      color: var(--cds-text-secondary);
-      font-size: 0.875rem;
-      margin-bottom: spacing.$spacing-05;
-    }
+    max-width: none;
 
     .grid-info {
       display: flex;
@@ -270,6 +303,11 @@
         min-width: 800px;
         position: relative;
 
+        // Design mode styling
+        &.mode-design {
+          cursor: crosshair;
+        }
+
         .panel-item {
           background-color: rgba(15, 98, 254, 0.15);
           border: 2px solid #0f62fe;
@@ -278,7 +316,7 @@
           flex-direction: column;
           position: relative;
           overflow: hidden;
-          transition: all 0.2s ease;
+          transition: all 0.15s ease;
 
           &:hover {
             background-color: rgba(15, 98, 254, 0.25);
@@ -288,10 +326,50 @@
 
           &.live-preview {
             background-color: var(--cds-background);
+            border-color: #525252;
 
             &:hover {
               background-color: var(--cds-background);
+              border-color: #78a9ff;
             }
+          }
+
+          &.design-mode {
+            .panel-header {
+              cursor: move;
+            }
+
+            .design-body {
+              cursor: pointer;
+              width: 100%;
+              height: 100%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+
+              &:hover {
+                background-color: rgba(36, 161, 72, 0.1);
+              }
+
+              .chart-info {
+                .edit-hint {
+                  color: #6f6f6f;
+                  font-size: 0.6875rem;
+                  font-style: italic;
+                  margin-top: spacing.$spacing-02;
+                }
+              }
+            }
+
+            &:hover {
+              box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            }
+          }
+
+          &.drawing {
+            background-color: rgba(36, 161, 72, 0.3);
+            border: 2px dashed #24a148;
+            pointer-events: none;
           }
 
           .panel-header {
@@ -313,7 +391,7 @@
             .panel-header-right {
               display: flex;
               align-items: center;
-              gap: spacing.$spacing-03;
+              gap: spacing.$spacing-02;
 
               .panel-size {
                 color: #c6c6c6;
@@ -321,30 +399,20 @@
                 font-family: 'IBM Plex Mono', monospace;
               }
 
-              .panel-selector {
-                .cds--overflow-menu {
-                  background-color: rgba(0, 0, 0, 0.4);
-                  border: 1px solid #525252;
-                  border-radius: 4px;
-                  width: 24px;
-                  height: 24px;
+              .cds--btn--icon-only {
+                min-height: 24px;
+                width: 24px;
+                height: 24px;
+                padding: 0;
 
-                  &:hover {
-                    background-color: rgba(0, 0, 0, 0.6);
-                    border-color: #78a9ff;
-                  }
+                svg {
+                  fill: #78a9ff;
+                }
 
-                  svg {
-                    fill: #78a9ff;
-                  }
+                &:hover {
+                  background-color: rgba(120, 169, 255, 0.2);
                 }
               }
-            }
-
-            .panel-size {
-              color: #c6c6c6;
-              font-size: 0.75rem;
-              font-family: 'IBM Plex Mono', monospace;
             }
           }
 
@@ -364,31 +432,35 @@
               overflow: auto;
             }
 
-            .assigned-component {
+            .chart-info {
               display: flex;
               flex-direction: column;
               align-items: center;
               gap: spacing.$spacing-02;
               text-align: center;
 
-              .component-name {
+              svg {
+                fill: #78a9ff;
+              }
+
+              .chart-name {
                 color: #f4f4f4;
                 font-size: 0.875rem;
                 font-weight: 600;
-              }
-
-              .component-source {
-                color: #c6c6c6;
-                font-size: 0.75rem;
-                font-family: 'IBM Plex Mono', monospace;
               }
             }
 
             .empty-panel {
               display: flex;
+              flex-direction: column;
               align-items: center;
               justify-content: center;
+              gap: spacing.$spacing-02;
               height: 100%;
+
+              svg {
+                fill: #6f6f6f;
+              }
 
               span {
                 color: #6f6f6f;
@@ -396,27 +468,29 @@
                 font-style: italic;
               }
             }
+          }
 
-            .panel-selector {
-              display: flex;
-              align-items: center;
-              justify-content: center;
+          // Resize handle
+          .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 16px;
+            height: 16px;
+            cursor: se-resize;
+            background: linear-gradient(
+              135deg,
+              transparent 50%,
+              #78a9ff 50%
+            );
+            border-radius: 0 0 4px 0;
 
-              // Style the overflow menu button
-              .cds--overflow-menu {
-                background-color: rgba(0, 0, 0, 0.4);
-                border: 1px solid #525252;
-                border-radius: 4px;
-
-                &:hover {
-                  background-color: rgba(0, 0, 0, 0.6);
-                  border-color: #78a9ff;
-                }
-
-                svg {
-                  fill: #78a9ff;
-                }
-              }
+            &:hover {
+              background: linear-gradient(
+                135deg,
+                transparent 50%,
+                #0f62fe 50%
+              );
             }
           }
         }

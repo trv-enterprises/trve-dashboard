@@ -4,35 +4,65 @@ import (
 	"time"
 )
 
-// Dashboard represents a complete dashboard configuration
-// @Description Dashboard model combining layout and components
-type Dashboard struct {
-	ID          string                 `json:"id" bson:"_id"`
-	Name        string                 `json:"name" bson:"name" binding:"required"`
-	Description string                 `json:"description" bson:"description"`
-	LayoutID    string                 `json:"layout_id" bson:"layout_id" binding:"required"`
-	Components  []DashboardComponent   `json:"components" bson:"components"`
-	Settings    DashboardSettings      `json:"settings" bson:"settings"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty" bson:"metadata,omitempty"`
-	Created     time.Time              `json:"created" bson:"created"`
-	Updated     time.Time              `json:"updated" bson:"updated"`
+// DashboardPanel represents a panel position in the dashboard grid
+// @Description Panel position and size in the grid (copied from layout template)
+type DashboardPanel struct {
+	ID string `json:"id" bson:"id"`
+	X  int    `json:"x" bson:"x"`
+	Y  int    `json:"y" bson:"y"`
+	W  int    `json:"w" bson:"w"`
+	H  int    `json:"h" bson:"h"`
 }
 
-// DashboardComponent represents a component placed in a dashboard
-// @Description Component placement within a dashboard
-type DashboardComponent struct {
-	ID          string                 `json:"id" bson:"id"`                       // Unique ID for this placement
-	ComponentID string                 `json:"component_id" bson:"component_id"`   // Reference to Component
-	PanelID     string                 `json:"panel_id" bson:"panel_id"`           // Reference to Layout Panel
-	Config      map[string]interface{} `json:"config,omitempty" bson:"config,omitempty"` // Component-specific config
-	Props       map[string]interface{} `json:"props,omitempty" bson:"props,omitempty"`   // Runtime props
+// ChartQueryConfig defines how to query data for a chart
+// @Description Query configuration for fetching chart data
+type ChartQueryConfig struct {
+	Raw    string                 `json:"raw" bson:"raw"`       // SQL query, filter, or API path
+	Type   string                 `json:"type" bson:"type"`     // sql, csv_filter, stream_filter, api
+	Params map[string]interface{} `json:"params" bson:"params"` // Query parameters
+}
+
+// ChartDataMapping defines how to map query results to chart elements
+// @Description Mapping configuration from data columns to chart axes/series
+type ChartDataMapping struct {
+	XAxis    string   `json:"x_axis" bson:"x_axis"`       // Column for X axis (categories)
+	YAxis    []string `json:"y_axis" bson:"y_axis"`       // Columns for Y axis (values/series)
+	GroupBy  string   `json:"group_by" bson:"group_by"`   // Column to group/split series by
+	LabelCol string   `json:"label_col" bson:"label_col"` // Column for labels
+}
+
+// EmbeddedChart represents a chart embedded directly in a dashboard
+// @Description Chart stored within a dashboard, keyed by panel_id
+type EmbeddedChart struct {
+	ID            string                 `json:"id" bson:"id"`
+	Name          string                 `json:"name" bson:"name"`
+	ChartType     string                 `json:"chart_type" bson:"chart_type"`         // bar, line, pie, etc.
+	DatasourceID  string                 `json:"datasource_id" bson:"datasource_id"`   // Reference to datasource
+	QueryConfig   *ChartQueryConfig      `json:"query_config" bson:"query_config"`     // How to query data
+	DataMapping   *ChartDataMapping      `json:"data_mapping" bson:"data_mapping"`     // How to map data to chart
+	ComponentCode string                 `json:"component_code" bson:"component_code"` // Custom React component code
+	Options       map[string]interface{} `json:"options" bson:"options"`               // ECharts options overrides
+}
+
+// Dashboard represents a complete dashboard configuration
+// @Description Self-contained dashboard with panels and embedded charts
+type Dashboard struct {
+	ID          string                   `json:"id" bson:"_id"`
+	Name        string                   `json:"name" bson:"name" binding:"required"`
+	Description string                   `json:"description" bson:"description"`
+	Panels      []DashboardPanel         `json:"panels" bson:"panels"`
+	Charts      map[string]EmbeddedChart `json:"charts" bson:"charts"`
+	Settings    DashboardSettings        `json:"settings" bson:"settings"`
+	Metadata    map[string]interface{}   `json:"metadata,omitempty" bson:"metadata,omitempty"`
+	Created     time.Time                `json:"created" bson:"created"`
+	Updated     time.Time                `json:"updated" bson:"updated"`
 }
 
 // DashboardSettings contains dashboard-level configuration
 // @Description Dashboard settings and preferences
 type DashboardSettings struct {
-	Theme           string `json:"theme" bson:"theme"`                       // "light", "dark", "auto"
-	RefreshInterval int    `json:"refresh_interval" bson:"refresh_interval"` // Auto-refresh interval in ms
+	Theme           string `json:"theme" bson:"theme"`
+	RefreshInterval int    `json:"refresh_interval" bson:"refresh_interval"`
 	TimeZone        string `json:"timezone,omitempty" bson:"timezone,omitempty"`
 	DefaultView     string `json:"default_view,omitempty" bson:"default_view,omitempty"`
 	IsPublic        bool   `json:"is_public" bson:"is_public"`
@@ -42,23 +72,23 @@ type DashboardSettings struct {
 // CreateDashboardRequest represents a request to create a dashboard
 // @Description Request body for creating a new dashboard
 type CreateDashboardRequest struct {
-	Name        string                 `json:"name" binding:"required"`
-	Description string                 `json:"description"`
-	LayoutID    string                 `json:"layout_id" binding:"required"`
-	Components  []DashboardComponent   `json:"components"`
-	Settings    DashboardSettings      `json:"settings"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	Name        string                   `json:"name" binding:"required"`
+	Description string                   `json:"description"`
+	Panels      []DashboardPanel         `json:"panels"`
+	Charts      map[string]EmbeddedChart `json:"charts"`
+	Settings    DashboardSettings        `json:"settings"`
+	Metadata    map[string]interface{}   `json:"metadata,omitempty"`
 }
 
 // UpdateDashboardRequest represents a request to update a dashboard
 // @Description Request body for updating an existing dashboard
 type UpdateDashboardRequest struct {
-	Name        *string                 `json:"name,omitempty"`
-	Description *string                 `json:"description,omitempty"`
-	LayoutID    *string                 `json:"layout_id,omitempty"`
-	Components  *[]DashboardComponent   `json:"components,omitempty"`
-	Settings    *DashboardSettings      `json:"settings,omitempty"`
-	Metadata    *map[string]interface{} `json:"metadata,omitempty"`
+	Name        *string                   `json:"name,omitempty"`
+	Description *string                   `json:"description,omitempty"`
+	Panels      *[]DashboardPanel         `json:"panels,omitempty"`
+	Charts      *map[string]EmbeddedChart `json:"charts,omitempty"`
+	Settings    *DashboardSettings        `json:"settings,omitempty"`
+	Metadata    *map[string]interface{}   `json:"metadata,omitempty"`
 }
 
 // DashboardListResponse represents a paginated list of dashboards
@@ -77,12 +107,4 @@ type DashboardQueryParams struct {
 	IsPublic *bool  `form:"is_public"`
 	Page     int    `form:"page" binding:"min=1"`
 	PageSize int    `form:"page_size" binding:"min=1,max=100"`
-}
-
-// DashboardWithDetails includes expanded layout and component details
-// @Description Dashboard with full layout and component information
-type DashboardWithDetails struct {
-	Dashboard
-	Layout           *Layout      `json:"layout,omitempty"`
-	ComponentDetails []Component  `json:"component_details,omitempty"`
 }

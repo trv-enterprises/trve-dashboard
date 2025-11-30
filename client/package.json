@@ -15,6 +15,7 @@
     "@antv/g2plot": "^2.4.35",
     "@babel/standalone": "^7.28.5",
     "@carbon/colors": "^11.42.0",
+    "@carbon/ibm-products": "^2.79.0",
     "@carbon/react": "^1.95.0",
     "@carbon/themes": "^11.62.0",
     "antd": "^5.28.1",

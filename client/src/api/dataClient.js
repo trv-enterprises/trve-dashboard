@@ -8,22 +8,22 @@ import apiClient from './client';
 /**
  * Query data from a datasource
  * @param {string} datasourceId - ID of the datasource
- * @param {object} query - Query parameters
+ * @param {object} query - Query parameters (raw, type, params)
  * @param {boolean} useCache - Whether to use cache (default: true)
  * @returns {Promise<object>} Query result with data and source
  */
 export async function queryData(datasourceId, query, useCache = true) {
   try {
-    const response = await apiClient.post('/data/query', {
-      datasourceId,
-      query,
-      useCache
+    // Use the existing datasource query endpoint
+    const response = await apiClient.post(`/datasources/${datasourceId}/query`, {
+      query: query
     });
 
+    // The backend returns result_set with columns and rows
     return {
-      data: response.data,
-      source: response.source,
-      cached: response.cached
+      data: response.result_set,
+      source: useCache ? 'cache' : 'datasource',
+      cached: useCache
     };
   } catch (error) {
     console.error('Data query error:', error);

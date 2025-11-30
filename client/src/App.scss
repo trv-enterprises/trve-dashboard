@@ -50,6 +50,33 @@ button.cds--header__action {
   fill: #f4f4f4 !important;
 }
 
+// Custom nav toggle button
+.nav-toggle-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.11s;
+
+  svg {
+    fill: #f4f4f4;
+  }
+
+  &:hover {
+    background-color: #393939;
+  }
+
+  &:focus {
+    outline: 2px solid var(--cds-focus, #0f62fe);
+    outline-offset: -2px;
+  }
+}
+
 // Header layout groups
 .header-mode-group {
   display: flex;
@@ -95,6 +122,49 @@ button.cds--header__action {
   border-right: 1px solid var(--cds-border-strong-01);
   box-shadow: 1px 0 2px rgba(0, 0, 0, 0.3);
   overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.11s cubic-bezier(0.2, 0, 1, 0.9);
+
+  // Collapsed state - show rail with icons only
+  &:not(.cds--side-nav--expanded) {
+    width: 48px;
+
+    // Hide text labels
+    .cds--side-nav__link-text {
+      opacity: 0;
+      width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    // Center icons
+    .cds--side-nav__link {
+      justify-content: center;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    .cds--side-nav__icon {
+      margin-right: 0;
+    }
+
+    // Hide view mode nav content when collapsed
+    .view-mode-nav {
+      .nav-header span,
+      .dashboard-tiles,
+      .nav-loading,
+      .nav-empty {
+        display: none;
+      }
+
+      .nav-header {
+        justify-content: center;
+        padding: spacing.$spacing-03;
+        margin: 0;
+        border-bottom: none;
+      }
+    }
+  }
 }
 
 .cds--side-nav__link {
@@ -132,6 +202,12 @@ button.cds--header__action {
   padding: 0;
   min-height: calc(100vh - 48px); // Account for header height
   overflow-y: auto;
+  transition: margin-left 0.11s cubic-bezier(0.2, 0, 1, 0.9);
+
+  // When nav is collapsed (shows rail with icons)
+  &.app-content--nav-collapsed {
+    margin-left: 48px; // Width of collapsed nav rail
+  }
 }
 
 // View Mode welcome screen
@@ -240,4 +316,21 @@ button.cds--overflow-menu {
 // Divider between menu items
 .cds--overflow-menu-options__option--divider {
   border-top: 1px solid var(--cds-border-subtle-01, #525252);
+}
+
+// Toggle dark theme styling
+.cds--toggle {
+  .cds--toggle__label-text {
+    color: var(--cds-text-primary, #f4f4f4) !important;
+  }
+
+  .cds--toggle__text {
+    color: var(--cds-text-secondary, #c6c6c6) !important;
+  }
+
+  // The "on" and "off" labels (labelA, labelB)
+  .cds--toggle__text--off,
+  .cds--toggle__text--on {
+    color: var(--cds-text-secondary, #c6c6c6) !important;
+  }
 }

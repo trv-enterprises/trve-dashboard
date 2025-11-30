@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/tviviano/dashboard/internal/models"
@@ -22,7 +23,7 @@ func NewDashboardHandler(service *service.DashboardService) *DashboardHandler {
 
 // CreateDashboard creates a new dashboard
 // @Summary Create a new dashboard
-// @Description Create a new dashboard combining layout and components
+// @Description Create a new dashboard with panels and embedded charts
 // @Tags dashboards
 // @Accept json
 // @Produce json
@@ -41,10 +42,7 @@ func (h *DashboardHandler) CreateDashboard(c *gin.Context) {
 	dashboard, err := h.service.CreateDashboard(c.Request.Context(), &req)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err.Error()[:len("dashboard with name")] == "dashboard with name" ||
-			err.Error()[:len("layout")] == "layout" ||
-			err.Error()[:len("component")] == "component" ||
-			err.Error()[:len("panel")] == "panel" {
+		if strings.Contains(err.Error(), "already exists") {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{"error": err.Error()})
@@ -56,7 +54,7 @@ func (h *DashboardHandler) CreateDashboard(c *gin.Context) {
 
 // GetDashboard retrieves a dashboard by ID
 // @Summary Get a dashboard
-// @Description Get a dashboard by ID
+// @Description Get a dashboard by ID (includes panels and charts)
 // @Tags dashboards
 // @Produce json
 // @Param id path string true "Dashboard ID"
@@ -69,33 +67,7 @@ func (h *DashboardHandler) GetDashboard(c *gin.Context) {
 
 	dashboard, err := h.service.GetDashboard(c.Request.Context(), id)
 	if err != nil {
-		if err.Error() == "dashboard not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Dashboard not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, dashboard)
-}
-
-// GetDashboardWithDetails retrieves a dashboard with expanded details
-// @Summary Get a dashboard with details
-// @Description Get a dashboard with expanded layout and component information
-// @Tags dashboards
-// @Produce json
-// @Param id path string true "Dashboard ID"
-// @Success 200 {object} models.DashboardWithDetails
-// @Failure 404 {object} map[string]interface{}
-// @Failure 500 {object} map[string]interface{}
-// @Router /dashboards/{id}/details [get]
-func (h *DashboardHandler) GetDashboardWithDetails(c *gin.Context) {
-	id := c.Param("id")
-
-	dashboard, err := h.service.GetDashboardWithDetails(c.Request.Context(), id)
-	if err != nil {
-		if err.Error() == "dashboard not found" {
+		if strings.Contains(err.Error(), "not found") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Dashboard not found"})
 			return
 		}
@@ -160,12 +132,9 @@ func (h *DashboardHandler) UpdateDashboard(c *gin.Context) {
 	dashboard, err := h.service.UpdateDashboard(c.Request.Context(), id, &req)
 	if err != nil {
 		status := http.StatusInternalServerError
-		if err.Error() == "dashboard not found" {
+		if strings.Contains(err.Error(), "not found") {
 			status = http.StatusNotFound
-		} else if err.Error()[:len("dashboard with name")] == "dashboard with name" ||
-			err.Error()[:len("layout")] == "layout" ||
-			err.Error()[:len("component")] == "component" ||
-			err.Error()[:len("panel")] == "panel" {
+		} else if strings.Contains(err.Error(), "already exists") {
 			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{"error": err.Error()})
@@ -189,7 +158,7 @@ func (h *DashboardHandler) DeleteDashboard(c *gin.Context) {
 
 	err := h.service.DeleteDashboard(c.Request.Context(), id)
 	if err != nil {
-		if err.Error() == "dashboard not found" {
+		if strings.Contains(err.Error(), "not found") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Dashboard not found"})
 			return
 		}

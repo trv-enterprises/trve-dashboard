@@ -6,6 +6,7 @@ import {
   HeaderName,
   HeaderGlobalBar,
   HeaderGlobalAction,
+  HeaderMenuButton,
   SideNav,
   SideNavItems,
   SideNavLink,
@@ -13,14 +14,15 @@ import {
   Content
 } from '@carbon/react';
 import {
-  Add,
   Checkmark,
   WarningAlt,
   Help,
   Switcher,
   Notification,
   UserAvatar,
-  ChartMultitype
+  ChartMultitype,
+  Menu,
+  Close
 } from '@carbon/icons-react';
 import DashboardPage from './pages/DashboardPage';
 import NodesPage from './pages/NodesPage';
@@ -109,16 +111,6 @@ function AppContent() {
     fetchFirstDashboard();
   }, []);
 
-  const handleCreateNew = () => {
-    navigate('/chart-design');
-    // Add a small delay to ensure navigation completes before triggering create mode
-    setTimeout(() => {
-      // This will be handled by the ChartDesignPage component
-      const event = new CustomEvent('create-component');
-      window.dispatchEvent(event);
-    }, 100);
-  };
-
   // Render navigation based on current mode
   const renderNavigation = () => {
     switch (currentMode) {
@@ -138,6 +130,14 @@ function AppContent() {
       <HeaderContainer
         render={() => (
           <Header aria-label="My Dashboard">
+            <button
+              className="nav-toggle-button"
+              aria-label={isSideNavExpanded ? 'Close menu' : 'Open menu'}
+              onClick={() => setIsSideNavExpanded(!isSideNavExpanded)}
+              type="button"
+            >
+              {isSideNavExpanded ? <Close size={20} /> : <Menu size={20} />}
+            </button>
             <HeaderName href="/" prefix="">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <ChartMultitype size={20} />
@@ -172,14 +172,6 @@ function AppContent() {
                   )}
                 </Tag>
               </div>
-              <HeaderGlobalAction
-                aria-label="Create new component"
-                onClick={handleCreateNew}
-                isActive={location.pathname === '/chart-design'}
-                disabled={serverStatus !== 'connected'}
-              >
-                <Add size={20} />
-              </HeaderGlobalAction>
               <HeaderGlobalAction aria-label="Help">
                 <Help size={20} />
               </HeaderGlobalAction>
@@ -206,7 +198,7 @@ function AppContent() {
         {renderNavigation()}
       </SideNav>
 
-      <Content className="app-content">
+      <Content className={`app-content ${isSideNavExpanded ? '' : 'app-content--nav-collapsed'}`}>
         <Routes>
           {/* Default route redirects to View mode - first dashboard or fallback */}
           <Route path="/" element={

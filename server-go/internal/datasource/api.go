@@ -137,10 +137,19 @@ func (a *APIDataSource) Stream(ctx context.Context, query models.Query) (<-chan 
 
 // buildRequest creates an HTTP request with all configured options
 func (a *APIDataSource) buildRequest(ctx context.Context, query models.Query) (*http.Request, error) {
-	// Use config URL or override from query
+	// Use config URL as base, append query.Raw as path if it starts with /
 	url := a.config.URL
 	if query.Raw != "" {
-		url = query.Raw
+		if strings.HasPrefix(query.Raw, "/") {
+			// Append path to base URL
+			url = strings.TrimSuffix(a.config.URL, "/") + query.Raw
+		} else if strings.HasPrefix(query.Raw, "http://") || strings.HasPrefix(query.Raw, "https://") {
+			// Full URL override
+			url = query.Raw
+		} else {
+			// Treat as path segment
+			url = strings.TrimSuffix(a.config.URL, "/") + "/" + query.Raw
+		}
 	}
 
 	// Create request body
@@ -267,6 +276,17 @@ func (a *APIDataSource) parseJSONArray(data []interface{}) *models.ResultSet {
 
 // parseJSONObject converts JSON object to ResultSet
 func (a *APIDataSource) parseJSONObject(data map[string]interface{}) *models.ResultSet {
+	// Check if there's a DataPath configured to extract array from object
+	if a.config.ResponseConfig != nil && a.config.ResponseConfig.DataPath != "" {
+		if extracted, ok := data[a.config.ResponseConfig.DataPath]; ok {
+			if arr, ok := extracted.([]interface{}); ok {
+				// Found the array at the configured path, parse it
+				return a.parseJSONArray(arr)
+			}
+		}
+	}
+
+	// Default behavior: convert object to key-value pairs
 	resultSet := &models.ResultSet{
 		Columns:  []string{"key", "value"},
 		Rows:     make([][]interface{}, 0),

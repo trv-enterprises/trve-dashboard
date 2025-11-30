@@ -92,7 +92,7 @@ func main() {
 	layoutService := service.NewLayoutService(layoutRepo)
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	componentService := service.NewComponentService(componentRepo)
-	dashboardService := service.NewDashboardService(dashboardRepo, layoutRepo, componentRepo)
+	dashboardService := service.NewDashboardService(dashboardRepo)
 
 	// Initialize handlers
 	layoutHandler := handlers.NewLayoutHandler(layoutService)
@@ -146,7 +146,6 @@ func main() {
 			dashboards.POST("", dashboardHandler.CreateDashboard)
 			dashboards.GET("", dashboardHandler.ListDashboards)
 			dashboards.GET("/:id", dashboardHandler.GetDashboard)
-			dashboards.GET("/:id/details", dashboardHandler.GetDashboardWithDetails)
 			dashboards.PUT("/:id", dashboardHandler.UpdateDashboard)
 			dashboards.DELETE("/:id", dashboardHandler.DeleteDashboard)
 		}
