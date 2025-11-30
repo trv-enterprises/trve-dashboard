@@ -15,8 +15,9 @@ import apiClient from './client';
 export async function queryData(datasourceId, query, useCache = true) {
   try {
     // Use the existing datasource query endpoint
-    const response = await apiClient.post(`/datasources/${datasourceId}/query`, {
-      query: query
+    const response = await apiClient.request(`/api/datasources/${datasourceId}/query`, {
+      method: 'POST',
+      body: JSON.stringify({ query: query })
     });
 
     // The backend returns result_set with columns and rows
@@ -27,7 +28,7 @@ export async function queryData(datasourceId, query, useCache = true) {
     };
   } catch (error) {
     console.error('Data query error:', error);
-    throw new Error(error.response?.data?.error || error.message || 'Failed to query data');
+    throw new Error(error.message || 'Failed to query data');
   }
 }
 

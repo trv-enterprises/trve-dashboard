@@ -211,12 +211,17 @@ function DashboardViewerPage() {
                   }}
                 >
                   {hasChart ? (
-                    <div className="component-wrapper">
-                      <DynamicComponentLoader
-                        code={chart.component_code}
-                        props={{}}
-                      />
-                    </div>
+                    <>
+                      <div className="chart-header">
+                        <span className="chart-name">{chart.name || 'Untitled Chart'}</span>
+                      </div>
+                      <div className="component-wrapper">
+                        <DynamicComponentLoader
+                          code={chart.component_code}
+                          props={{}}
+                        />
+                      </div>
+                    </>
                   ) : (
                     <div className="empty-panel-placeholder">
                       <span>No chart</span>

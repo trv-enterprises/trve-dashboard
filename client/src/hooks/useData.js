@@ -6,28 +6,29 @@
  * const { data, loading, error, refetch } = useData({
  *   datasourceId: 'uuid',
  *   query: {
- *     table: 'metrics',
- *     metric: 'cpu_usage',
- *     aggregation: 'avg',
- *     interval: '5m',
- *     startTime: new Date(Date.now() - 3600000),
- *     endTime: new Date()
+ *     raw: '/readings',
+ *     type: 'api',
+ *     params: {}
  *   },
  *   refreshInterval: 5000 // Optional: auto-refresh every 5 seconds
  * });
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { queryData } from '../api/dataClient';
 
 export function useData({ datasourceId, query, refreshInterval = null, useCache = true }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [source, setSource] = useState(null); // 'cache', 'partial-cache', or 'datasource'
+  const [source, setSource] = useState(null);
 
   const intervalRef = useRef(null);
   const mountedRef = useRef(true);
+  const fetchingRef = useRef(false);
+
+  // Serialize query for stable dependency comparison
+  const queryKey = useMemo(() => JSON.stringify(query), [query]);
 
   // Fetch data function
   const fetchData = useCallback(async () => {
@@ -36,6 +37,13 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
       setLoading(false);
       return;
     }
+
+    // Prevent concurrent fetches
+    if (fetchingRef.current) {
+      return;
+    }
+
+    fetchingRef.current = true;
 
     try {
       setLoading(true);
@@ -53,16 +61,21 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
         setError(err);
         setLoading(false);
       }
+    } finally {
+      fetchingRef.current = false;
     }
-  }, [datasourceId, query, useCache]);
+  }, [datasourceId, queryKey, useCache]);
 
   // Refetch function (bypasses cache)
   const refetch = useCallback(async () => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+
     try {
       setLoading(true);
       setError(null);
 
-      const result = await queryData(datasourceId, query, false); // Force fresh fetch
+      const result = await queryData(datasourceId, query, false);
 
       if (mountedRef.current) {
         setData(result.data);
@@ -74,13 +87,20 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
         setError(err);
         setLoading(false);
       }
+    } finally {
+      fetchingRef.current = false;
     }
-  }, [datasourceId, query]);
+  }, [datasourceId, queryKey]);
 
-  // Initial fetch
+  // Initial fetch - only run once when deps change
   useEffect(() => {
+    mountedRef.current = true;
     fetchData();
-  }, [fetchData]);
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [datasourceId, queryKey]);
 
   // Auto-refresh interval
   useEffect(() => {
@@ -97,22 +117,12 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     }
   }, [refreshInterval, fetchData]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, []);
-
   return {
     data,
     loading,
     error,
     refetch,
-    source, // 'cache', 'partial-cache', or 'datasource'
+    source,
     cached: source === 'cache' || source === 'partial-cache'
   };
 }

@@ -295,15 +295,55 @@
   .chart-preview-container {
     flex: 1;
     min-height: 400px;
+    height: 400px;
     background-color: var(--cds-layer-01);
     border-radius: 4px;
-    padding: spacing.$spacing-04;
+    border: 1px solid #393939;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 
-    > div {
+    .preview-chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: spacing.$spacing-03 spacing.$spacing-04;
+      background-color: #1a1a1a;
+      border-bottom: 1px solid #393939;
+      flex-shrink: 0;
+      height: 40px;
+
+      .preview-chart-name {
+        color: #f4f4f4;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
+    .preview-chart-body {
       flex: 1;
       min-height: 0;
+      height: calc(100% - 40px);
+      width: 100%;
+      padding: spacing.$spacing-04;
+      position: relative;
+
+      > div {
+        position: absolute;
+        top: spacing.$spacing-04;
+        left: spacing.$spacing-04;
+        right: spacing.$spacing-04;
+        bottom: spacing.$spacing-04;
+      }
+
+      .echarts-for-react {
+        width: 100% !important;
+        height: 100% !important;
+      }
     }
 
     .preview-placeholder {
@@ -314,6 +354,7 @@
       height: 100%;
       color: var(--cds-text-secondary);
       gap: spacing.$spacing-03;
+      padding: spacing.$spacing-04;
 
       p {
         margin: 0;

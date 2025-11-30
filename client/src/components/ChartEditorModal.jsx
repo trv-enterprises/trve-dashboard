@@ -495,7 +495,14 @@ function ChartEditorModal({ open, onClose, onSave, chart, panelId }) {
             <div className="tab-content preview-tab">
               <div className="chart-preview-container">
                 {generatedCode ? (
-                  <DynamicComponentLoader code={generatedCode} props={{}} />
+                  <>
+                    <div className="preview-chart-header">
+                      <span className="preview-chart-name">{name || 'Untitled Chart'}</span>
+                    </div>
+                    <div className="preview-chart-body">
+                      <DynamicComponentLoader code={generatedCode} props={{}} />
+                    </div>
+                  </>
                 ) : (
                   <div className="preview-placeholder">
                     <ChartBar size={48} />
@@ -683,14 +690,14 @@ function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xA
       ${chartType === 'area' ? 'areaStyle: {},' : ''}
       ${chartType === 'line' || chartType === 'area' ? 'smooth: true,' : ''}
     }));`
-    : `const series = [{
+    : `const yColumns = [${yAxisStr}];
+    const series = [{
       data: rows.map(r => r[data.columns.indexOf(yColumns[0])]),
       type: '${chartType === 'area' ? 'line' : chartType}',
       ${chartType === 'area' ? 'areaStyle: {},' : ''}
       ${chartType === 'line' || chartType === 'area' ? 'smooth: true,' : ''}
       itemStyle: { color: '#0f62fe' }
-    }];
-    const yColumns = [${yAxisStr}];`;
+    }];`;
 
   if (chartType === 'pie') {
     return `const Component = () => {
