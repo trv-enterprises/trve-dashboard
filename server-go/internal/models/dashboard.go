@@ -5,13 +5,14 @@ import (
 )
 
 // DashboardPanel represents a panel position in the dashboard grid
-// @Description Panel position and size in the grid (copied from layout template)
+// @Description Panel position and size in the grid with optional chart reference
 type DashboardPanel struct {
-	ID string `json:"id" bson:"id"`
-	X  int    `json:"x" bson:"x"`
-	Y  int    `json:"y" bson:"y"`
-	W  int    `json:"w" bson:"w"`
-	H  int    `json:"h" bson:"h"`
+	ID      string `json:"id" bson:"id"`
+	X       int    `json:"x" bson:"x"`
+	Y       int    `json:"y" bson:"y"`
+	W       int    `json:"w" bson:"w"`
+	H       int    `json:"h" bson:"h"`
+	ChartID string `json:"chart_id,omitempty" bson:"chart_id,omitempty"` // Reference to chart
 }
 
 // ChartQueryConfig defines how to query data for a chart
@@ -22,13 +23,35 @@ type ChartQueryConfig struct {
 	Params map[string]interface{} `json:"params" bson:"params"` // Query parameters
 }
 
+// DataFilter defines a single filter condition
+// @Description Filter condition for data transformation
+type DataFilter struct {
+	Field string      `json:"field" bson:"field"` // Column name to filter on
+	Op    string      `json:"op" bson:"op"`       // Operator: eq, neq, gt, gte, lt, lte, contains, in, notIn, isNull, isNotNull
+	Value interface{} `json:"value" bson:"value"` // Value to compare against (can be array for 'in' operator)
+}
+
+// DataAggregation defines how to aggregate/reduce data
+// @Description Aggregation configuration for data transformation
+type DataAggregation struct {
+	Type   string `json:"type" bson:"type"`       // first, last, min, max, avg, sum, count, limit
+	SortBy string `json:"sort_by" bson:"sort_by"` // Column to sort by (for first/last)
+	Field  string `json:"field" bson:"field"`     // Column to aggregate (for min/max/avg/sum)
+	Count  int    `json:"count" bson:"count"`     // Row count (for limit)
+}
+
 // ChartDataMapping defines how to map query results to chart elements
 // @Description Mapping configuration from data columns to chart axes/series
 type ChartDataMapping struct {
-	XAxis    string   `json:"x_axis" bson:"x_axis"`       // Column for X axis (categories)
-	YAxis    []string `json:"y_axis" bson:"y_axis"`       // Columns for Y axis (values/series)
-	GroupBy  string   `json:"group_by" bson:"group_by"`   // Column to group/split series by
-	LabelCol string   `json:"label_col" bson:"label_col"` // Column for labels
+	XAxis       string           `json:"x_axis" bson:"x_axis"`             // Column for X axis (categories)
+	YAxis       []string         `json:"y_axis" bson:"y_axis"`             // Columns for Y axis (values/series)
+	GroupBy     string           `json:"group_by" bson:"group_by"`         // Column to group/split series by
+	LabelCol    string           `json:"label_col" bson:"label_col"`       // Column for labels
+	Filters     []DataFilter     `json:"filters" bson:"filters"`           // Client-side filters applied after data fetch
+	Aggregation *DataAggregation `json:"aggregation" bson:"aggregation"`   // Aggregation to apply (first, last, avg, etc.)
+	SortBy      string           `json:"sort_by" bson:"sort_by"`           // Column to sort by
+	SortOrder   string           `json:"sort_order" bson:"sort_order"`     // asc or desc
+	Limit       int              `json:"limit" bson:"limit"`               // Max rows to return
 }
 
 // EmbeddedChart represents a chart embedded directly in a dashboard
@@ -36,26 +59,26 @@ type ChartDataMapping struct {
 type EmbeddedChart struct {
 	ID            string                 `json:"id" bson:"id"`
 	Name          string                 `json:"name" bson:"name"`
-	ChartType     string                 `json:"chart_type" bson:"chart_type"`         // bar, line, pie, etc.
-	DatasourceID  string                 `json:"datasource_id" bson:"datasource_id"`   // Reference to datasource
-	QueryConfig   *ChartQueryConfig      `json:"query_config" bson:"query_config"`     // How to query data
-	DataMapping   *ChartDataMapping      `json:"data_mapping" bson:"data_mapping"`     // How to map data to chart
-	ComponentCode string                 `json:"component_code" bson:"component_code"` // Custom React component code
-	Options       map[string]interface{} `json:"options" bson:"options"`               // ECharts options overrides
+	ChartType     string                 `json:"chart_type" bson:"chart_type"`           // bar, line, pie, etc.
+	DatasourceID  string                 `json:"datasource_id" bson:"datasource_id"`     // Reference to datasource
+	QueryConfig   *ChartQueryConfig      `json:"query_config" bson:"query_config"`       // How to query data
+	DataMapping   *ChartDataMapping      `json:"data_mapping" bson:"data_mapping"`       // How to map data to chart
+	ComponentCode string                 `json:"component_code" bson:"component_code"`   // Custom React component code
+	UseCustomCode bool                   `json:"use_custom_code" bson:"use_custom_code"` // Whether custom code mode is enabled
+	Options       map[string]interface{} `json:"options" bson:"options"`                 // ECharts options overrides
 }
 
 // Dashboard represents a complete dashboard configuration
-// @Description Self-contained dashboard with panels and embedded charts
+// @Description Dashboard with panels that reference standalone charts
 type Dashboard struct {
-	ID          string                   `json:"id" bson:"_id"`
-	Name        string                   `json:"name" bson:"name" binding:"required"`
-	Description string                   `json:"description" bson:"description"`
-	Panels      []DashboardPanel         `json:"panels" bson:"panels"`
-	Charts      map[string]EmbeddedChart `json:"charts" bson:"charts"`
-	Settings    DashboardSettings        `json:"settings" bson:"settings"`
-	Metadata    map[string]interface{}   `json:"metadata,omitempty" bson:"metadata,omitempty"`
-	Created     time.Time                `json:"created" bson:"created"`
-	Updated     time.Time                `json:"updated" bson:"updated"`
+	ID          string                 `json:"id" bson:"_id"`
+	Name        string                 `json:"name" bson:"name" binding:"required"`
+	Description string                 `json:"description" bson:"description"`
+	Panels      []DashboardPanel       `json:"panels" bson:"panels"` // Panels with chart_id references
+	Settings    DashboardSettings      `json:"settings" bson:"settings"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty" bson:"metadata,omitempty"`
+	Created     time.Time              `json:"created" bson:"created"`
+	Updated     time.Time              `json:"updated" bson:"updated"`
 }
 
 // DashboardSettings contains dashboard-level configuration
@@ -72,23 +95,21 @@ type DashboardSettings struct {
 // CreateDashboardRequest represents a request to create a dashboard
 // @Description Request body for creating a new dashboard
 type CreateDashboardRequest struct {
-	Name        string                   `json:"name" binding:"required"`
-	Description string                   `json:"description"`
-	Panels      []DashboardPanel         `json:"panels"`
-	Charts      map[string]EmbeddedChart `json:"charts"`
-	Settings    DashboardSettings        `json:"settings"`
-	Metadata    map[string]interface{}   `json:"metadata,omitempty"`
+	Name        string                 `json:"name" binding:"required"`
+	Description string                 `json:"description"`
+	Panels      []DashboardPanel       `json:"panels"` // Panels with optional chart_id
+	Settings    DashboardSettings      `json:"settings"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // UpdateDashboardRequest represents a request to update a dashboard
 // @Description Request body for updating an existing dashboard
 type UpdateDashboardRequest struct {
-	Name        *string                   `json:"name,omitempty"`
-	Description *string                   `json:"description,omitempty"`
-	Panels      *[]DashboardPanel         `json:"panels,omitempty"`
-	Charts      *map[string]EmbeddedChart `json:"charts,omitempty"`
-	Settings    *DashboardSettings        `json:"settings,omitempty"`
-	Metadata    *map[string]interface{}   `json:"metadata,omitempty"`
+	Name        *string                 `json:"name,omitempty"`
+	Description *string                 `json:"description,omitempty"`
+	Panels      *[]DashboardPanel       `json:"panels,omitempty"` // Panels with optional chart_id
+	Settings    *DashboardSettings      `json:"settings,omitempty"`
+	Metadata    *map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // DashboardListResponse represents a paginated list of dashboards
@@ -105,6 +126,19 @@ type DashboardListResponse struct {
 type DashboardQueryParams struct {
 	Name     string `form:"name"`
 	IsPublic *bool  `form:"is_public"`
-	Page     int    `form:"page" binding:"min=1"`
-	PageSize int    `form:"page_size" binding:"min=1,max=100"`
+	ChartID  string `form:"chart_id"` // Filter dashboards using a specific chart
+	Page     int    `form:"page"`
+	PageSize int    `form:"page_size"`
+}
+
+// DashboardWithCharts represents a dashboard with expanded chart data
+// @Description Dashboard with full chart objects for rendering
+type DashboardWithCharts struct {
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Panels      []DashboardPanel       `json:"panels"`
+	Charts      map[string]*Chart      `json:"charts"` // panel_id -> Chart mapping (uses Chart from chart.go)
+	Settings    DashboardSettings      `json:"settings"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }

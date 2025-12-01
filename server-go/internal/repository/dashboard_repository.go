@@ -24,14 +24,27 @@ func NewDashboardRepository(db *mongo.Database) *DashboardRepository {
 	}
 }
 
-// Create creates a new dashboard
-func (r *DashboardRepository) Create(ctx context.Context, req *models.CreateDashboardRequest) (*models.Dashboard, error) {
-	// Initialize charts map if nil
-	charts := req.Charts
-	if charts == nil {
-		charts = make(map[string]models.EmbeddedChart)
+// CreateIndexes creates necessary indexes for the dashboards collection
+func (r *DashboardRepository) CreateIndexes(ctx context.Context) error {
+	indexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "name", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys: bson.D{{Key: "panels.chart_id", Value: 1}}, // For finding dashboards by chart
+		},
+		{
+			Keys: bson.D{{Key: "updated", Value: -1}},
+		},
 	}
 
+	_, err := r.collection.Indexes().CreateMany(ctx, indexes)
+	return err
+}
+
+// Create creates a new dashboard
+func (r *DashboardRepository) Create(ctx context.Context, req *models.CreateDashboardRequest) (*models.Dashboard, error) {
 	// Initialize panels if nil
 	panels := req.Panels
 	if panels == nil {
@@ -43,7 +56,6 @@ func (r *DashboardRepository) Create(ctx context.Context, req *models.CreateDash
 		Name:        req.Name,
 		Description: req.Description,
 		Panels:      panels,
-		Charts:      charts,
 		Settings:    req.Settings,
 		Metadata:    req.Metadata,
 		Created:     time.Now(),
@@ -93,6 +105,9 @@ func (r *DashboardRepository) List(ctx context.Context, params models.DashboardQ
 	}
 	if params.IsPublic != nil {
 		filter["settings.is_public"] = *params.IsPublic
+	}
+	if params.ChartID != "" {
+		filter["panels.chart_id"] = params.ChartID
 	}
 
 	// Count total documents
@@ -156,9 +171,6 @@ func (r *DashboardRepository) Update(ctx context.Context, id string, req *models
 	if req.Panels != nil {
 		setFields["panels"] = *req.Panels
 	}
-	if req.Charts != nil {
-		setFields["charts"] = *req.Charts
-	}
 	if req.Settings != nil {
 		setFields["settings"] = *req.Settings
 	}
@@ -195,4 +207,23 @@ func (r *DashboardRepository) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("dashboard not found")
 	}
 	return nil
+}
+
+// FindByChartID retrieves all dashboards using a specific chart
+// Used for notifying dashboards when a chart is updated
+func (r *DashboardRepository) FindByChartID(ctx context.Context, chartID string) ([]models.Dashboard, error) {
+	filter := bson.M{"panels.chart_id": chartID}
+
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find dashboards by chart: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var dashboards []models.Dashboard
+	if err := cursor.All(ctx, &dashboards); err != nil {
+		return nil, fmt.Errorf("failed to decode dashboards: %w", err)
+	}
+
+	return dashboards, nil
 }

@@ -91,6 +91,87 @@ class APIClient {
   async health() {
     return this.request('/health');
   }
+
+  // Chart endpoints
+  async getCharts(filters = {}) {
+    const params = new URLSearchParams(filters);
+    return this.request(`/api/charts?${params}`);
+  }
+
+  async getChart(id) {
+    return this.request(`/api/charts/${id}`);
+  }
+
+  async getChartSummaries(limit = 50) {
+    return this.request(`/api/charts/summaries?limit=${limit}`);
+  }
+
+  async createChart(chart) {
+    return this.request('/api/charts', {
+      method: 'POST',
+      body: JSON.stringify(chart),
+    });
+  }
+
+  async updateChart(id, updates) {
+    return this.request(`/api/charts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteChart(id) {
+    return this.request(`/api/charts/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Dashboard endpoints
+  async getDashboards(filters = {}) {
+    const params = new URLSearchParams(filters);
+    return this.request(`/api/dashboards?${params}`);
+  }
+
+  async getDashboard(id) {
+    return this.request(`/api/dashboards/${id}`);
+  }
+
+  async createDashboard(dashboard) {
+    return this.request('/api/dashboards', {
+      method: 'POST',
+      body: JSON.stringify(dashboard),
+    });
+  }
+
+  async updateDashboard(id, updates) {
+    return this.request(`/api/dashboards/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteDashboard(id) {
+    return this.request(`/api/dashboards/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Data sources endpoints
+  async getDatasources(filters = {}) {
+    const params = new URLSearchParams(filters);
+    return this.request(`/api/datasources?${params}`);
+  }
+
+  async getDatasource(id) {
+    return this.request(`/api/datasources/${id}`);
+  }
+
+  async queryDatasource(id, query) {
+    return this.request(`/api/datasources/${id}/query`, {
+      method: 'POST',
+      body: JSON.stringify(query),
+    });
+  }
 }
 
 export default new APIClient();

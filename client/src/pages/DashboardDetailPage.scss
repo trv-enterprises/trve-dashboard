@@ -468,6 +468,19 @@
                 font-style: italic;
               }
             }
+
+            .empty-panel-actions {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              gap: spacing.$spacing-03;
+              height: 100%;
+
+              .cds--btn {
+                min-width: 140px;
+              }
+            }
           }
 
           // Resize handle
@@ -534,4 +547,83 @@
 
 .cds--modal-content {
   color: var(--cds-text-primary);
+}
+
+// Chart selector modal
+.chart-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: spacing.$spacing-04;
+  padding: spacing.$spacing-03;
+
+  .chart-card {
+    background-color: #262626;
+    border: 1px solid #393939;
+    border-radius: 8px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: all 0.2s ease;
+
+    &:hover {
+      border-color: #0f62fe;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .chart-card-preview {
+      height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #1a1a1a;
+
+      img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+      }
+
+      svg {
+        fill: #6f6f6f;
+      }
+    }
+
+    .chart-card-info {
+      padding: spacing.$spacing-03;
+
+      h4 {
+        color: #f4f4f4;
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin: 0 0 spacing.$spacing-02;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .chart-type {
+        color: #78a9ff;
+        font-size: 0.75rem;
+        margin: 0;
+        text-transform: capitalize;
+      }
+
+      .chart-desc {
+        color: #8d8d8d;
+        font-size: 0.75rem;
+        margin: spacing.$spacing-02 0 0;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+    }
+  }
+
+  .no-charts-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: spacing.$spacing-05;
+    color: #8d8d8d;
+  }
 }

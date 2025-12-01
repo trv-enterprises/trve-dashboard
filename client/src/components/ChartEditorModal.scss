@@ -48,7 +48,22 @@
     background-color: #161616;
     padding: 0;
     overflow-y: auto;
-    max-height: calc(85vh - 180px);
+    max-height: calc(85vh - 140px);
+    padding-bottom: spacing.$spacing-05;
+
+    // Remove Carbon's scroll indicator gradient/mask
+    &::after {
+      display: none !important;
+    }
+
+    // Ensure no gradient mask on content
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+  }
+
+  // Override any Carbon content gradient
+  .cds--modal-content--overflow-indicator {
+    display: none !important;
   }
 
   .cds--modal-footer {
@@ -82,9 +97,8 @@
 .chart-editor-content {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 500px;
   padding: spacing.$spacing-05;
+  padding-bottom: spacing.$spacing-07;
   background-color: #161616;
 
   // ContentSwitcher styling
@@ -119,6 +133,7 @@
     display: flex;
     flex-direction: column;
     min-height: 400px;
+    overflow: visible;
   }
 
   .chart-metadata-section {
@@ -129,7 +144,7 @@
 
   .tab-content {
     padding: spacing.$spacing-05 0;
-    height: 100%;
+    padding-bottom: spacing.$spacing-07;
 
     &.preview-tab {
       display: flex;
@@ -214,11 +229,93 @@
         }
       }
     }
+
+    .run-query-hint {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      font-style: italic;
+      margin: 0;
+    }
+  }
+
+  // Filters section
+  .filters-section {
+    margin-top: spacing.$spacing-05;
+    padding: spacing.$spacing-04;
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: spacing.$spacing-03;
+
+      h4 {
+        color: var(--cds-text-primary);
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin: 0;
+      }
+    }
+
+    .filters-list {
+      display: flex;
+      flex-direction: column;
+      gap: spacing.$spacing-03;
+    }
+
+    .filter-row {
+      display: flex;
+      align-items: flex-end;
+      gap: spacing.$spacing-03;
+      padding: spacing.$spacing-03;
+      background-color: var(--cds-layer-02);
+      border-radius: 4px;
+
+      > * {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .cds--btn--icon-only {
+        flex: 0 0 auto;
+        margin-bottom: spacing.$spacing-02;
+      }
+    }
+
+    .no-filters-message {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      margin: 0;
+    }
+  }
+
+  // Aggregation section
+  .aggregation-section {
+    margin-top: spacing.$spacing-05;
+    padding: spacing.$spacing-04;
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
+
+    h4 {
+      color: var(--cds-text-primary);
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin: 0 0 spacing.$spacing-04 0;
+    }
+
+    .sort-row {
+      margin-top: spacing.$spacing-04;
+      padding-top: spacing.$spacing-04;
+      border-top: 1px solid var(--cds-border-subtle-01);
+    }
   }
 
   // Data preview table
   .data-preview {
     margin-top: spacing.$spacing-05;
+    margin-bottom: spacing.$spacing-05;
 
     h4 {
       color: var(--cds-text-primary);
@@ -272,6 +369,14 @@
       font-size: 0.75rem;
       margin: spacing.$spacing-02 0 0 0;
       text-align: center;
+    }
+
+    .no-results-notice {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      margin: spacing.$spacing-05;
+      text-align: center;
+      font-style: italic;
     }
   }
 
@@ -401,5 +506,54 @@
   // Inline notification spacing
   .cds--inline-notification {
     margin-top: spacing.$spacing-04;
+  }
+
+  // Custom code warning at top
+  .custom-code-warning {
+    margin-bottom: spacing.$spacing-05;
+    margin-top: 0;
+  }
+
+  // Saved values display (shown when columns not loaded)
+  .saved-values-display {
+    .saved-value-field {
+      margin-bottom: spacing.$spacing-03;
+
+      .cds--label {
+        display: block;
+        margin-bottom: spacing.$spacing-02;
+        color: var(--cds-text-secondary);
+        font-size: 0.75rem;
+      }
+
+      .no-value {
+        color: var(--cds-text-placeholder);
+        font-size: 0.875rem;
+        font-style: italic;
+      }
+
+      .column-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: spacing.$spacing-02;
+      }
+    }
+  }
+
+  // Saved filters display as tags
+  .saved-filters-display {
+    .filter-tag-row {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-02;
+      padding: spacing.$spacing-02 spacing.$spacing-03;
+      background-color: var(--cds-layer-02);
+      border-radius: 4px;
+      margin-bottom: spacing.$spacing-02;
+
+      .cds--btn--icon-only {
+        margin-left: auto;
+      }
+    }
   }
 }

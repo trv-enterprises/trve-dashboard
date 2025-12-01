@@ -18,10 +18,12 @@ import {
   TrashCan,
   Edit,
   View,
-  ChartBar
+  ChartBar,
+  Catalog
 } from '@carbon/icons-react';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import ChartEditorModal from '../components/ChartEditorModal';
+import apiClient from '../api/client';
 import './DashboardDetailPage.scss';
 
 // Editor modes for the dashboard designer
@@ -46,8 +48,8 @@ function DashboardDetailPage() {
   const [dashboard, setDashboard] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [panels, setPanels] = useState([]); // Panel positions/sizes
-  const [charts, setCharts] = useState({}); // Chart data keyed by panel_id
+  const [panels, setPanels] = useState([]); // Panel positions/sizes with chart_id references
+  const [chartsMap, setChartsMap] = useState({}); // Chart data keyed by chart_id (for rendering)
   const [theme, setTheme] = useState('dark');
   const [refreshInterval, setRefreshInterval] = useState(0);
   const [isPublic, setIsPublic] = useState(false);
@@ -72,6 +74,12 @@ function DashboardDetailPage() {
   // Chart editor modal state
   const [chartEditorOpen, setChartEditorOpen] = useState(false);
   const [editingPanelId, setEditingPanelId] = useState(null);
+  const [editingChart, setEditingChart] = useState(null);
+
+  // Chart selector modal state
+  const [chartSelectorOpen, setChartSelectorOpen] = useState(false);
+  const [selectingPanelId, setSelectingPanelId] = useState(null);
+  const [availableCharts, setAvailableCharts] = useState([]);
 
   // Layout editing state
   const [draggingPanel, setDraggingPanel] = useState(null);
@@ -136,13 +144,7 @@ function DashboardDetailPage() {
   const fetchDashboard = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/dashboards/${id}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await apiClient.getDashboard(id);
       console.log('Dashboard response:', data);
 
       setDashboard(data);
@@ -153,15 +155,24 @@ function DashboardDetailPage() {
       setIsPublic(data.settings?.is_public || false);
       setAllowExport(data.settings?.allow_export !== false);
 
-      // Load panels
+      // Load panels (now contain chart_id references)
       if (data.panels && data.panels.length > 0) {
         setPanels(data.panels);
-        setTemplateApplied(true); // Panels exist, so template is "applied"
-      }
+        setTemplateApplied(true);
 
-      // Load embedded charts
-      if (data.charts) {
-        setCharts(data.charts);
+        // Fetch all referenced charts
+        const chartIds = [...new Set(data.panels.map(p => p.chart_id).filter(Boolean))];
+        if (chartIds.length > 0) {
+          const chartPromises = chartIds.map(chartId => apiClient.getChart(chartId).catch(() => null));
+          const charts = await Promise.all(chartPromises);
+          const newChartsMap = {};
+          charts.forEach(chart => {
+            if (chart) {
+              newChartsMap[chart.id] = chart;
+            }
+          });
+          setChartsMap(newChartsMap);
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -174,8 +185,7 @@ function DashboardDetailPage() {
     const templateId = e.target.value;
     if (templateId) {
       setSelectedTemplateId(templateId);
-      // Clear existing charts when applying new template
-      setCharts({});
+      // Don't need to clear chartsMap since it's keyed by chart_id, not panel_id
     }
   };
 
@@ -204,33 +214,83 @@ function DashboardDetailPage() {
 
   const deletePanel = (panelId) => {
     setPanels(prev => prev.filter(p => p.id !== panelId));
-    // Also remove any chart assigned to this panel
-    setCharts(prev => {
-      const newCharts = { ...prev };
-      delete newCharts[panelId];
-      return newCharts;
-    });
+    // Note: We don't delete the chart from chartsMap since other panels might use it
+    // The chart continues to exist as a standalone entity
     markPanelsModified();
   };
 
   // Chart operations
   const handleChartSave = async (chartData) => {
     const { panel_id, ...chartInfo } = chartData;
-    setCharts(prev => ({
+
+    // Add chart to chartsMap (keyed by chart_id)
+    setChartsMap(prev => ({
       ...prev,
-      [panel_id]: chartInfo
+      [chartInfo.id]: chartInfo
     }));
+
+    // Update panel to reference this chart_id
+    setPanels(prev => prev.map(p =>
+      p.id === panel_id ? { ...p, chart_id: chartInfo.id } : p
+    ));
+
     setHasChanges(true);
   };
 
+  // Open chart editor for creating/editing a chart
   const openChartEditor = (panelId) => {
+    const panel = panels.find(p => p.id === panelId);
+    const chart = panel?.chart_id ? chartsMap[panel.chart_id] : null;
     setEditingPanelId(panelId);
+    setEditingChart(chart);
     setChartEditorOpen(true);
   };
 
   const closeChartEditor = () => {
     setChartEditorOpen(false);
     setEditingPanelId(null);
+    setEditingChart(null);
+  };
+
+  // Chart selector operations
+  const openChartSelector = async (panelId) => {
+    setSelectingPanelId(panelId);
+    try {
+      const response = await apiClient.getChartSummaries(100);
+      setAvailableCharts(response.summaries || []);
+    } catch (err) {
+      console.error('Failed to fetch charts:', err);
+      setAvailableCharts([]);
+    }
+    setChartSelectorOpen(true);
+  };
+
+  const closeChartSelector = () => {
+    setChartSelectorOpen(false);
+    setSelectingPanelId(null);
+  };
+
+  const handleChartSelect = async (chartId) => {
+    if (!selectingPanelId) return;
+
+    // Fetch full chart data if not already in chartsMap
+    if (!chartsMap[chartId]) {
+      try {
+        const chart = await apiClient.getChart(chartId);
+        setChartsMap(prev => ({ ...prev, [chartId]: chart }));
+      } catch (err) {
+        console.error('Failed to fetch chart:', err);
+        return;
+      }
+    }
+
+    // Update panel to reference this chart_id
+    setPanels(prev => prev.map(p =>
+      p.id === selectingPanelId ? { ...p, chart_id: chartId } : p
+    ));
+
+    setHasChanges(true);
+    closeChartSelector();
   };
 
   // Grid mouse handlers for Layout Mode
@@ -344,11 +404,11 @@ function DashboardDetailPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Panels already contain chart_id references, no need to embed charts
       const payload = {
         name,
         description,
-        panels,
-        charts,
+        panels, // Each panel has: id, x, y, w, h, chart_id (optional)
         settings: {
           theme,
           refresh_interval: refreshInterval,
@@ -357,30 +417,16 @@ function DashboardDetailPage() {
         }
       };
 
-      let response;
+      let data;
       if (isCreateMode) {
-        response = await fetch('http://localhost:3001/api/dashboards', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        data = await apiClient.createDashboard(payload);
       } else {
-        response = await fetch(`http://localhost:3001/api/dashboards/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        data = await apiClient.updateDashboard(id, payload);
       }
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setHasChanges(false);
-        setShowSaveModal(false);
-        navigate('/design/dashboards');
-      } else {
-        alert(`Failed to save: ${data.error || 'Unknown error'}`);
-      }
+      setHasChanges(false);
+      setShowSaveModal(false);
+      navigate('/design/dashboards');
     } catch (err) {
       alert(`Error: ${err.message}`);
     } finally {
@@ -577,7 +623,7 @@ function DashboardDetailPage() {
           >
             {/* Existing panels */}
             {panels.map((panel) => {
-              const chart = charts[panel.id];
+              const chart = panel.chart_id ? chartsMap[panel.chart_id] : null;
               const hasChart = !!chart;
               const isDesignMode = editorMode === EDITOR_MODES.DESIGN;
               const isPreviewMode = editorMode === EDITOR_MODES.PREVIEW;
@@ -630,20 +676,31 @@ function DashboardDetailPage() {
                         />
                       </div>
                     ) : isDesignMode ? (
-                      <div
-                        className="design-body"
-                        onClick={() => openChartEditor(panel.id)}
-                      >
+                      <div className="design-body">
                         {hasChart ? (
-                          <div className="chart-info">
+                          <div className="chart-info" onClick={() => openChartEditor(panel.id)}>
                             <ChartBar size={24} />
                             <span className="chart-name">{chart.name}</span>
                             <span className="edit-hint">Click to edit</span>
                           </div>
                         ) : (
-                          <div className="empty-panel">
-                            <Add size={24} />
-                            <span>Click to add chart</span>
+                          <div className="empty-panel-actions">
+                            <Button
+                              kind="tertiary"
+                              size="sm"
+                              renderIcon={Add}
+                              onClick={() => openChartEditor(panel.id)}
+                            >
+                              New Chart
+                            </Button>
+                            <Button
+                              kind="ghost"
+                              size="sm"
+                              renderIcon={Catalog}
+                              onClick={() => openChartSelector(panel.id)}
+                            >
+                              Select Existing
+                            </Button>
                           </div>
                         )}
                       </div>
@@ -711,9 +768,54 @@ function DashboardDetailPage() {
         open={chartEditorOpen}
         onClose={closeChartEditor}
         onSave={handleChartSave}
-        chart={editingPanelId ? charts[editingPanelId] : null}
+        chart={editingChart}
         panelId={editingPanelId}
       />
+
+      {/* Chart Selector Modal */}
+      {chartSelectorOpen && (
+        <Modal
+          open={true}
+          onRequestClose={closeChartSelector}
+          modalHeading="Select a Chart"
+          modalLabel="Chart Library"
+          primaryButtonText="Cancel"
+          onRequestSubmit={closeChartSelector}
+          size="lg"
+          passiveModal
+        >
+          <div className="chart-selector-grid">
+            {availableCharts.length > 0 ? (
+              availableCharts.map((chartSummary) => (
+                <div
+                  key={chartSummary.id}
+                  className="chart-card"
+                  onClick={() => handleChartSelect(chartSummary.id)}
+                >
+                  <div className="chart-card-preview">
+                    {chartSummary.thumbnail ? (
+                      <img src={chartSummary.thumbnail} alt={chartSummary.name} />
+                    ) : (
+                      <ChartBar size={32} />
+                    )}
+                  </div>
+                  <div className="chart-card-info">
+                    <h4>{chartSummary.name}</h4>
+                    <p className="chart-type">{chartSummary.chart_type}</p>
+                    {chartSummary.description && (
+                      <p className="chart-desc">{chartSummary.description}</p>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="no-charts-message">
+                <p>No charts available. Create a new chart first.</p>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {/* Cancel confirmation modal */}
       {showCancelModal && (
@@ -743,7 +845,7 @@ function DashboardDetailPage() {
         >
           <p>
             {isCreateMode
-              ? `Create dashboard "${name}" with ${panels.length} panels and ${Object.keys(charts).length} charts?`
+              ? `Create dashboard "${name}" with ${panels.length} panels and ${panels.filter(p => p.chart_id).length} charts?`
               : `Save changes to dashboard "${name}"?`}
           </p>
         </Modal>

@@ -15,6 +15,7 @@ import (
 	"github.com/tviviano/dashboard/config"
 	"github.com/tviviano/dashboard/internal/database"
 	"github.com/tviviano/dashboard/internal/handlers"
+	"github.com/tviviano/dashboard/internal/mcp"
 	"github.com/tviviano/dashboard/internal/repository"
 	"github.com/tviviano/dashboard/internal/service"
 
@@ -86,19 +87,31 @@ func main() {
 	layoutRepo := repository.NewLayoutRepository(mongodb.Database)
 	datasourceRepo := repository.NewDatasourceRepository(mongodb.Database)
 	componentRepo := repository.NewComponentRepository(mongodb.Database)
+	chartRepo := repository.NewChartRepository(mongodb.Database)
 	dashboardRepo := repository.NewDashboardRepository(mongodb.Database)
+
+	// Create chart indexes
+	if err := chartRepo.CreateIndexes(ctx); err != nil {
+		log.Printf("Warning: Failed to create chart indexes: %v", err)
+	}
 
 	// Initialize services
 	layoutService := service.NewLayoutService(layoutRepo)
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	componentService := service.NewComponentService(componentRepo)
+	chartService := service.NewChartService(chartRepo)
 	dashboardService := service.NewDashboardService(dashboardRepo)
 
 	// Initialize handlers
 	layoutHandler := handlers.NewLayoutHandler(layoutService)
 	datasourceHandler := handlers.NewDatasourceHandler(datasourceService)
 	componentHandler := handlers.NewComponentHandler(componentService)
+	chartHandler := handlers.NewChartHandler(chartService)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
+
+	// Initialize MCP
+	mcpRegistry := mcp.NewToolRegistry(datasourceService, dashboardService, chartService)
+	mcpHandler := mcp.NewHandler(mcpRegistry)
 
 	// API routes
 	api := router.Group("/api")
@@ -129,7 +142,7 @@ func main() {
 			datasources.POST("/:id/query", datasourceHandler.QueryDatasource)
 		}
 
-		// Component routes
+		// Component routes (legacy - being replaced by charts)
 		components := api.Group("/components")
 		{
 			components.GET("/systems", componentHandler.GetSystems)
@@ -138,6 +151,17 @@ func main() {
 			components.GET("/:id", componentHandler.GetComponent)
 			components.PUT("/:id", componentHandler.UpdateComponent)
 			components.DELETE("/:id", componentHandler.DeleteComponent)
+		}
+
+		// Chart routes
+		charts := api.Group("/charts")
+		{
+			charts.GET("/summaries", chartHandler.GetChartSummaries)
+			charts.POST("", chartHandler.CreateChart)
+			charts.GET("", chartHandler.ListCharts)
+			charts.GET("/:id", chartHandler.GetChart)
+			charts.PUT("/:id", chartHandler.UpdateChart)
+			charts.DELETE("/:id", chartHandler.DeleteChart)
 		}
 
 		// Dashboard routes
@@ -154,11 +178,16 @@ func main() {
 		// chat := api.Group("/chat")
 	}
 
+	// MCP routes (outside /api group)
+	mcpHandler.SetupRoutes(router.Group(""))
+
 	// Swagger documentation
 	if cfg.Swagger.Enabled {
 		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 		fmt.Println("✓ Swagger UI enabled at http://localhost:3001/swagger/index.html")
 	}
+
+	fmt.Println("✓ MCP SSE endpoint enabled at http://localhost:3001/mcp/sse")
 
 	// Create HTTP server
 	srv := &http.Server{

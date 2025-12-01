@@ -4,6 +4,7 @@ import * as echarts from 'echarts';
 import ReactECharts from 'echarts-for-react';
 import { carbonLightTheme, carbonDarkTheme } from '../theme/carbonEchartsTheme';
 import { useData } from '../hooks/useData';
+import { transformData, toObjects, getValue } from '../utils/dataTransforms';
 import * as Babel from '@babel/standalone';
 
 /**
@@ -13,6 +14,9 @@ import * as Babel from '@babel/standalone';
  * Available libraries in component scope:
  * - React hooks: useState, useEffect, useMemo, useCallback, useRef, useContext
  * - useData: Custom hook for fetching data from datasources with caching
+ * - transformData: Utility to apply filters and aggregations to data
+ * - toObjects: Convert columnar data to array of objects
+ * - getValue: Get a single value from first row of data
  * - echarts: ECharts core library
  * - ReactECharts: ECharts React wrapper component
  * - carbonTheme: Carbon Design System ECharts theme (light mode)
@@ -40,7 +44,7 @@ export default function DynamicComponentLoader({ code, props = {} }) {
       }).code;
 
       // Create a function that will evaluate the component code
-      // We provide React hooks, data fetching, and visualization libraries in the scope
+      // We provide React hooks, data fetching, transforms, and visualization libraries in the scope
       const componentFunction = new Function(
         'React',
         'useState',
@@ -50,6 +54,9 @@ export default function DynamicComponentLoader({ code, props = {} }) {
         'useRef',
         'useContext',
         'useData',
+        'transformData',
+        'toObjects',
+        'getValue',
         'echarts',
         'ReactECharts',
         'carbonTheme',
@@ -62,7 +69,7 @@ export default function DynamicComponentLoader({ code, props = {} }) {
         `
       );
 
-      // Execute the function with React dependencies, data hooks, and visualization libraries
+      // Execute the function with React dependencies, data hooks, transforms, and visualization libraries
       const LoadedComponent = componentFunction(
         React,
         React.useState,
@@ -72,6 +79,9 @@ export default function DynamicComponentLoader({ code, props = {} }) {
         React.useRef,
         React.useContext,
         useData,
+        transformData,
+        toObjects,
+        getValue,
         echarts,
         ReactECharts,
         carbonLightTheme,
