@@ -547,3 +547,63 @@ func (s *DatasourceService) QueryDatasource(ctx context.Context, id string, req 
 		Duration:  duration,
 	}, nil
 }
+
+// GetSchema retrieves schema information for a datasource that supports it
+// Only SQL datasources implement SchemaProvider; others return an error
+func (s *DatasourceService) GetSchema(ctx context.Context, id string) (*models.SchemaResponse, error) {
+	// Get datasource configuration
+	ds, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving datasource: %w", err)
+	}
+	if ds == nil {
+		return nil, fmt.Errorf("datasource not found")
+	}
+
+	// Only SQL datasources support schema discovery
+	if ds.Type != models.DatasourceTypeSQL {
+		return &models.SchemaResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Schema discovery not supported for datasource type: %s", ds.Type),
+		}, nil
+	}
+
+	// Create datasource adapter
+	factory := datasource.NewDataSourceFactory()
+	dataSource, err := factory.CreateFromConfig(ds)
+	if err != nil {
+		return &models.SchemaResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Failed to create datasource: %v", err),
+		}, nil
+	}
+	defer dataSource.Close()
+
+	// Check if datasource implements SchemaProvider
+	schemaProvider, ok := dataSource.(models.SchemaProvider)
+	if !ok {
+		return &models.SchemaResponse{
+			Success: false,
+			Error:   "Datasource does not support schema discovery",
+		}, nil
+	}
+
+	// Get schema
+	startTime := time.Now()
+	schema, err := schemaProvider.GetSchema(ctx)
+	duration := time.Since(startTime).Milliseconds()
+
+	if err != nil {
+		return &models.SchemaResponse{
+			Success:  false,
+			Error:    err.Error(),
+			Duration: duration,
+		}, nil
+	}
+
+	return &models.SchemaResponse{
+		Success:  true,
+		Schema:   schema,
+		Duration: duration,
+	}, nil
+}

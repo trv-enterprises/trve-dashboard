@@ -20,6 +20,12 @@ class APIClient {
 
     try {
       const response = await fetch(url, config);
+
+      // Handle 204 No Content (successful DELETE)
+      if (response.status === 204) {
+        return { success: true };
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
@@ -171,6 +177,10 @@ class APIClient {
       method: 'POST',
       body: JSON.stringify(query),
     });
+  }
+
+  async getDatasourceSchema(id) {
+    return this.request(`/api/datasources/${id}/schema`);
   }
 }
 

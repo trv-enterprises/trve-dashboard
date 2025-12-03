@@ -524,80 +524,84 @@ function DatasourceDetailPage() {
 
   return (
     <div className="datasource-detail-page">
-      {/* Action buttons in top right */}
-      <div className="page-actions">
-        <Button
-          kind="secondary"
-          renderIcon={Close}
-          onClick={handleCancel}
-          size="md"
-        >
-          Cancel
-        </Button>
-        <Button
-          kind="primary"
-          renderIcon={Save}
-          onClick={() => setShowSaveModal(true)}
-          disabled={!name || !type}
-          size="md"
-        >
-          Save Datasource
-        </Button>
+      {/* Page header bar with title and actions */}
+      <div className="page-header-bar">
+        <h1>{isCreateMode ? 'Create Data Source' : 'Edit Data Source'}</h1>
+        <div className="page-actions">
+          <Button
+            kind="secondary"
+            renderIcon={Close}
+            onClick={handleCancel}
+            size="md"
+          >
+            Cancel
+          </Button>
+          <Button
+            kind="primary"
+            renderIcon={Save}
+            onClick={() => setShowSaveModal(true)}
+            disabled={!name || !type}
+            size="md"
+          >
+            Save Data Source
+          </Button>
+        </div>
       </div>
 
-      {/* Header with name */}
-      <div className="page-header">
-        <TextInput
-          id="datasource-name"
-          labelText="Datasource Name"
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setHasChanges(true);
-          }}
-          placeholder="Enter datasource name"
-          size="lg"
-        />
-      </div>
+      {/* Form content */}
+      <div className="form-content">
+        {/* Datasource Name - full width */}
+        <div className="form-row">
+          <TextInput
+            id="datasource-name"
+            labelText="Data Source Name"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setHasChanges(true);
+            }}
+            placeholder="Enter data source name"
+          />
+        </div>
 
-      {/* Description row */}
-      <div className="description-row">
-        <TextInput
-          id="datasource-description"
-          labelText="Description (optional)"
-          value={description}
-          onChange={(e) => {
-            setDescription(e.target.value);
-            setHasChanges(true);
-          }}
-          placeholder="Enter datasource description"
-          size="md"
-        />
-      </div>
+        {/* Description - full width */}
+        <div className="form-row">
+          <TextInput
+            id="datasource-description"
+            labelText="Description (optional)"
+            value={description}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              setHasChanges(true);
+            }}
+            placeholder="Enter data source description"
+          />
+        </div>
 
-      {/* Type selector */}
-      <div className="type-row">
-        <Select
-          id="datasource-type"
-          labelText="Datasource Type"
-          value={type}
-          onChange={handleTypeChange}
-          disabled={!isCreateMode}
-        >
-          <SelectItem value="sql" text="SQL Database" />
-          <SelectItem value="csv" text="CSV File" />
-          <SelectItem value="socket" text="Socket/WebSocket" />
-          <SelectItem value="api" text="REST API" />
-        </Select>
-      </div>
+        {/* Type selector */}
+        <div className="form-row">
+          <Select
+            id="datasource-type"
+            labelText="Data Source Type"
+            value={type}
+            onChange={handleTypeChange}
+            disabled={!isCreateMode}
+          >
+            <SelectItem value="sql" text="SQL Database" />
+            <SelectItem value="csv" text="CSV File" />
+            <SelectItem value="socket" text="Socket/WebSocket" />
+            <SelectItem value="api" text="REST API" />
+          </Select>
+        </div>
 
-      {/* Type-specific configuration */}
-      <div className="config-section">
-        <h3>Configuration</h3>
-        {type === 'sql' && renderSQLConfig()}
-        {type === 'csv' && renderCSVConfig()}
-        {type === 'socket' && renderSocketConfig()}
-        {type === 'api' && renderAPIConfig()}
+        {/* Type-specific configuration */}
+        <div className="config-section">
+          <h3>Configuration</h3>
+          {type === 'sql' && renderSQLConfig()}
+          {type === 'csv' && renderCSVConfig()}
+          {type === 'socket' && renderSocketConfig()}
+          {type === 'api' && renderAPIConfig()}
+        </div>
       </div>
 
       {/* Cancel confirmation modal */}

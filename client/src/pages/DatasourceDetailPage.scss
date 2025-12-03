@@ -1,70 +1,54 @@
 @use '@carbon/react/scss/spacing' as spacing;
 
 .datasource-detail-page {
-  padding: spacing.$spacing-05;
   background-color: var(--cds-background);
-  min-height: 100%;
-  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
-  .page-actions {
-    position: absolute;
-    top: spacing.$spacing-05;
-    right: spacing.$spacing-05;
+  // Page header bar with title and actions
+  .page-header-bar {
     display: flex;
-    gap: spacing.$spacing-03;
-    z-index: 10;
-  }
+    justify-content: space-between;
+    align-items: center;
+    height: 56px;
+    padding: 0 spacing.$spacing-05;
+    background-color: transparent;
+    border-bottom: 1px solid #393939;
+    flex-shrink: 0;
 
-  .page-header {
-    margin-bottom: spacing.$spacing-03;
-    margin-left: spacing.$spacing-04;
-    padding-right: 300px; // Space for action buttons
-
-    .cds--text-input-wrapper {
-      max-width: 600px;
-    }
-
-    .cds--label {
-      color: #c6c6c6 !important;
-      margin-bottom: spacing.$spacing-02;
+    h1 {
+      color: #f4f4f4;
+      font-size: 1.25rem;
       font-weight: 600;
-      font-size: 0.875rem;
-      display: block;
+      margin: 0;
     }
 
-    .cds--text-input {
-      background-color: #262626 !important;
-      color: #f4f4f4 !important;
-      border: none !important;
-      border-bottom: 1px solid #525252 !important;
-
-      &:focus {
-        outline: 2px solid var(--cds-focus);
-        outline-offset: -2px;
-      }
-    }
-
-    .cds--text-input__field-wrapper {
-      &:focus-within {
-        outline: none;
-      }
+    .page-actions {
+      display: flex;
+      gap: spacing.$spacing-03;
     }
   }
 
-  .description-row {
-    margin-bottom: spacing.$spacing-02;
-    margin-left: spacing.$spacing-04;
+  // Form content area
+  .form-content {
+    padding: spacing.$spacing-05;
+    max-width: 800px;
+    flex: 1;
+    overflow: auto;
 
-    .cds--text-input-wrapper {
-      max-width: 800px;
+    // Form rows with 32px vertical spacing (Carbon standard)
+    .form-row {
+      margin-bottom: spacing.$spacing-07; // 32px
     }
 
+    // Form field styling
     .cds--label {
       color: #c6c6c6 !important;
       margin-bottom: spacing.$spacing-02;
       font-weight: 400;
       font-size: 0.875rem;
-      display: block;
     }
 
     .cds--text-input {
@@ -77,29 +61,6 @@
         outline: 2px solid var(--cds-focus);
         outline-offset: -2px;
       }
-    }
-
-    .cds--text-input__field-wrapper {
-      &:focus-within {
-        outline: none;
-      }
-    }
-  }
-
-  .type-row {
-    margin-bottom: spacing.$spacing-05;
-    margin-left: spacing.$spacing-04;
-
-    .cds--select {
-      max-width: 400px;
-    }
-
-    .cds--label {
-      color: #c6c6c6 !important;
-      margin-bottom: spacing.$spacing-02;
-      font-weight: 600;
-      font-size: 0.875rem;
-      display: block;
     }
 
     .cds--select-input {
@@ -113,13 +74,16 @@
         outline-offset: -2px;
       }
     }
+
+    .cds--select {
+      max-width: 400px;
+    }
   }
 
   .config-section {
     background-color: var(--cds-layer-01);
     border-radius: 4px;
     padding: spacing.$spacing-05;
-    margin-left: spacing.$spacing-04;
     max-width: 900px;
 
     h3 {
@@ -138,6 +102,7 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: spacing.$spacing-04;
+        margin-bottom: 0;
 
         .cds--number-input,
         .cds--text-input-wrapper {

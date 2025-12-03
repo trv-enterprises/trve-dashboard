@@ -1,25 +1,44 @@
 @use '@carbon/react/scss/spacing' as spacing;
 
 .datasources-page {
-  padding: spacing.$spacing-06;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   background-color: var(--cds-background);
-  min-height: 100%;
+  overflow: hidden;
 
   .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: spacing.$spacing-06;
+    flex-shrink: 0;
+    padding: spacing.$spacing-06;
+    padding-bottom: spacing.$spacing-05;
 
     h1 {
-      margin: 0;
       font-size: 2rem;
-      font-weight: 400;
-      color: var(--cds-text-primary);
+      font-weight: 600;
+      color: #f4f4f4;
+      margin: 0 0 spacing.$spacing-03 0;
+    }
+
+    .page-description {
+      font-size: 0.875rem;
+      color: #c6c6c6;
+      margin: 0;
+      line-height: 1.5;
+
+      a {
+        color: var(--cds-link-primary);
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
     }
   }
 
   .error-message {
+    flex-shrink: 0;
+    margin: 0 spacing.$spacing-06;
     padding: spacing.$spacing-05;
     background-color: var(--cds-notification-error-background);
     color: var(--cds-notification-error-text);
@@ -27,17 +46,75 @@
     border-radius: 4px;
   }
 
-  // DataTable styling
+  // DataTable container with scrolling
   .cds--data-table-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin: 0 spacing.$spacing-06 spacing.$spacing-06;
+    background-color: var(--cds-layer-01);
+    overflow: hidden;
+  }
+
+  // Toolbar stays fixed
+  .cds--table-toolbar {
+    flex-shrink: 0;
     background-color: var(--cds-layer-01);
   }
 
+  // Table wrapper for scrolling
+  .cds--data-table-content {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  // Empty state styling
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: spacing.$spacing-09 spacing.$spacing-05;
+    text-align: center;
+
+    svg {
+      color: var(--cds-icon-secondary);
+      margin-bottom: spacing.$spacing-05;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 400;
+      color: #f4f4f4;
+      margin: 0 0 spacing.$spacing-03 0;
+    }
+
+    p {
+      font-size: 0.875rem;
+      color: var(--cds-text-secondary);
+      margin: 0;
+
+      a {
+        color: var(--cds-link-primary);
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+    }
+  }
+
+  // DataTable styling
   .cds--data-table {
     background-color: var(--cds-layer-01);
     color: var(--cds-text-primary);
   }
 
   .cds--data-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     background-color: var(--cds-layer-02);
   }
 
@@ -55,5 +132,43 @@
 
   .cds--data-table tbody tr:hover td {
     background-color: var(--cds-layer-hover-01);
+  }
+
+  // Clickable rows
+  .clickable-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover td {
+      background-color: var(--cds-layer-hover-01);
+    }
+  }
+
+  // Actions cell
+  .actions-cell {
+    width: 48px;
+    text-align: right;
+
+    .cds--btn--icon-only {
+      color: #f4f4f4 !important;
+
+      svg {
+        fill: #f4f4f4 !important;
+      }
+
+      &:hover {
+        color: #fa4d56 !important;
+        background-color: rgba(218, 30, 40, 0.1);
+
+        svg {
+          fill: #fa4d56 !important;
+        }
+      }
+    }
+  }
+
+  // Tags styling
+  .cds--tag {
+    margin: 0;
   }
 }

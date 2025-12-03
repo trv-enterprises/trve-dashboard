@@ -1,26 +1,36 @@
 @use '@carbon/react/scss/spacing' as spacing;
 
 .view-mode-nav {
-  padding: spacing.$spacing-03;
+  padding: 0;
 
   .nav-header {
     display: flex;
     align-items: center;
     gap: spacing.$spacing-03;
-    padding: spacing.$spacing-03 spacing.$spacing-05;
-    margin: 0 (-(spacing.$spacing-03));
+    // Match height with content page header for alignment
+    height: 56px;
+    padding: 0 spacing.$spacing-05;
     color: #c6c6c6;
     font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     border-bottom: 1px solid #393939;
-    margin-bottom: spacing.$spacing-03;
     background-color: transparent;
 
     svg {
       fill: #c6c6c6;
+      flex-shrink: 0;
     }
+
+    span {
+      white-space: nowrap;
+      overflow: hidden;
+    }
+  }
+
+  .dashboard-tiles {
+    padding: spacing.$spacing-03;
   }
 
   .nav-loading,

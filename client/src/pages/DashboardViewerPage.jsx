@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -11,10 +11,11 @@ import {
   Maximize,
   Minimize,
   Renew,
-  Settings,
+  Edit,
   Time
 } from '@carbon/icons-react';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
+import apiClient from '../api/client';
 import './DashboardViewerPage.scss';
 
 /**
@@ -26,29 +27,56 @@ import './DashboardViewerPage.scss';
  * - Fullscreen mode
  * - Real-time component rendering
  *
- * Dashboard structure (self-contained):
- * - panels: Array of {id, x, y, w, h} - panel positions
- * - charts: Object keyed by panel_id with embedded chart data
+ * Dashboard structure:
+ * - panels: Array of {id, x, y, w, h, chart_id} - panel positions with chart references
+ * - Charts are fetched separately by chart_id
  */
 function DashboardViewerPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [dashboard, setDashboard] = useState(null);
+  const [chartsMap, setChartsMap] = useState({}); // Chart data keyed by chart_id
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  // Fetch dashboard data (self-contained with panels and charts)
+  // Grid configuration
+  const GRID_ROW_HEIGHT = 32;
+
+  // Calculate actual rows needed based on panel positions
+  const maxGridRow = useMemo(() => {
+    if (!dashboard?.panels || dashboard.panels.length === 0) return 0;
+    return dashboard.panels.reduce((max, panel) => {
+      return Math.max(max, panel.y + panel.h);
+    }, 0);
+  }, [dashboard?.panels]);
+
+  // Fetch dashboard data and referenced charts
   const fetchDashboard = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:3001/api/dashboards/${id}`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      const data = await response.json();
+      const data = await apiClient.getDashboard(id);
       setDashboard(data);
+
+      // Fetch all referenced charts
+      if (data.panels && data.panels.length > 0) {
+        const chartIds = [...new Set(data.panels.map(p => p.chart_id).filter(Boolean))];
+        if (chartIds.length > 0) {
+          const chartPromises = chartIds.map(chartId =>
+            apiClient.getChart(chartId).catch(() => null)
+          );
+          const charts = await Promise.all(chartPromises);
+          const newChartsMap = {};
+          charts.forEach(chart => {
+            if (chart) {
+              newChartsMap[chart.id] = chart;
+            }
+          });
+          setChartsMap(newChartsMap);
+        }
+      }
+
       setLastRefresh(new Date());
     } catch (err) {
       setError(err.message);
@@ -178,10 +206,10 @@ function DashboardViewerPage() {
           </IconButton>
           <IconButton
             kind="ghost"
-            label="Dashboard settings"
-            onClick={() => navigate(`/design/dashboards/${id}`)}
+            label="Edit dashboard"
+            onClick={() => navigate(`/design/dashboards/${id}`, { state: { from: `/view/dashboards/${id}` } })}
           >
-            <Settings size={20} />
+            <Edit size={20} />
           </IconButton>
         </div>
       </div>
@@ -193,12 +221,11 @@ function DashboardViewerPage() {
             className="dashboard-grid"
             style={{
               gridTemplateColumns: 'repeat(12, 1fr)',
-              gridTemplateRows: 'repeat(50, 32px)',
-              minHeight: '1600px'
+              gridTemplateRows: `repeat(${maxGridRow}, ${GRID_ROW_HEIGHT}px)`
             }}
           >
             {dashboard.panels.map((panel) => {
-              const chart = dashboard.charts?.[panel.id];
+              const chart = panel.chart_id ? chartsMap[panel.chart_id] : null;
               const hasChart = !!chart?.component_code;
 
               return (

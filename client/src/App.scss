@@ -2,10 +2,18 @@
 @use '@carbon/react/scss/theme' as *;
 
 // Global app styling
+html,
 body {
   margin: 0;
   padding: 0;
   background-color: var(--cds-background);
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
 }
 
 // Header styling with visible outline
@@ -14,8 +22,7 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  border-bottom: 1px solid var(--cds-border-strong-01);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid #393939;
   z-index: 8000;
   background-color: var(--cds-layer-01);
 }
@@ -81,36 +88,10 @@ button.cds--header__action {
 .header-mode-group {
   display: flex;
   align-items: center;
-  margin-left: spacing.$spacing-08; // 2rem gap after header name
+  margin-left: spacing.$spacing-05; // Gap after header name
 }
 
-.header-title {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 
-  h2 {
-    margin: 0;
-    padding: 0;
-    font-size: 1.125rem;
-    font-weight: 400;
-    color: #f4f4f4;
-    letter-spacing: 0.16px;
-  }
-}
-
-.header-status {
-  display: flex;
-  align-items: center;
-  margin-right: 1rem;
-
-  .cds--tag {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-}
 
 // Side navigation with visible outline
 .cds--side-nav {
@@ -124,6 +105,11 @@ button.cds--header__action {
   overflow-y: auto;
   overflow-x: hidden;
   transition: width 0.11s cubic-bezier(0.2, 0, 1, 0.9);
+
+  // Reset default SideNavItems padding
+  .cds--side-nav__items {
+    padding: 0;
+  }
 
   // Collapsed state - show rail with icons only
   &:not(.cds--side-nav--expanded) {
@@ -154,6 +140,38 @@ button.cds--header__action {
       .dashboard-tiles,
       .nav-loading,
       .nav-empty {
+        display: none;
+      }
+
+      .nav-header {
+        justify-content: center;
+        padding: spacing.$spacing-03;
+        margin: 0;
+        border-bottom: none;
+      }
+    }
+
+    // Hide design mode nav content when collapsed
+    .design-mode-nav {
+      .nav-header span {
+        display: none;
+      }
+
+      .nav-header {
+        justify-content: center;
+        padding: spacing.$spacing-03;
+        margin: 0;
+        border-bottom: none;
+      }
+
+      .nav-links .cds--side-nav__link-text {
+        display: none;
+      }
+    }
+
+    // Hide manage mode nav content when collapsed
+    .manage-mode-nav {
+      .nav-header span {
         display: none;
       }
 
@@ -200,13 +218,18 @@ button.cds--header__action {
   margin-left: 256px; // Width of side nav
   margin-top: 48px; // Height of header
   padding: 0;
-  min-height: calc(100vh - 48px); // Account for header height
-  overflow-y: auto;
+  height: calc(100vh - 48px); // Fixed height to fill viewport
+  overflow: hidden; // Child pages manage their own scroll
   transition: margin-left 0.11s cubic-bezier(0.2, 0, 1, 0.9);
 
   // When nav is collapsed (shows rail with icons)
   &.app-content--nav-collapsed {
     margin-left: 48px; // Width of collapsed nav rail
+  }
+
+  // Child pages fill container but manage their own internal scroll
+  > * {
+    height: 100%;
   }
 }
 

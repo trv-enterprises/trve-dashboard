@@ -194,3 +194,39 @@ type QueryResponse struct {
 	Error     string     `json:"error,omitempty"`
 	Duration  int64      `json:"duration"` // milliseconds
 }
+
+// SchemaProvider is an optional interface for datasources that support schema discovery
+// SQL databases implement this; CSV/API/Socket do not
+type SchemaProvider interface {
+	GetSchema(ctx context.Context) (*SchemaInfo, error)
+}
+
+// SchemaInfo represents database schema information
+type SchemaInfo struct {
+	Database string      `json:"database"`          // Current database name
+	Tables   []TableInfo `json:"tables"`            // Tables in the database
+}
+
+// TableInfo represents a database table
+type TableInfo struct {
+	Name    string       `json:"name"`              // Table name
+	Schema  string       `json:"schema,omitempty"`  // Schema/namespace (e.g., "public" for PostgreSQL)
+	Columns []ColumnInfo `json:"columns"`           // Columns in the table
+}
+
+// ColumnInfo represents a database column
+type ColumnInfo struct {
+	Name       string `json:"name"`                  // Column name
+	Type       string `json:"type"`                  // Data type (e.g., "varchar", "integer")
+	Nullable   bool   `json:"nullable"`              // Whether column allows NULL
+	PrimaryKey bool   `json:"primary_key,omitempty"` // Whether column is part of primary key
+	Default    string `json:"default,omitempty"`     // Default value if any
+}
+
+// SchemaResponse represents the API response for schema discovery
+type SchemaResponse struct {
+	Success  bool        `json:"success"`
+	Schema   *SchemaInfo `json:"schema,omitempty"`
+	Error    string      `json:"error,omitempty"`
+	Duration int64       `json:"duration"` // milliseconds
+}

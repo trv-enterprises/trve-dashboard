@@ -5,8 +5,10 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/tviviano/dashboard/internal/models"
 )
@@ -19,25 +21,25 @@ type CSVDataSource struct {
 
 // NewCSVDataSource creates a new CSV datasource
 func NewCSVDataSource(config *models.CSVConfig) (*CSVDataSource, error) {
-	// Verify file exists and is readable
-	file, err := os.Open(config.Path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open CSV file: %w", err)
-	}
-	defer file.Close()
-
 	ds := &CSVDataSource{
 		config: config,
 	}
 
+	// Get a reader for the CSV data (supports both local files and HTTP URLs)
+	reader, cleanup, err := ds.getReader()
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+
 	// Read header if present
 	if config.HasHeader {
-		reader := csv.NewReader(file)
+		csvReader := csv.NewReader(reader)
 		if config.Delimiter != "" {
-			reader.Comma = rune(config.Delimiter[0])
+			csvReader.Comma = rune(config.Delimiter[0])
 		}
 
-		header, err := reader.Read()
+		header, err := csvReader.Read()
 		if err != nil {
 			return nil, fmt.Errorf("failed to read CSV header: %w", err)
 		}
@@ -50,22 +52,66 @@ func NewCSVDataSource(config *models.CSVConfig) (*CSVDataSource, error) {
 	return ds, nil
 }
 
-// Query executes a filter query on CSV data and returns normalized results
-func (c *CSVDataSource) Query(ctx context.Context, query models.Query) (*models.ResultSet, error) {
+// isURL checks if the path is an HTTP/HTTPS URL
+func isURL(path string) bool {
+	return strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://")
+}
+
+// getReader returns an io.Reader for the CSV data, supporting both local files and HTTP URLs
+// Returns the reader, a cleanup function, and any error
+func (c *CSVDataSource) getReader() (io.Reader, func(), error) {
+	if isURL(c.config.Path) {
+		// Fetch from HTTP URL
+		client := &http.Client{
+			Timeout: 30 * time.Second,
+		}
+
+		resp, err := client.Get(c.config.Path)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to fetch CSV from URL: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, nil, fmt.Errorf("failed to fetch CSV: HTTP %d %s", resp.StatusCode, resp.Status)
+		}
+
+		cleanup := func() {
+			resp.Body.Close()
+		}
+
+		return resp.Body, cleanup, nil
+	}
+
+	// Local file
 	file, err := os.Open(c.config.Path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open CSV file: %w", err)
+		return nil, nil, fmt.Errorf("failed to open CSV file: %w", err)
 	}
-	defer file.Close()
 
-	reader := csv.NewReader(file)
+	cleanup := func() {
+		file.Close()
+	}
+
+	return file, cleanup, nil
+}
+
+// Query executes a filter query on CSV data and returns normalized results
+func (c *CSVDataSource) Query(ctx context.Context, query models.Query) (*models.ResultSet, error) {
+	reader, cleanup, err := c.getReader()
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+
+	csvReader := csv.NewReader(reader)
 	if c.config.Delimiter != "" {
-		reader.Comma = rune(c.config.Delimiter[0])
+		csvReader.Comma = rune(c.config.Delimiter[0])
 	}
 
 	// Skip header if present
 	if c.config.HasHeader {
-		if _, err := reader.Read(); err != nil {
+		if _, err := csvReader.Read(); err != nil {
 			return nil, fmt.Errorf("failed to read header: %w", err)
 		}
 	}
@@ -79,7 +125,7 @@ func (c *CSVDataSource) Query(ctx context.Context, query models.Query) (*models.
 	// Read all records (filtering logic can be added based on query.Raw)
 	rowCount := 0
 	for {
-		record, err := reader.Read()
+		record, err := csvReader.Read()
 		if err == io.EOF {
 			break
 		}
@@ -112,26 +158,27 @@ func (c *CSVDataSource) Query(ctx context.Context, query models.Query) (*models.
 	resultSet.Metadata["row_count"] = rowCount
 	resultSet.Metadata["column_count"] = len(c.columns)
 	resultSet.Metadata["file_path"] = c.config.Path
+	resultSet.Metadata["is_url"] = isURL(c.config.Path)
 
 	return resultSet, nil
 }
 
 // Stream reads CSV data and streams records as they're read
 func (c *CSVDataSource) Stream(ctx context.Context, query models.Query) (<-chan models.Record, error) {
-	file, err := os.Open(c.config.Path)
+	reader, cleanup, err := c.getReader()
 	if err != nil {
-		return nil, fmt.Errorf("failed to open CSV file: %w", err)
+		return nil, err
 	}
 
-	reader := csv.NewReader(file)
+	csvReader := csv.NewReader(reader)
 	if c.config.Delimiter != "" {
-		reader.Comma = rune(c.config.Delimiter[0])
+		csvReader.Comma = rune(c.config.Delimiter[0])
 	}
 
 	// Skip header if present
 	if c.config.HasHeader {
-		if _, err := reader.Read(); err != nil {
-			file.Close()
+		if _, err := csvReader.Read(); err != nil {
+			cleanup()
 			return nil, fmt.Errorf("failed to read header: %w", err)
 		}
 	}
@@ -140,10 +187,10 @@ func (c *CSVDataSource) Stream(ctx context.Context, query models.Query) (<-chan 
 
 	go func() {
 		defer close(recordChan)
-		defer file.Close()
+		defer cleanup()
 
 		for {
-			csvRecord, err := reader.Read()
+			csvRecord, err := csvReader.Read()
 			if err == io.EOF {
 				break
 			}

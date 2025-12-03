@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   Header,
@@ -6,16 +6,10 @@ import {
   HeaderName,
   HeaderGlobalBar,
   HeaderGlobalAction,
-  HeaderMenuButton,
   SideNav,
-  SideNavItems,
-  SideNavLink,
-  Tag,
   Content
 } from '@carbon/react';
 import {
-  Checkmark,
-  WarningAlt,
   Help,
   Switcher,
   Notification,
@@ -24,12 +18,6 @@ import {
   Menu,
   Close
 } from '@carbon/icons-react';
-import DashboardPage from './pages/DashboardPage';
-import NodesPage from './pages/NodesPage';
-import QueriesPage from './pages/QueriesPage';
-import ChartDesignPage from './pages/ChartDesignPage';
-import LayoutsPage from './pages/LayoutsPage';
-import LayoutDetailPage from './pages/LayoutDetailPage';
 import DatasourcesPage from './pages/DatasourcesPage';
 import DatasourceDetailPage from './pages/DatasourceDetailPage';
 import ChartsListPage from './pages/ChartsListPage';
@@ -42,12 +30,10 @@ import DesignModeNav from './components/navigation/DesignModeNav';
 import ViewModeNav from './components/navigation/ViewModeNav';
 import ManageModeNav from './components/navigation/ManageModeNav';
 import { MODES } from './config/layoutConfig';
-import apiClient from './api/client';
 import buildInfo from '../build.json';
 import './App.scss';
 
 function AppContent() {
-  const [serverStatus, setServerStatus] = useState('checking');
   const [isSideNavExpanded, setIsSideNavExpanded] = useState(true);
   const [currentMode, setCurrentMode] = useState(() => {
     // Load mode from localStorage or default to VIEW
@@ -65,7 +51,7 @@ function AppContent() {
     localStorage.setItem('dashboardMode', newMode);
     // Navigate to appropriate default route for the mode
     if (newMode === MODES.DESIGN) {
-      navigate('/design/layouts');
+      navigate('/design/dashboards');
     } else if (newMode === MODES.VIEW) {
       // Navigate to first dashboard if available, otherwise to dashboard list
       if (firstDashboardId) {
@@ -77,19 +63,6 @@ function AppContent() {
       navigate('/manage');
     }
   };
-
-  // Check server health on mount
-  useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        await apiClient.health();
-        setServerStatus('connected');
-      } catch (err) {
-        setServerStatus('disconnected');
-      }
-    };
-    checkHealth();
-  }, []);
 
   // Fetch first dashboard for default redirect
   useEffect(() => {
@@ -139,39 +112,18 @@ function AppContent() {
               {isSideNavExpanded ? <Close size={20} /> : <Menu size={20} />}
             </button>
             <HeaderName href="/" prefix="">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem' }}>
                 <ChartMultitype size={20} />
-                <span>GiVi-Solutions (Build {buildInfo.buildNumber})</span>
+                <span>GiVi Dashboards (Build {buildInfo.buildNumber})</span>
               </div>
             </HeaderName>
+            <div className="header-mode-group">
+              <ModeToggle
+                currentMode={currentMode}
+                onModeChange={handleModeChange}
+              />
+            </div>
             <HeaderGlobalBar>
-              <div className="header-mode-group">
-                <ModeToggle
-                  currentMode={currentMode}
-                  onModeChange={handleModeChange}
-                />
-              </div>
-              <div className="header-title">
-                <h2>My Dashboard</h2>
-              </div>
-              <div className="header-status">
-                <Tag
-                  type={serverStatus === 'connected' ? 'green' : 'red'}
-                  size="md"
-                >
-                  {serverStatus === 'connected' ? (
-                    <>
-                      <Checkmark size={16} />
-                      <span>Connected</span>
-                    </>
-                  ) : (
-                    <>
-                      <WarningAlt size={16} />
-                      <span>Offline</span>
-                    </>
-                  )}
-                </Tag>
-              </div>
               <HeaderGlobalAction aria-label="Help">
                 <Help size={20} />
               </HeaderGlobalAction>
@@ -212,8 +164,6 @@ function AppContent() {
           } />
 
           {/* Design Mode Routes */}
-          <Route path="/design/layouts" element={<LayoutsPage />} />
-          <Route path="/design/layouts/:id" element={<LayoutDetailPage />} />
           <Route path="/design/datasources" element={<DatasourcesPage />} />
           <Route path="/design/datasources/:id" element={<DatasourceDetailPage />} />
           <Route path="/design/charts" element={<ChartsListPage />} />
@@ -234,7 +184,9 @@ function AppContent() {
           <Route path="/manage" element={<div>Manage Settings (Coming in Phase 8)</div>} />
 
           {/* Legacy routes for backwards compatibility - redirect to design mode */}
-          <Route path="/dashboard" element={<Navigate to="/design/layouts" replace />} />
+          <Route path="/dashboard" element={<Navigate to="/design/dashboards" replace />} />
+          <Route path="/design/layouts" element={<Navigate to="/design/dashboards" replace />} />
+          <Route path="/design/layouts/:id" element={<Navigate to="/design/dashboards" replace />} />
           <Route path="/nodes" element={<Navigate to="/design/datasources" replace />} />
           <Route path="/queries" element={<Navigate to="/design/datasources" replace />} />
           <Route path="/chart-design" element={<Navigate to="/design/charts" replace />} />

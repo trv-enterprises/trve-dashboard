@@ -1,5 +1,6 @@
 import { SideNavItems, SideNavLink } from '@carbon/react';
-import { Settings } from '@carbon/icons-react';
+import { Settings, SettingsAdjust } from '@carbon/icons-react';
+import './ManageModeNav.scss';
 
 /**
  * ManageModeNav Component
@@ -11,7 +12,7 @@ function ManageModeNav({ location, navigate }) {
   const manageNavItems = [
     {
       path: '/manage',
-      icon: Settings,
+      icon: SettingsAdjust,
       label: 'Settings',
       description: 'System administration'
     }
@@ -19,23 +20,32 @@ function ManageModeNav({ location, navigate }) {
 
   return (
     <SideNavItems>
-      {manageNavItems.map((item) => {
-        const Icon = item.icon;
-        return (
-          <SideNavLink
-            key={item.path}
-            renderIcon={Icon}
-            href={item.path}
-            isActive={location.pathname === item.path}
-            onClick={(e) => {
-              e.preventDefault();
-              navigate(item.path);
-            }}
-          >
-            {item.label}
-          </SideNavLink>
-        );
-      })}
+      <div className="manage-mode-nav">
+        <div className="nav-header">
+          <Settings size={16} />
+          <span>Configuration</span>
+        </div>
+
+        <div className="nav-links">
+          {manageNavItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <SideNavLink
+                key={item.path}
+                renderIcon={Icon}
+                href={item.path}
+                isActive={location.pathname === item.path}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(item.path);
+                }}
+              >
+                {item.label}
+              </SideNavLink>
+            );
+          })}
+        </div>
+      </div>
     </SideNavItems>
   );
 }

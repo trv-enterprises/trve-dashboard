@@ -1,88 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Loading,
-  Modal,
-  TextInput,
-  TextArea,
-  Tag,
-  TagSkeleton,
-  Toggle
-} from '@carbon/react';
-import { Save, Close, View, ViewOff } from '@carbon/icons-react';
-import DynamicComponentLoader from '../components/DynamicComponentLoader';
+import { Button, Loading, Modal } from '@carbon/react';
+import { Save, Close } from '@carbon/icons-react';
+import ChartEditor from '../components/ChartEditor';
+import apiClient from '../api/client';
 import './ChartDetailPage.scss';
 
 /**
  * ChartDetailPage Component
  *
- * Create/Edit component/chart with code editor.
- * Supports: Name, System, Source, Description, Component Code, Metadata
+ * Standalone page for creating/editing charts.
+ * Uses shared ChartEditor component.
  */
 function ChartDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isCreateMode = id === 'new';
 
-  const [component, setComponent] = useState(null);
-  const [name, setName] = useState('');
-  const [system, setSystem] = useState('');
-  const [source, setSource] = useState('');
-  const [description, setDescription] = useState('');
-  const [componentCode, setComponentCode] = useState('');
-  const [category, setCategory] = useState('');
-  const [tags, setTags] = useState([]);
-  const [tagInput, setTagInput] = useState('');
+  const [chart, setChart] = useState(null);
   const [loading, setLoading] = useState(!isCreateMode);
   const [error, setError] = useState(null);
-  const [hasChanges, setHasChanges] = useState(false);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [showSaveModal, setShowSaveModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showPreview, setShowPreview] = useState(true);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState(null);
+  const [isValid, setIsValid] = useState(false);
+  const editorRef = useRef(null);
 
   useEffect(() => {
     if (!isCreateMode) {
-      fetchComponent();
-    } else {
-      // Initialize with default component template
-      setComponentCode(`const Component = () => {
-  const [count, setCount] = useState(0);
-
-  return (
-    <div style={{ padding: '20px', textAlign: 'center' }}>
-      <h2>My Component</h2>
-      <p>Count: {count}</p>
-      <button onClick={() => setCount(count + 1)}>
-        Increment
-      </button>
-    </div>
-  );
-};`);
+      fetchChart();
     }
   }, [id]);
 
-  const fetchComponent = async () => {
+  const fetchChart = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/components/${id}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('Component response:', data);
-
-      setComponent(data);
-      setName(data.name);
-      setSystem(data.system);
-      setSource(data.source);
-      setDescription(data.description || '');
-      setComponentCode(data.component_code || '');
-      setCategory(data.metadata?.category || '');
-      setTags(data.metadata?.tags || []);
+      const data = await apiClient.getChart(id);
+      setChart(data);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -90,65 +44,25 @@ function ChartDetailPage() {
     }
   };
 
-  const handleAddTag = () => {
-    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
-      setTags([...tags, tagInput.trim()]);
-      setTagInput('');
-      setHasChanges(true);
-    }
+  const handleSave = async (chartPayload) => {
+    // Show confirmation modal with the payload
+    setPendingPayload(chartPayload);
+    setShowSaveModal(true);
   };
 
-  const handleRemoveTag = (tagToRemove) => {
-    setTags(tags.filter(t => t !== tagToRemove));
-    setHasChanges(true);
-  };
+  const confirmSave = async () => {
+    if (!pendingPayload) return;
 
-  const handleSave = async () => {
     setSaving(true);
     try {
-      const payload = {
-        name,
-        system,
-        source,
-        description,
-        component_code: componentCode,
-        metadata: {
-          category,
-          tags
-        }
-      };
-
-      let response;
       if (isCreateMode) {
-        response = await fetch('http://localhost:3001/api/components', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        await apiClient.createChart(pendingPayload);
       } else {
-        response = await fetch(`http://localhost:3001/api/components/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            description,
-            component_code: componentCode,
-            metadata: {
-              category,
-              tags
-            }
-          })
-        });
+        await apiClient.updateChart(id, pendingPayload);
       }
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setHasChanges(false);
-        setShowSaveModal(false);
-        navigate('/design/charts');
-      } else {
-        alert(`Failed to save: ${data.error || 'Unknown error'}`);
-      }
+      setShowSaveModal(false);
+      navigate('/design/charts');
     } catch (err) {
       alert(`Error: ${err.message}`);
     } finally {
@@ -157,22 +71,19 @@ function ChartDetailPage() {
   };
 
   const handleCancel = () => {
-    if (hasChanges) {
-      setShowCancelModal(true);
-    } else {
-      navigate('/design/charts');
-    }
+    navigate('/design/charts');
   };
 
-  const confirmCancel = () => {
-    setShowCancelModal(false);
-    navigate('/design/charts');
+  const handleSaveClick = () => {
+    if (editorRef.current) {
+      editorRef.current.save();
+    }
   };
 
   if (loading) {
     return (
       <div className="chart-detail-page">
-        <Loading description="Loading component..." withOverlay={false} />
+        <Loading description="Loading chart..." withOverlay={false} />
       </div>
     );
   }
@@ -188,208 +99,56 @@ function ChartDetailPage() {
 
   return (
     <div className="chart-detail-page">
-      {/* Action buttons in top right */}
-      <div className="page-actions">
-        <Button
-          kind="secondary"
-          renderIcon={Close}
-          onClick={handleCancel}
-          size="md"
-        >
-          Cancel
-        </Button>
-        <Button
-          kind="primary"
-          renderIcon={Save}
-          onClick={() => setShowSaveModal(true)}
-          disabled={!name || !system || !source || !componentCode}
-          size="md"
-        >
-          Save Component
-        </Button>
-      </div>
-
-      {/* Header with name */}
-      <div className="page-header">
-        <TextInput
-          id="component-name"
-          labelText="Component Name"
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setHasChanges(true);
-          }}
-          placeholder="Enter component name"
-          size="lg"
-          disabled={!isCreateMode}
-        />
-      </div>
-
-      {/* System and Source row */}
-      <div className="system-source-row">
-        <TextInput
-          id="component-system"
-          labelText="System"
-          value={system}
-          onChange={(e) => {
-            setSystem(e.target.value);
-            setHasChanges(true);
-          }}
-          placeholder="e.g., visualization"
-          disabled={!isCreateMode}
-        />
-        <TextInput
-          id="component-source"
-          labelText="Source"
-          value={source}
-          onChange={(e) => {
-            setSource(e.target.value);
-            setHasChanges(true);
-          }}
-          placeholder="e.g., charts"
-          disabled={!isCreateMode}
-        />
-      </div>
-
-      {/* Description row */}
-      <div className="description-row">
-        <TextInput
-          id="component-description"
-          labelText="Description (optional)"
-          value={description}
-          onChange={(e) => {
-            setDescription(e.target.value);
-            setHasChanges(true);
-          }}
-          placeholder="Enter component description"
-          size="md"
-        />
-      </div>
-
-      {/* Category and Tags */}
-      <div className="metadata-row">
-        <TextInput
-          id="component-category"
-          labelText="Category (optional)"
-          value={category}
-          onChange={(e) => {
-            setCategory(e.target.value);
-            setHasChanges(true);
-          }}
-          placeholder="e.g., demo, widget"
-        />
-        <div className="tags-input">
-          <label className="cds--label">Tags</label>
-          <div className="tags-container">
-            {tags.map((tag) => (
-              <Tag
-                key={tag}
-                type="blue"
-                size="md"
-                onClose={() => handleRemoveTag(tag)}
-              >
-                {tag}
-              </Tag>
-            ))}
-            <TextInput
-              id="tag-input"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddTag();
-                }
-              }}
-              placeholder="Add tag (press Enter)"
-              size="sm"
-              labelText=""
-            />
-          </div>
+      {/* Page header bar with title and actions */}
+      <div className="page-header-bar">
+        <h1>{isCreateMode ? 'Create Chart' : 'Edit Chart'}</h1>
+        <div className="page-actions">
+          <Button
+            kind="secondary"
+            renderIcon={Close}
+            onClick={handleCancel}
+            size="md"
+          >
+            Cancel
+          </Button>
+          <Button
+            kind="primary"
+            renderIcon={Save}
+            onClick={handleSaveClick}
+            disabled={saving || !isValid}
+            size="md"
+          >
+            Save Chart
+          </Button>
         </div>
       </div>
 
-      {/* Code editor with live preview */}
-      <div className="code-preview-container">
-        <div className={`code-editor-section ${showPreview ? 'with-preview' : 'full-width'}`}>
-          <div className="section-header">
-            <h3>Component Code</h3>
-            <Toggle
-              id="preview-toggle"
-              labelText=""
-              labelA="Preview Off"
-              labelB="Preview On"
-              toggled={showPreview}
-              onToggle={() => setShowPreview(!showPreview)}
-              size="sm"
-            />
-          </div>
-          <p className="code-help">
-            Write your React component code. Must export a `Component` or `Widget` variable.
-            Available: useState, useEffect, useMemo, useCallback, useRef, useContext, echarts, ReactECharts
-          </p>
-          <TextArea
-            id="component-code"
-            labelText=""
-            value={componentCode}
-            onChange={(e) => {
-              setComponentCode(e.target.value);
-              setHasChanges(true);
-            }}
-            placeholder="const Component = () => { ... };"
-            rows={20}
-            className="code-textarea"
-          />
-        </div>
-
-        {showPreview && (
-          <div className="preview-section">
-            <div className="section-header">
-              <h3>Live Preview</h3>
-            </div>
-            <div className="preview-container">
-              {componentCode ? (
-                <DynamicComponentLoader code={componentCode} props={{}} />
-              ) : (
-                <div className="preview-placeholder">
-                  <p>Write component code to see preview</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Cancel confirmation modal */}
-      {showCancelModal && (
-        <Modal
-          open={true}
-          onRequestClose={() => setShowCancelModal(false)}
-          onRequestSubmit={confirmCancel}
-          modalHeading="Discard Changes?"
-          primaryButtonText="Discard"
-          secondaryButtonText="Keep Editing"
-          danger
-        >
-          <p>You have unsaved changes. Are you sure you want to discard them?</p>
-        </Modal>
-      )}
+      <ChartEditor
+        ref={editorRef}
+        chart={chart}
+        onSave={handleSave}
+        onCancel={handleCancel}
+        saving={saving}
+        showActions={false}
+        className="chart-detail-editor"
+        onValidityChange={setIsValid}
+      />
 
       {/* Save confirmation modal */}
       {showSaveModal && (
         <Modal
           open={true}
           onRequestClose={() => setShowSaveModal(false)}
-          onRequestSubmit={handleSave}
-          modalHeading={isCreateMode ? "Create Component" : "Save Changes"}
+          onRequestSubmit={confirmSave}
+          modalHeading={isCreateMode ? "Create Chart" : "Save Changes"}
           primaryButtonText={saving ? "Saving..." : "Save"}
           secondaryButtonText="Cancel"
           primaryButtonDisabled={saving}
         >
           <p>
             {isCreateMode
-              ? `Create component "${name}" in ${system}/${source}?`
-              : `Save changes to component "${name}"?`}
+              ? `Create chart "${pendingPayload?.name}"?`
+              : `Save changes to chart "${pendingPayload?.name}"?`}
           </p>
         </Modal>
       )}

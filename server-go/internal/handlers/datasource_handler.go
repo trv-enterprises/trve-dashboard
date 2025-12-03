@@ -258,3 +258,29 @@ func (h *DatasourceHandler) QueryDatasource(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+
+// GetDatasourceSchema handles schema discovery for SQL datasources
+// @Summary Get database schema for a SQL datasource
+// @Description Retrieve tables and columns for SQL datasources. Only SQL-type datasources support this endpoint.
+// @Tags datasources
+// @Produce json
+// @Param id path string true "Datasource ID"
+// @Success 200 {object} models.SchemaResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /datasources/{id}/schema [get]
+func (h *DatasourceHandler) GetDatasourceSchema(c *gin.Context) {
+	id := c.Param("id")
+
+	response, err := h.service.GetSchema(c.Request.Context(), id)
+	if err != nil {
+		if err.Error() == "datasource not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Datasource not found"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}

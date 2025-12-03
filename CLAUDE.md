@@ -310,10 +310,20 @@ const Component = () => {
 - Config API for user/system settings
 
 ### 📋 Planned
+- **Data Source Testing in Editor**: Add connection test capability to data source editor UI (backend API already exists at `/api/datasources/test`)
 - Manage Mode implementation
 - AI chat integration for component generation
 - User authentication
 - EdgeLake integration
+- **Versioning for Dashboards and Charts**:
+  - Add `version` field to dashboards and charts (composite key: id + version)
+  - UI should expose version number and auto-increment on save
+  - Allow user to reset/revert to previous versions
+  - List pages should have toggle to show all versions or just latest (default: latest)
+  - Open questions:
+    - How to handle name changes between versions?
+    - Should chart names be unique per ID (allowing different names across versions)?
+    - Version history UI design
 
 ---
 

@@ -140,6 +140,7 @@ func main() {
 			datasources.POST("/test", datasourceHandler.TestDatasource)
 			datasources.POST("/:id/health", datasourceHandler.CheckDatasourceHealth)
 			datasources.POST("/:id/query", datasourceHandler.QueryDatasource)
+			datasources.GET("/:id/schema", datasourceHandler.GetDatasourceSchema)
 		}
 
 		// Component routes (legacy - being replaced by charts)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Button,
   Loading,
@@ -42,7 +42,19 @@ const EDITOR_MODES = {
 function DashboardDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const isCreateMode = id === 'new';
+
+  // Determine where to go back to after save/cancel
+  // If came from view mode (referrer contains /view/), go back to dashboard viewer
+  const returnPath = location.state?.from || '/design/dashboards';
+  const getReturnPath = () => {
+    // For existing dashboards, check if we came from view mode
+    if (!isCreateMode && location.state?.from?.startsWith('/view/')) {
+      return `/view/dashboards/${id}`;
+    }
+    return returnPath;
+  };
 
   // Dashboard state
   const [dashboard, setDashboard] = useState(null);
@@ -54,11 +66,6 @@ function DashboardDetailPage() {
   const [refreshInterval, setRefreshInterval] = useState(0);
   const [isPublic, setIsPublic] = useState(false);
   const [allowExport, setAllowExport] = useState(true);
-
-  // Layout templates for starting point
-  const [layouts, setLayouts] = useState([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState('');
-  const [templateApplied, setTemplateApplied] = useState(false); // True once panels exist
 
   // Editor mode state
   const [editorMode, setEditorMode] = useState(EDITOR_MODES.DESIGN);
@@ -93,53 +100,10 @@ function DashboardDetailPage() {
   const GRID_ROWS = 50;
 
   useEffect(() => {
-    fetchLayouts();
     if (!isCreateMode) {
       fetchDashboard();
     }
   }, [id]);
-
-  // When template is selected (in create mode), copy panels from template
-  useEffect(() => {
-    if (selectedTemplateId && !templateApplied) {
-      applyLayoutTemplate(selectedTemplateId);
-    }
-  }, [selectedTemplateId]);
-
-  const fetchLayouts = async () => {
-    try {
-      const response = await fetch('http://localhost:3001/api/layouts?page=1&page_size=100');
-      const data = await response.json();
-      if (data.layouts) {
-        setLayouts(data.layouts);
-      }
-    } catch (err) {
-      console.error('Failed to fetch layouts:', err);
-    }
-  };
-
-  // Apply a layout template - copies panels into dashboard
-  const applyLayoutTemplate = async (templateId) => {
-    try {
-      const response = await fetch(`http://localhost:3001/api/layouts/${templateId}`);
-      const data = await response.json();
-
-      if (data.panels) {
-        // Copy panels from template (using w for width, h for height)
-        setPanels(data.panels.map(panel => ({
-          id: panel.id,
-          x: panel.x,
-          y: panel.y,
-          w: panel.w,
-          h: panel.h
-        })));
-        setTemplateApplied(true);
-        setHasChanges(true);
-      }
-    } catch (err) {
-      console.error('Failed to apply layout template:', err);
-    }
-  };
 
   const fetchDashboard = async () => {
     try {
@@ -158,7 +122,6 @@ function DashboardDetailPage() {
       // Load panels (now contain chart_id references)
       if (data.panels && data.panels.length > 0) {
         setPanels(data.panels);
-        setTemplateApplied(true);
 
         // Fetch all referenced charts
         const chartIds = [...new Set(data.panels.map(p => p.chart_id).filter(Boolean))];
@@ -181,17 +144,8 @@ function DashboardDetailPage() {
     }
   };
 
-  const handleTemplateChange = (e) => {
-    const templateId = e.target.value;
-    if (templateId) {
-      setSelectedTemplateId(templateId);
-      // Don't need to clear chartsMap since it's keyed by chart_id, not panel_id
-    }
-  };
-
   // Mark that panels have been modified
   const markPanelsModified = () => {
-    setTemplateApplied(true);
     setHasChanges(true);
   };
 
@@ -426,7 +380,7 @@ function DashboardDetailPage() {
 
       setHasChanges(false);
       setShowSaveModal(false);
-      navigate('/design/dashboards');
+      navigate(getReturnPath());
     } catch (err) {
       alert(`Error: ${err.message}`);
     } finally {
@@ -438,13 +392,13 @@ function DashboardDetailPage() {
     if (hasChanges) {
       setShowCancelModal(true);
     } else {
-      navigate('/design/dashboards');
+      navigate(getReturnPath());
     }
   };
 
   const confirmCancel = () => {
     setShowCancelModal(false);
-    navigate('/design/dashboards');
+    navigate(getReturnPath());
   };
 
   if (loading) {
@@ -466,106 +420,95 @@ function DashboardDetailPage() {
 
   return (
     <div className="dashboard-detail-page">
-      {/* Action buttons in top right */}
-      <div className="page-actions">
-        <Button
-          kind="secondary"
-          renderIcon={Close}
-          onClick={handleCancel}
-          size="md"
-        >
-          Cancel
-        </Button>
-        <Button
-          kind="primary"
-          renderIcon={Save}
-          onClick={() => setShowSaveModal(true)}
-          disabled={!name}
-          size="md"
-        >
-          Save Dashboard
-        </Button>
+      {/* Page header with title and actions */}
+      <div className="page-header-bar">
+        <h1>Edit Dashboard</h1>
+        <div className="page-actions">
+          <Button
+            kind="secondary"
+            renderIcon={Close}
+            onClick={handleCancel}
+            size="md"
+          >
+            Cancel
+          </Button>
+          <Button
+            kind="primary"
+            renderIcon={Save}
+            onClick={() => setShowSaveModal(true)}
+            disabled={!name}
+            size="md"
+          >
+            Save Dashboard
+          </Button>
+        </div>
       </div>
 
-      {/* Header with name */}
-      <div className="page-header">
-        <TextInput
-          id="dashboard-name"
-          labelText="Dashboard Name"
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setHasChanges(true);
-          }}
-          placeholder="Enter dashboard name"
-          size="lg"
-        />
-      </div>
+      {/* Scrollable content area */}
+      <div className="page-content">
+        {/* Form content */}
+        <div className="form-content">
+        {/* Dashboard Name - full width */}
+        <div className="form-row">
+          <TextInput
+            id="dashboard-name"
+            labelText="Dashboard Name"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setHasChanges(true);
+            }}
+            placeholder="Enter dashboard name"
+          />
+        </div>
 
-      {/* Description row */}
-      <div className="description-row">
-        <TextInput
-          id="dashboard-description"
-          labelText="Description (optional)"
-          value={description}
-          onChange={(e) => {
-            setDescription(e.target.value);
-            setHasChanges(true);
-          }}
-          placeholder="Enter dashboard description"
-          size="md"
-        />
-      </div>
+        {/* Description - full width */}
+        <div className="form-row">
+          <TextInput
+            id="dashboard-description"
+            labelText="Description (optional)"
+            value={description}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              setHasChanges(true);
+            }}
+            placeholder="Enter dashboard description"
+          />
+        </div>
 
-      {/* Settings row - Theme, Refresh, and Layout */}
-      <div className="settings-row">
-        <Select
-          id="dashboard-theme"
-          labelText="Theme"
-          value={theme}
-          onChange={(e) => {
-            setTheme(e.target.value);
-            setHasChanges(true);
-          }}
-        >
-          <SelectItem value="light" text="Light" />
-          <SelectItem value="dark" text="Dark" />
-          <SelectItem value="auto" text="Auto" />
-        </Select>
-
-        <NumberInput
-          id="dashboard-refresh"
-          label="Refresh (sec)"
-          value={refreshInterval}
-          onChange={(e, { value }) => {
-            setRefreshInterval(value);
-            setHasChanges(true);
-          }}
-          min={0}
-          max={3600}
-          step={5}
-        />
-
-        <Select
-          id="dashboard-template"
-          labelText="Layout Template"
-          value={selectedTemplateId}
-          onChange={handleTemplateChange}
-          disabled={templateApplied}
-          className={templateApplied ? 'layout-disabled' : ''}
-        >
-          <SelectItem value="" text={templateApplied ? "Template applied" : "Select a template (optional)"} />
-          {layouts.map((layout) => (
-            <SelectItem
-              key={layout.id}
-              value={layout.id}
-              text={`${layout.name} (${layout.panels?.length || 0} panels)`}
+        {/* Two column row: Theme and Refresh */}
+        <div className="form-row two-column">
+          <div className="form-column">
+            <Select
+              id="dashboard-theme"
+              labelText="Theme"
+              value={theme}
+              onChange={(e) => {
+                setTheme(e.target.value);
+                setHasChanges(true);
+              }}
+            >
+              <SelectItem value="light" text="Light" />
+              <SelectItem value="dark" text="Dark" />
+              <SelectItem value="auto" text="Auto" />
+            </Select>
+          </div>
+          <div className="form-column">
+            <NumberInput
+              id="dashboard-refresh"
+              label="Auto Refresh (seconds)"
+              value={refreshInterval}
+              onChange={(e, { value }) => {
+                setRefreshInterval(value);
+                setHasChanges(true);
+              }}
+              min={0}
+              max={3600}
+              step={5}
+              helperText="Set to 0 to disable auto refresh"
             />
-          ))}
-        </Select>
-        {templateApplied && panels.length > 0 && (
-          <span className="custom-layout-badge">{panels.length} panels</span>
-        )}
+          </div>
+        </div>
       </div>
 
       {/* Editor mode toolbar */}
@@ -761,6 +704,7 @@ function DashboardDetailPage() {
             setHasChanges(true);
           }}
         />
+      </div>
       </div>
 
       {/* Chart Editor Modal */}

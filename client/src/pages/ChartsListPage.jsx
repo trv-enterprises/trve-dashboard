@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DataTable,
@@ -9,52 +9,53 @@ import {
   TableHeader,
   TableBody,
   TableCell,
+  TableToolbar,
+  TableToolbarContent,
+  TableToolbarSearch,
   Button,
-  OverflowMenu,
-  OverflowMenuItem,
+  IconButton,
   Loading,
-  Tag
+  Tag,
+  Link
 } from '@carbon/react';
-import { Add } from '@carbon/icons-react';
+import { Add, TrashCan, ChartLineSmooth } from '@carbon/icons-react';
+import apiClient from '../api/client';
 import './ChartsListPage.scss';
 
 /**
  * ChartsListPage Component
  *
- * Displays list of all chart components with CRUD operations.
- * Shows: Name, System, Source, Description, Last Modified
- * Actions: Create, View, Edit, Delete (via three-dot menu)
+ * Displays list of all standalone charts with IBM Cloud-style design:
+ * - Page header with title and description
+ * - Search bar with filtering
+ * - Sortable columns
+ * - Click on row to edit, trash icon to delete
  */
 function ChartsListPage() {
   const navigate = useNavigate();
-  const [components, setComponents] = useState([]);
+  const [charts, setCharts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
 
-  // Fetch components from API
+  // Fetch charts from API
   useEffect(() => {
-    fetchComponents();
+    fetchCharts();
   }, []);
 
-  const fetchComponents = async () => {
+  const fetchCharts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/components?page=1&page_size=100');
+      const data = await apiClient.getCharts();
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('Components response:', data);
-
-      // Go API returns components directly
-      if (data.components) {
-        setComponents(data.components);
+      if (data.charts) {
+        setCharts(data.charts);
       } else if (data.error) {
         setError(data.error);
       } else {
-        setComponents([]);
+        setCharts([]);
       }
     } catch (err) {
       setError(err.message);
@@ -67,28 +68,16 @@ function ChartsListPage() {
     navigate('/design/charts/new');
   };
 
-  const handleView = (component) => {
-    navigate(`/design/charts/${component.id}`);
+  const handleRowClick = (chart) => {
+    navigate(`/design/charts/${chart.id}`);
   };
 
-  const handleEdit = (component) => {
-    navigate(`/design/charts/${component.id}`);
-  };
-
-  const handleDelete = async (component) => {
-    // TODO: Add confirmation dialog
-    if (window.confirm(`Are you sure you want to delete "${component.name}"?`)) {
+  const handleDelete = async (e, chart) => {
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to delete "${chart.name}"?`)) {
       try {
-        const response = await fetch(`http://localhost:3001/api/components/${component.id}`, {
-          method: 'DELETE'
-        });
-        const data = await response.json();
-
-        if (data.success) {
-          fetchComponents(); // Refresh list
-        } else {
-          alert(`Failed to delete: ${data.error}`);
-        }
+        await apiClient.deleteChart(chart.id);
+        fetchCharts();
       } catch (err) {
         alert(`Error: ${err.message}`);
       }
@@ -101,36 +90,82 @@ function ChartsListPage() {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 
-  const getSystemColor = (system) => {
+  const getChartTypeColor = (chartType) => {
     const colors = {
-      'visualization': 'blue',
-      'test': 'gray',
-      'analytics': 'green',
-      'monitoring': 'purple'
+      'bar': 'blue',
+      'line': 'green',
+      'area': 'teal',
+      'pie': 'purple',
+      'scatter': 'magenta',
+      'gauge': 'cyan',
+      'custom': 'gray'
     };
-    return colors[system?.toLowerCase()] || 'cyan';
+    return colors[chartType?.toLowerCase()] || 'gray';
   };
 
+  // Handle column sorting
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
+
+  // Filter and sort charts
+  const filteredAndSortedCharts = useMemo(() => {
+    let result = [...charts];
+
+    // Filter by search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(chart =>
+        chart.name?.toLowerCase().includes(term) ||
+        chart.description?.toLowerCase().includes(term) ||
+        chart.chart_type?.toLowerCase().includes(term)
+      );
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let aVal = a[sortKey] || '';
+      let bVal = b[sortKey] || '';
+
+      // Handle date sorting
+      if (sortKey === 'updated') {
+        aVal = new Date(aVal).getTime() || 0;
+        bVal = new Date(bVal).getTime() || 0;
+      } else {
+        aVal = String(aVal).toLowerCase();
+        bVal = String(bVal).toLowerCase();
+      }
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [charts, searchTerm, sortKey, sortDirection]);
+
   const headers = [
-    { key: 'name', header: 'Name' },
-    { key: 'system', header: 'System' },
-    { key: 'source', header: 'Source' },
-    { key: 'description', header: 'Description' },
-    { key: 'updated', header: 'Last Modified' },
-    { key: 'actions', header: 'Actions' }
+    { key: 'name', header: 'Name', isSortable: true },
+    { key: 'chart_type', header: 'Type', isSortable: true },
+    { key: 'description', header: 'Description', isSortable: false },
+    { key: 'updated', header: 'Last modified', isSortable: true },
+    { key: 'actions', header: '', isSortable: false }
   ];
 
-  const rows = components.map((component) => ({
-    id: component.id,
-    name: component.name,
-    system: component.system,
-    source: component.source,
-    description: component.description || 'No description',
-    updated: formatDate(component.updated)
+  const rows = filteredAndSortedCharts.map((chart) => ({
+    id: chart.id,
+    name: chart.name,
+    chart_type: chart.chart_type,
+    description: chart.description || '',
+    updated: formatDate(chart.updated)
   }));
 
-  // Helper to find original component by row id
-  const getComponentById = (id) => components.find(c => c.id === id);
+  const getChartById = (id) => charts.find(c => c.id === id);
 
   if (loading) {
     return (
@@ -150,70 +185,112 @@ function ChartsListPage() {
 
   return (
     <div className="charts-list-page">
+      {/* Page Header */}
       <div className="page-header">
         <h1>Charts</h1>
-        <Button
-          renderIcon={Add}
-          onClick={handleCreate}
-          size="md"
-        >
-          Create Chart
-        </Button>
+        <p className="page-description">
+          Create and manage reusable chart components for your dashboards.
+          Charts can connect to data sources and be placed in multiple dashboards.
+          {' '}<Link href="#" onClick={(e) => e.preventDefault()}>Learn more</Link>.
+        </p>
       </div>
 
-      <DataTable rows={rows} headers={headers}>
-        {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
+      {/* Data Table with Toolbar */}
+      <DataTable rows={rows} headers={headers} isSortable>
+        {({ rows, headers, getTableProps, getHeaderProps, getRowProps, onInputChange }) => (
           <TableContainer>
+            <TableToolbar>
+              <TableToolbarContent>
+                <TableToolbarSearch
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    onInputChange(e);
+                  }}
+                  placeholder="Search"
+                  persistent
+                />
+                <Button
+                  renderIcon={Add}
+                  onClick={handleCreate}
+                  size="md"
+                  kind="primary"
+                >
+                  Create
+                </Button>
+              </TableToolbarContent>
+            </TableToolbar>
             <Table {...getTableProps()}>
               <TableHead>
                 <TableRow>
                   {headers.map((header) => (
-                    <TableHeader {...getHeaderProps({ header })} key={header.key}>
+                    <TableHeader
+                      {...getHeaderProps({ header })}
+                      key={header.key}
+                      isSortable={header.isSortable}
+                      isSortHeader={sortKey === header.key}
+                      sortDirection={sortKey === header.key ? sortDirection.toUpperCase() : 'NONE'}
+                      onClick={() => header.isSortable && handleSort(header.key)}
+                    >
                       {header.header}
                     </TableHeader>
                   ))}
                 </TableRow>
               </TableHead>
               <TableBody>
-                {rows.map((row) => (
-                  <TableRow {...getRowProps({ row })} key={row.id}>
-                    {row.cells.map((cell) => {
-                      if (cell.info.header === 'system') {
-                        return (
-                          <TableCell key={cell.id}>
-                            <Tag type={getSystemColor(cell.value)} size="md">
-                              {cell.value?.toUpperCase()}
-                            </Tag>
-                          </TableCell>
-                        );
-                      }
-                      if (cell.info.header === 'actions') {
-                        const component = getComponentById(row.id);
-                        return (
-                          <TableCell key={cell.id}>
-                            <OverflowMenu flipped size="sm">
-                              <OverflowMenuItem
-                                itemText="View"
-                                onClick={() => handleView(component)}
-                              />
-                              <OverflowMenuItem
-                                itemText="Edit"
-                                onClick={() => handleEdit(component)}
-                              />
-                              <OverflowMenuItem
-                                itemText="Delete"
-                                hasDivider
-                                isDelete
-                                onClick={() => handleDelete(component)}
-                              />
-                            </OverflowMenu>
-                          </TableCell>
-                        );
-                      }
-                      return <TableCell key={cell.id}>{cell.value}</TableCell>;
-                    })}
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={headers.length}>
+                      <div className="empty-state">
+                        <ChartLineSmooth size={64} />
+                        <h3>No charts available</h3>
+                        <p>
+                          Looks like you haven't added any charts. Click{' '}
+                          <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
+                          {' '}to get started.
+                        </p>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  rows.map((row) => {
+                    const chart = getChartById(row.id);
+                    return (
+                      <TableRow
+                        {...getRowProps({ row })}
+                        key={row.id}
+                        onClick={() => handleRowClick(chart)}
+                        className="clickable-row"
+                      >
+                        {row.cells.map((cell) => {
+                          if (cell.info.header === 'chart_type') {
+                            return (
+                              <TableCell key={cell.id}>
+                                <Tag type={getChartTypeColor(cell.value)} size="md">
+                                  {cell.value?.toUpperCase() || 'N/A'}
+                                </Tag>
+                              </TableCell>
+                            );
+                          }
+                          if (cell.info.header === 'actions') {
+                            return (
+                              <TableCell key={cell.id} className="actions-cell">
+                                <IconButton
+                                  kind="ghost"
+                                  label="Delete"
+                                  onClick={(e) => handleDelete(e, chart)}
+                                  size="sm"
+                                >
+                                  <TrashCan size={16} />
+                                </IconButton>
+                              </TableCell>
+                            );
+                          }
+                          return <TableCell key={cell.id}>{cell.value}</TableCell>;
+                        })}
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
           </TableContainer>

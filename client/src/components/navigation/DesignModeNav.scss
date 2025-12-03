@@ -1,0 +1,39 @@
+@use '@carbon/react/scss/spacing' as spacing;
+
+.design-mode-nav {
+  padding: 0;
+
+  .nav-header {
+    display: flex;
+    align-items: center;
+    gap: spacing.$spacing-03;
+    // Match height with content page header for alignment
+    height: 56px;
+    padding: 0 spacing.$spacing-05;
+    color: #c6c6c6;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #393939;
+    background-color: transparent;
+
+    svg {
+      fill: #c6c6c6;
+      flex-shrink: 0;
+    }
+
+    span {
+      white-space: nowrap;
+      overflow: hidden;
+    }
+  }
+
+  .nav-links {
+    .cds--side-nav__link {
+      &:hover {
+        background-color: #333333;
+      }
+    }
+  }
+}
