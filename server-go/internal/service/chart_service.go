@@ -21,6 +21,7 @@ func NewChartService(repo *repository.ChartRepository) *ChartService {
 }
 
 // CreateChart creates a new chart with validation
+// Creates as version 1 with status "final"
 func (s *ChartService) CreateChart(ctx context.Context, req *models.CreateChartRequest) (*models.Chart, error) {
 	// Check name uniqueness
 	existing, err := s.repo.FindByName(ctx, req.Name)
@@ -32,6 +33,8 @@ func (s *ChartService) CreateChart(ctx context.Context, req *models.CreateChartR
 	}
 
 	chart := &models.Chart{
+		Version:       1,
+		Status:        models.ChartStatusFinal,
 		Name:          req.Name,
 		Description:   req.Description,
 		ChartType:     req.ChartType,
@@ -52,7 +55,7 @@ func (s *ChartService) CreateChart(ctx context.Context, req *models.CreateChartR
 	return chart, nil
 }
 
-// GetChart retrieves a chart by ID
+// GetChart retrieves the latest version of a chart by ID
 func (s *ChartService) GetChart(ctx context.Context, id string) (*models.Chart, error) {
 	chart, err := s.repo.FindByID(ctx, id)
 	if err != nil {
@@ -64,7 +67,76 @@ func (s *ChartService) GetChart(ctx context.Context, id string) (*models.Chart, 
 	return chart, nil
 }
 
-// ListCharts retrieves charts with pagination and filtering
+// GetChartVersion retrieves a specific version of a chart
+func (s *ChartService) GetChartVersion(ctx context.Context, id string, version int) (*models.Chart, error) {
+	chart, err := s.repo.FindByIDAndVersion(ctx, id, version)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving chart version: %w", err)
+	}
+	if chart == nil {
+		return nil, fmt.Errorf("chart version not found")
+	}
+	return chart, nil
+}
+
+// GetChartDraft retrieves the draft version of a chart (if exists)
+func (s *ChartService) GetChartDraft(ctx context.Context, id string) (*models.Chart, error) {
+	chart, err := s.repo.FindDraft(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving chart draft: %w", err)
+	}
+	if chart == nil {
+		return nil, fmt.Errorf("no draft found for chart")
+	}
+	return chart, nil
+}
+
+// GetVersionInfo returns version metadata for delete dialogs
+func (s *ChartService) GetVersionInfo(ctx context.Context, id string) (*models.ChartVersionInfo, error) {
+	info, err := s.repo.GetVersionInfo(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving version info: %w", err)
+	}
+	if info == nil {
+		return nil, fmt.Errorf("chart not found")
+	}
+	return info, nil
+}
+
+// ListChartVersions retrieves all versions of a chart
+func (s *ChartService) ListChartVersions(ctx context.Context, id string) ([]models.Chart, error) {
+	// First check if chart exists
+	latest, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error checking chart: %w", err)
+	}
+	if latest == nil {
+		return nil, fmt.Errorf("chart not found")
+	}
+
+	// Get all versions - we need to add this method to repository
+	// For now, we can use aggregation or iterate
+	var versions []models.Chart
+	for v := 1; v <= latest.Version; v++ {
+		chart, err := s.repo.FindByIDAndVersion(ctx, id, v)
+		if err != nil {
+			return nil, fmt.Errorf("error retrieving version %d: %w", v, err)
+		}
+		if chart != nil {
+			versions = append(versions, *chart)
+		}
+	}
+
+	// Check for draft (version higher than latest final)
+	draft, _ := s.repo.FindDraft(ctx, id)
+	if draft != nil {
+		versions = append(versions, *draft)
+	}
+
+	return versions, nil
+}
+
+// ListCharts retrieves latest version of each chart with pagination and filtering
 func (s *ChartService) ListCharts(ctx context.Context, params models.ChartQueryParams) (*models.ChartListResponse, error) {
 	if params.Page < 1 {
 		params.Page = 1
@@ -73,7 +145,7 @@ func (s *ChartService) ListCharts(ctx context.Context, params models.ChartQueryP
 		params.PageSize = 20
 	}
 
-	charts, total, err := s.repo.FindAll(ctx, params)
+	charts, total, err := s.repo.FindAllLatest(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("error listing charts: %w", err)
 	}
@@ -91,9 +163,10 @@ func (s *ChartService) GetChartSummaries(ctx context.Context, limit int64) ([]mo
 	return s.repo.FindSummaries(ctx, limit)
 }
 
-// UpdateChart updates an existing chart
+// UpdateChart updates the latest version of a chart in-place
+// This is used for manual edits (non-AI)
 func (s *ChartService) UpdateChart(ctx context.Context, id string, req *models.UpdateChartRequest) (*models.Chart, error) {
-	// Get existing chart
+	// Get existing chart (latest version)
 	chart, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving chart: %w", err)
@@ -146,14 +219,15 @@ func (s *ChartService) UpdateChart(ctx context.Context, id string, req *models.U
 		chart.Tags = *req.Tags
 	}
 
-	if err := s.repo.Update(ctx, id, chart); err != nil {
+	// Update in place (same version)
+	if err := s.repo.Update(ctx, id, chart.Version, chart); err != nil {
 		return nil, fmt.Errorf("error updating chart: %w", err)
 	}
 
 	return chart, nil
 }
 
-// DeleteChart deletes a chart by ID
+// DeleteChart deletes all versions of a chart by ID
 func (s *ChartService) DeleteChart(ctx context.Context, id string) error {
 	// Check if chart exists
 	chart, err := s.repo.FindByID(ctx, id)
@@ -167,14 +241,50 @@ func (s *ChartService) DeleteChart(ctx context.Context, id string) error {
 	// TODO: Check if chart is used by any dashboards before deleting
 	// For now, allow deletion - dashboards will need to handle missing charts
 
-	if err := s.repo.Delete(ctx, id); err != nil {
+	if err := s.repo.DeleteAllVersions(ctx, id); err != nil {
 		return fmt.Errorf("error deleting chart: %w", err)
 	}
 
 	return nil
 }
 
-// GetChartsByDatasource retrieves all charts using a specific data source
+// DeleteChartVersion deletes a specific version of a chart
+func (s *ChartService) DeleteChartVersion(ctx context.Context, id string, version int) error {
+	// Check if version exists
+	chart, err := s.repo.FindByIDAndVersion(ctx, id, version)
+	if err != nil {
+		return fmt.Errorf("error retrieving chart version: %w", err)
+	}
+	if chart == nil {
+		return fmt.Errorf("chart version not found")
+	}
+
+	if err := s.repo.DeleteVersion(ctx, id, version); err != nil {
+		return fmt.Errorf("error deleting chart version: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteChartDraft deletes only the draft version of a chart
+func (s *ChartService) DeleteChartDraft(ctx context.Context, id string) error {
+	// Check if draft exists
+	draft, err := s.repo.FindDraft(ctx, id)
+	if err != nil {
+		return fmt.Errorf("error retrieving draft: %w", err)
+	}
+	if draft == nil {
+		return fmt.Errorf("no draft found for chart")
+	}
+
+	if err := s.repo.DeleteVersion(ctx, id, draft.Version); err != nil {
+		return fmt.Errorf("error deleting draft: %w", err)
+	}
+
+	return nil
+}
+
+// GetChartsByDatasource retrieves latest version of all charts using a specific data source
 func (s *ChartService) GetChartsByDatasource(ctx context.Context, datasourceID string) ([]models.Chart, error) {
 	return s.repo.FindByDatasourceID(ctx, datasourceID)
 }

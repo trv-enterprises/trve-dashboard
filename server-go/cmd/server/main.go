@@ -89,6 +89,7 @@ func main() {
 	componentRepo := repository.NewComponentRepository(mongodb.Database)
 	chartRepo := repository.NewChartRepository(mongodb.Database)
 	dashboardRepo := repository.NewDashboardRepository(mongodb.Database)
+	aiSessionRepo := repository.NewAISessionRepository(redisClient.Client)
 
 	// Create chart indexes
 	if err := chartRepo.CreateIndexes(ctx); err != nil {
@@ -101,6 +102,7 @@ func main() {
 	componentService := service.NewComponentService(componentRepo)
 	chartService := service.NewChartService(chartRepo)
 	dashboardService := service.NewDashboardService(dashboardRepo)
+	aiSessionService := service.NewAISessionService(aiSessionRepo, chartRepo)
 
 	// Initialize handlers
 	layoutHandler := handlers.NewLayoutHandler(layoutService)
@@ -108,6 +110,7 @@ func main() {
 	componentHandler := handlers.NewComponentHandler(componentService)
 	chartHandler := handlers.NewChartHandler(chartService)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
+	aiSessionHandler := handlers.NewAISessionHandler(aiSessionService)
 
 	// Initialize MCP
 	mcpRegistry := mcp.NewToolRegistry(datasourceService, dashboardService, chartService)
@@ -163,6 +166,13 @@ func main() {
 			charts.GET("/:id", chartHandler.GetChart)
 			charts.PUT("/:id", chartHandler.UpdateChart)
 			charts.DELETE("/:id", chartHandler.DeleteChart)
+			// Versioning endpoints
+			charts.GET("/:id/versions", chartHandler.ListChartVersions)
+			charts.GET("/:id/versions/:version", chartHandler.GetChartVersion)
+			charts.DELETE("/:id/versions/:version", chartHandler.DeleteChartVersion)
+			charts.GET("/:id/version-info", chartHandler.GetChartVersionInfo)
+			charts.GET("/:id/draft", chartHandler.GetChartDraft)
+			charts.DELETE("/:id/draft", chartHandler.DeleteChartDraft)
 		}
 
 		// Dashboard routes
@@ -175,8 +185,16 @@ func main() {
 			dashboards.DELETE("/:id", dashboardHandler.DeleteDashboard)
 		}
 
-		// TODO: Add more routes in future phases
-		// chat := api.Group("/chat")
+		// AI Session routes
+		aiSessions := api.Group("/ai/sessions")
+		{
+			aiSessions.POST("", aiSessionHandler.CreateSession)
+			aiSessions.GET("/:id", aiSessionHandler.GetSession)
+			aiSessions.POST("/:id/messages", aiSessionHandler.SendMessage)
+			aiSessions.GET("/:id/events", aiSessionHandler.StreamEvents)
+			aiSessions.POST("/:id/save", aiSessionHandler.SaveSession)
+			aiSessions.DELETE("/:id", aiSessionHandler.CancelSession)
+		}
 	}
 
 	// MCP routes (outside /api group)

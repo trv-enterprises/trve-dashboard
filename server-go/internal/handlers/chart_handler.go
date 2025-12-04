@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +24,7 @@ func NewChartHandler(service *service.ChartService) *ChartHandler {
 
 // CreateChart creates a new chart
 // @Summary Create a new chart
-// @Description Create a new chart with data source binding and visualization config
+// @Description Create a new chart with data source binding and visualization config. Creates as version 1 with status "final".
 // @Tags charts
 // @Accept json
 // @Produce json
@@ -52,9 +53,9 @@ func (h *ChartHandler) CreateChart(c *gin.Context) {
 	c.JSON(http.StatusCreated, chart)
 }
 
-// GetChart retrieves a chart by ID
+// GetChart retrieves the latest version of a chart by ID
 // @Summary Get a chart
-// @Description Get a chart by ID
+// @Description Get the latest version of a chart by ID
 // @Tags charts
 // @Produce json
 // @Param id path string true "Chart ID"
@@ -78,9 +79,121 @@ func (h *ChartHandler) GetChart(c *gin.Context) {
 	c.JSON(http.StatusOK, chart)
 }
 
+// GetChartVersion retrieves a specific version of a chart
+// @Summary Get a specific chart version
+// @Description Get a specific version of a chart by ID and version number
+// @Tags charts
+// @Produce json
+// @Param id path string true "Chart ID"
+// @Param version path int true "Version number"
+// @Success 200 {object} models.Chart
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /charts/{id}/versions/{version} [get]
+func (h *ChartHandler) GetChartVersion(c *gin.Context) {
+	id := c.Param("id")
+	versionStr := c.Param("version")
+
+	version, err := strconv.Atoi(versionStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid version number"})
+		return
+	}
+
+	chart, err := h.service.GetChartVersion(c.Request.Context(), id, version)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Chart version not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, chart)
+}
+
+// ListChartVersions retrieves all versions of a chart
+// @Summary List chart versions
+// @Description Get all versions of a chart by ID
+// @Tags charts
+// @Produce json
+// @Param id path string true "Chart ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /charts/{id}/versions [get]
+func (h *ChartHandler) ListChartVersions(c *gin.Context) {
+	id := c.Param("id")
+
+	versions, err := h.service.ListChartVersions(c.Request.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Chart not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"versions": versions})
+}
+
+// GetChartVersionInfo retrieves version metadata for delete dialogs
+// @Summary Get chart version info
+// @Description Get version metadata for a chart (version count, has draft, etc.)
+// @Tags charts
+// @Produce json
+// @Param id path string true "Chart ID"
+// @Success 200 {object} models.ChartVersionInfo
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /charts/{id}/version-info [get]
+func (h *ChartHandler) GetChartVersionInfo(c *gin.Context) {
+	id := c.Param("id")
+
+	info, err := h.service.GetVersionInfo(c.Request.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Chart not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, info)
+}
+
+// GetChartDraft retrieves the draft version of a chart
+// @Summary Get chart draft
+// @Description Get the draft version of a chart (if exists)
+// @Tags charts
+// @Produce json
+// @Param id path string true "Chart ID"
+// @Success 200 {object} models.Chart
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /charts/{id}/draft [get]
+func (h *ChartHandler) GetChartDraft(c *gin.Context) {
+	id := c.Param("id")
+
+	chart, err := h.service.GetChartDraft(c.Request.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "no draft found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "No draft found for chart"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, chart)
+}
+
 // ListCharts retrieves a list of charts with pagination
 // @Summary List charts
-// @Description Get a paginated list of charts with optional filtering
+// @Description Get a paginated list of charts (latest version of each) with optional filtering
 // @Tags charts
 // @Produce json
 // @Param name query string false "Filter by name (partial match)"
@@ -121,12 +234,7 @@ func (h *ChartHandler) ListCharts(c *gin.Context) {
 func (h *ChartHandler) GetChartSummaries(c *gin.Context) {
 	limit := int64(50)
 	if l := c.Query("limit"); l != "" {
-		// Parse limit if provided
-		var parsed int64
-		if _, err := c.GetQuery("limit"); err == false {
-			parsed = 50
-		}
-		if parsed > 0 {
+		if parsed, err := strconv.ParseInt(l, 10, 64); err == nil && parsed > 0 {
 			limit = parsed
 		}
 	}
@@ -140,9 +248,9 @@ func (h *ChartHandler) GetChartSummaries(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"summaries": summaries})
 }
 
-// UpdateChart updates a chart
+// UpdateChart updates the latest version of a chart in-place
 // @Summary Update a chart
-// @Description Update an existing chart
+// @Description Update the latest version of a chart in-place (for manual edits)
 // @Tags charts
 // @Accept json
 // @Produce json
@@ -177,9 +285,9 @@ func (h *ChartHandler) UpdateChart(c *gin.Context) {
 	c.JSON(http.StatusOK, chart)
 }
 
-// DeleteChart deletes a chart
+// DeleteChart deletes all versions of a chart
 // @Summary Delete a chart
-// @Description Delete a chart by ID
+// @Description Delete all versions of a chart by ID
 // @Tags charts
 // @Param id path string true "Chart ID"
 // @Success 204
@@ -193,6 +301,64 @@ func (h *ChartHandler) DeleteChart(c *gin.Context) {
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Chart not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// DeleteChartVersion deletes a specific version of a chart
+// @Summary Delete a chart version
+// @Description Delete a specific version of a chart
+// @Tags charts
+// @Param id path string true "Chart ID"
+// @Param version path int true "Version number"
+// @Success 204
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /charts/{id}/versions/{version} [delete]
+func (h *ChartHandler) DeleteChartVersion(c *gin.Context) {
+	id := c.Param("id")
+	versionStr := c.Param("version")
+
+	version, err := strconv.Atoi(versionStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid version number"})
+		return
+	}
+
+	err = h.service.DeleteChartVersion(c.Request.Context(), id, version)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Chart version not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// DeleteChartDraft deletes only the draft version of a chart
+// @Summary Delete chart draft
+// @Description Delete the draft version of a chart (if exists)
+// @Tags charts
+// @Param id path string true "Chart ID"
+// @Success 204
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /charts/{id}/draft [delete]
+func (h *ChartHandler) DeleteChartDraft(c *gin.Context) {
+	id := c.Param("id")
+
+	err := h.service.DeleteChartDraft(c.Request.Context(), id)
+	if err != nil {
+		if strings.Contains(err.Error(), "no draft found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "No draft found for chart"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

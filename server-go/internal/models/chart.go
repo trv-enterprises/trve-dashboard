@@ -4,10 +4,19 @@ import (
 	"time"
 )
 
+// Chart status constants
+const (
+	ChartStatusDraft = "draft" // AI work in progress, not visible in dashboards
+	ChartStatusFinal = "final" // Saved/committed version
+)
+
 // Chart represents a standalone chart configuration
 // @Description Chart with data source binding, query config, and visualization settings
+// Primary key is composite (id, version) - id stays same across versions
 type Chart struct {
-	ID            string                 `json:"id" bson:"_id"`
+	ID            string                 `json:"id" bson:"id"`                           // UUID - same across versions
+	Version       int                    `json:"version" bson:"version"`                 // Version number (1, 2, 3...)
+	Status        string                 `json:"status" bson:"status"`                   // "draft" | "final"
 	Name          string                 `json:"name" bson:"name" binding:"required"`
 	Description   string                 `json:"description" bson:"description"`
 	ChartType     string                 `json:"chart_type" bson:"chart_type"`           // bar, line, pie, gauge, etc.
@@ -19,6 +28,7 @@ type Chart struct {
 	Options       map[string]interface{} `json:"options" bson:"options"`                 // ECharts options overrides
 	Thumbnail     string                 `json:"thumbnail,omitempty" bson:"thumbnail"`   // Base64 preview image for card display
 	Tags          []string               `json:"tags,omitempty" bson:"tags,omitempty"`   // Searchable tags
+	AISessionID   string                 `json:"ai_session_id,omitempty" bson:"ai_session_id,omitempty"` // Active AI session (drafts only)
 	Created       time.Time              `json:"created" bson:"created"`
 	Updated       time.Time              `json:"updated" bson:"updated"`
 }
@@ -79,10 +89,22 @@ type ChartQueryParams struct {
 // @Description Minimal chart info for selection cards and lists
 type ChartSummary struct {
 	ID           string   `json:"id"`
+	Version      int      `json:"version"`
+	Status       string   `json:"status"`
 	Name         string   `json:"name"`
 	Description  string   `json:"description"`
 	ChartType    string   `json:"chart_type"`
 	DatasourceID string   `json:"datasource_id"`
 	Thumbnail    string   `json:"thumbnail,omitempty"`
 	Tags         []string `json:"tags,omitempty"`
+}
+
+// ChartVersionInfo provides version metadata for delete dialogs
+// @Description Version info for a chart
+type ChartVersionInfo struct {
+	ID           string `json:"id"`
+	Version      int    `json:"version"`
+	Status       string `json:"status"`
+	VersionCount int    `json:"version_count"` // Total versions for this chart id
+	HasDraft     bool   `json:"has_draft"`     // Whether a draft version exists
 }
