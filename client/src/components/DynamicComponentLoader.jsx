@@ -4,7 +4,7 @@ import * as echarts from 'echarts';
 import ReactECharts from 'echarts-for-react';
 import { carbonLightTheme, carbonDarkTheme } from '../theme/carbonEchartsTheme';
 import { useData } from '../hooks/useData';
-import { transformData, toObjects, getValue } from '../utils/dataTransforms';
+import { transformData, toObjects, getValue, formatTimestamp, formatCellValue } from '../utils/dataTransforms';
 import * as Babel from '@babel/standalone';
 
 /**
@@ -17,6 +17,8 @@ import * as Babel from '@babel/standalone';
  * - transformData: Utility to apply filters and aggregations to data
  * - toObjects: Convert columnar data to array of objects
  * - getValue: Get a single value from first row of data
+ * - formatTimestamp: Format timestamp values for display (supports Unix seconds, ms, ISO)
+ * - formatCellValue: Auto-format cell values based on column name and value type
  * - echarts: ECharts core library
  * - ReactECharts: ECharts React wrapper component
  * - carbonTheme: Carbon Design System ECharts theme (light mode)
@@ -57,6 +59,8 @@ export default function DynamicComponentLoader({ code, props = {} }) {
         'transformData',
         'toObjects',
         'getValue',
+        'formatTimestamp',
+        'formatCellValue',
         'echarts',
         'ReactECharts',
         'carbonTheme',
@@ -82,6 +86,8 @@ export default function DynamicComponentLoader({ code, props = {} }) {
         transformData,
         toObjects,
         getValue,
+        formatTimestamp,
+        formatCellValue,
         echarts,
         ReactECharts,
         carbonLightTheme,

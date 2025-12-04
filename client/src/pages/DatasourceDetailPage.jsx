@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -14,9 +14,10 @@ import {
   TabList,
   Tab,
   TabPanels,
-  TabPanel
+  TabPanel,
+  InlineNotification
 } from '@carbon/react';
-import { Save, Close, TrashCan } from '@carbon/icons-react';
+import { Save, Close, TrashCan, Play } from '@carbon/icons-react';
 import './DatasourceDetailPage.scss';
 
 /**
@@ -42,6 +43,7 @@ function DatasourceDetailPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testInput, setTestInput] = useState('{\n  "type": "reading",\n  "data": {\n    "temperature": 23.5,\n    "humidity": 65,\n    "pressure": 1013.25\n  },\n  "timestamp": "2024-01-15T10:30:00Z"\n}');
 
   useEffect(() => {
     if (!isCreateMode) {
@@ -113,7 +115,11 @@ function DatasourceDetailPage() {
             reconnect_delay: 5000,
             ping_interval: 30,
             message_format: 'json',
-            buffer_size: 100
+            buffer_size: 100,
+            parser: {
+              data_path: '',
+              timestamp_field: ''
+            }
           }
         };
       case 'api':
@@ -216,6 +222,67 @@ function DatasourceDetailPage() {
     setShowCancelModal(false);
     navigate('/design/datasources');
   };
+
+  // Helper function to extract data by path (mirrors backend logic)
+  const extractByPath = (data, path) => {
+    if (!path || path.trim() === '') return data;
+    const parts = path.split('.');
+    let current = data;
+    for (const part of parts) {
+      if (current && typeof current === 'object' && part in current) {
+        current = current[part];
+      } else {
+        return null;
+      }
+    }
+    return current;
+  };
+
+  // Compute parsed output based on test input, data_path, and timestamp_field
+  const parsedOutput = useMemo(() => {
+    const socketConfig = config.socket || {};
+    const parserConfig = socketConfig.parser || {};
+    const dataPath = parserConfig.data_path || '';
+    const timestampField = parserConfig.timestamp_field || '';
+
+    try {
+      const parsed = JSON.parse(testInput);
+
+      // Step 1: Extract timestamp from original (before data extraction)
+      let extractedTimestamp = null;
+      if (timestampField) {
+        extractedTimestamp = extractByPath(parsed, timestampField);
+      }
+
+      // Step 2: Extract data from data_path
+      let extracted = dataPath ? extractByPath(parsed, dataPath) : parsed;
+
+      // Step 3: If extracted is an object, merge timestamp into it
+      if (extracted && typeof extracted === 'object' && !Array.isArray(extracted)) {
+        extracted = { ...extracted };
+        if (extractedTimestamp !== null) {
+          extracted.timestamp = extractedTimestamp;
+        }
+      }
+
+      return {
+        success: true,
+        original: parsed,
+        extracted: extracted,
+        fields: extracted && typeof extracted === 'object' && !Array.isArray(extracted)
+          ? Object.keys(extracted)
+          : []
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err.message,
+        original: null,
+        extracted: null,
+        fields: []
+      };
+    }
+  }, [testInput, config.socket?.parser?.data_path, config.socket?.parser?.timestamp_field]);
 
   const renderSQLConfig = () => {
     const sqlConfig = config.sql || {};
@@ -358,6 +425,7 @@ function DatasourceDetailPage() {
 
   const renderSocketConfig = () => {
     const socketConfig = config.socket || {};
+    const parserConfig = socketConfig.parser || {};
     return (
       <div className="config-form">
         <TextInput
@@ -368,27 +436,29 @@ function DatasourceDetailPage() {
           placeholder="ws://localhost:8080/stream"
         />
 
-        <Select
-          id="socket-protocol"
-          labelText="Protocol"
-          value={socketConfig.protocol || 'websocket'}
-          onChange={(e) => updateConfig('socket.protocol', e.target.value)}
-        >
-          <SelectItem value="websocket" text="WebSocket" />
-          <SelectItem value="tcp" text="TCP" />
-          <SelectItem value="udp" text="UDP" />
-        </Select>
+        <div className="form-row">
+          <Select
+            id="socket-protocol"
+            labelText="Protocol"
+            value={socketConfig.protocol || 'websocket'}
+            onChange={(e) => updateConfig('socket.protocol', e.target.value)}
+          >
+            <SelectItem value="websocket" text="WebSocket" />
+            <SelectItem value="tcp" text="TCP" />
+            <SelectItem value="udp" text="UDP" />
+          </Select>
 
-        <Select
-          id="socket-message-format"
-          labelText="Message Format"
-          value={socketConfig.message_format || 'json'}
-          onChange={(e) => updateConfig('socket.message_format', e.target.value)}
-        >
-          <SelectItem value="json" text="JSON" />
-          <SelectItem value="text" text="Text" />
-          <SelectItem value="binary" text="Binary" />
-        </Select>
+          <Select
+            id="socket-message-format"
+            labelText="Message Format"
+            value={socketConfig.message_format || 'json'}
+            onChange={(e) => updateConfig('socket.message_format', e.target.value)}
+          >
+            <SelectItem value="json" text="JSON" />
+            <SelectItem value="text" text="Text" />
+            <SelectItem value="binary" text="Binary" />
+          </Select>
+        </div>
 
         <Checkbox
           id="socket-reconnect"
@@ -424,6 +494,80 @@ function DatasourceDetailPage() {
           min={1}
           max={10000}
         />
+
+        {/* Parser Configuration Section */}
+        <div className="parser-config-section">
+          <h4>Data Parser Configuration</h4>
+          <p className="helper-text">
+            Configure how to extract data fields from incoming messages.
+          </p>
+
+          <div className="parser-fields-row">
+            <TextInput
+              id="socket-data-path"
+              labelText="Data Path"
+              value={parserConfig.data_path || ''}
+              onChange={(e) => updateConfig('socket.parser.data_path', e.target.value)}
+              placeholder="data, payload.readings"
+              helperText="Path to the data object containing metrics"
+            />
+            <TextInput
+              id="socket-timestamp-field"
+              labelText="Timestamp Field"
+              value={parserConfig.timestamp_field || ''}
+              onChange={(e) => updateConfig('socket.parser.timestamp_field', e.target.value)}
+              placeholder="timestamp, ts, time"
+              helperText="Path to the timestamp (extracted before data path)"
+            />
+          </div>
+
+          {/* Test Parse Preview */}
+          <div className="parse-preview-section">
+            <h5>Test Parser</h5>
+            <p className="helper-text">
+              Paste a sample message to test the data path extraction.
+            </p>
+
+            <div className="preview-columns">
+              <div className="preview-column">
+                <label className="preview-label">Sample Input (JSON)</label>
+                <TextArea
+                  id="test-input"
+                  value={testInput}
+                  onChange={(e) => setTestInput(e.target.value)}
+                  rows={8}
+                  className="preview-textarea"
+                />
+              </div>
+              <div className="preview-column">
+                <label className="preview-label">
+                  Extracted Output {parserConfig.data_path && <span className="path-badge">path: {parserConfig.data_path}</span>}
+                </label>
+                {parsedOutput.success ? (
+                  <pre className="preview-output">
+                    {JSON.stringify(parsedOutput.extracted, null, 2)}
+                  </pre>
+                ) : (
+                  <InlineNotification
+                    kind="error"
+                    title="Parse Error"
+                    subtitle={parsedOutput.error}
+                    lowContrast
+                    hideCloseButton
+                  />
+                )}
+                {parsedOutput.success && parsedOutput.fields.length > 0 && (
+                  <div className="extracted-fields">
+                    <span className="fields-label">Fields: </span>
+                    {parsedOutput.fields.map((field, i) => (
+                      <span key={field} className="field-tag">{field}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };

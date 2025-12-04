@@ -20,6 +20,145 @@ This file provides context and guidance for AI assistants working on this projec
 
 ---
 
+## React Architecture Rules
+
+These rules establish consistent patterns for the React frontend. Based on 2025 best practices.
+
+### 1. State Management
+
+| State Type | Tool | When to Use |
+|------------|------|-------------|
+| **Local UI State** | `useState` | Toggles, form inputs, modal open/close, component-specific state |
+| **Shared Client State** | `useContext` + `useReducer` | App-wide state (mode, theme, user preferences) |
+| **Server/Remote State** | Custom hooks wrapping `apiClient` | Data from backend APIs |
+
+**Rules:**
+- Keep state as local as possible - lift only when needed
+- Mode state should use Context (not localStorage alone)
+- Never duplicate server state in multiple components - use shared hooks
+
+**Future:** Consider TanStack Query for server state caching and background refresh.
+
+### 2. Data Fetching
+
+**ALWAYS use `apiClient`** from `src/api/client.js` - never raw `fetch()` in components.
+
+**Pattern for pages:**
+```javascript
+// Good - use apiClient
+const data = await apiClient.getDashboard(id);
+
+// Bad - raw fetch
+const response = await fetch(`http://localhost:3001/api/dashboards/${id}`);
+```
+
+**Create entity-specific hooks:**
+```javascript
+// src/hooks/useDashboard.js
+function useDashboard(id) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    apiClient.getDashboard(id)
+      .then(setData)
+      .catch(setError)
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  return { data, loading, error, refetch: () => {...} };
+}
+```
+
+**Existing hooks to use:** `useData`, `useComponents`, `useSources` in `src/hooks/`
+
+### 3. Component Organization
+
+| Type | Location | Responsibility | Max Lines |
+|------|----------|----------------|-----------|
+| **Pages** | `src/pages/` | Route handling, layout composition, data orchestration | ~400 |
+| **Components** | `src/components/` | Reusable UI, receive data via props | ~200 |
+| **Hooks** | `src/hooks/` | Reusable logic (data fetching, subscriptions) | ~100 |
+
+**Rules:**
+- Pages should NOT contain complex business logic - extract to hooks
+- Components should be presentational where possible
+- If a component exceeds 400 lines, break it into smaller components
+
+### 4. File Structure (Target)
+
+```
+src/
+├── api/
+│   └── client.js           # API client singleton (ALWAYS use this)
+├── hooks/
+│   ├── useData.js          # Generic data fetching hook
+│   ├── useDashboard.js     # Dashboard-specific hook
+│   ├── useCharts.js        # Charts-specific hook
+│   └── useDatasources.js   # Data sources-specific hook
+├── context/
+│   ├── ModeContext.jsx     # App mode (Design/View/Manage)
+│   └── ThemeContext.jsx    # Theme preferences (future)
+├── components/
+│   ├── mode/               # Mode toggle components
+│   ├── navigation/         # Nav components per mode
+│   ├── charts/             # Chart-related components
+│   └── shared/             # Truly shared components
+├── pages/                  # Route components
+├── utils/                  # Pure utility functions
+└── config/                 # Configuration constants
+```
+
+### 5. Error Handling
+
+**Rules:**
+- **Never use `alert()`** - use Carbon `InlineNotification` or `Modal`
+- Wrap app in `ErrorBoundary` component for crash recovery
+- Data fetching errors: Show inline notification with retry option
+- Form validation errors: Show per-field errors, not just form-level
+
+**Pattern:**
+```javascript
+// Good
+{error && (
+  <InlineNotification
+    kind="error"
+    title="Failed to load"
+    subtitle={error.message}
+    actions={<Button onClick={refetch}>Retry</Button>}
+  />
+)}
+
+// Bad
+catch (err) {
+  alert(err.message);
+}
+```
+
+### 6. Forms
+
+**Current:** Controlled components with individual `useState` calls.
+
+**Rules:**
+- Use Carbon form components exclusively
+- Validate on blur/submit, not on every keystroke
+- Track dirty state with single `hasChanges` boolean
+- Show field-level validation errors
+
+**Future:** Consider React Hook Form for complex forms to reduce boilerplate.
+
+### 7. Styling
+
+**Rules:**
+- One SCSS file per component, co-located (e.g., `Page.jsx` + `Page.scss`)
+- Use Carbon CSS variables: `var(--cds-text-primary)`, `var(--cds-background)`
+- Use Carbon spacing tokens: `spacing.$spacing-05`
+- Never hardcode colors - use Carbon tokens
+- Minimal inline styles (only for truly dynamic values like dimensions)
+
+---
+
 ## Project Overview
 
 **GiVi-Solution Dashboard** - A full-stack application for creating, managing, and viewing dynamic data visualization dashboards. The application features:
@@ -345,5 +484,5 @@ const Component = () => {
 
 ---
 
-**Last Updated**: 2025-11-25
-**Build**: 27
+**Last Updated**: 2025-12-03
+**Build**: 124

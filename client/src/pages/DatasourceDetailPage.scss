@@ -31,19 +31,24 @@
     }
   }
 
-  // Form content area
+  // Form content area - full width scroll container
   .form-content {
     padding: spacing.$spacing-05;
-    max-width: 800px;
     flex: 1;
     overflow: auto;
 
-    // Form rows with 32px vertical spacing (Carbon standard)
-    .form-row {
-      margin-bottom: spacing.$spacing-07; // 32px
+    // Inner content constrained to max-width
+    > .form-row,
+    > .config-section {
+      max-width: 800px;
     }
 
-    // Form field styling
+    // Consistent form row spacing
+    .form-row {
+      margin-bottom: spacing.$spacing-05;
+    }
+
+    // Unified form field styling - applies to all fields in form
     .cds--label {
       color: #c6c6c6 !important;
       margin-bottom: spacing.$spacing-02;
@@ -63,11 +68,10 @@
       }
     }
 
-    .cds--select-input {
+    .cds--text-area {
       background-color: #262626 !important;
       color: #f4f4f4 !important;
-      border: none !important;
-      border-bottom: 1px solid #525252 !important;
+      border: 1px solid #525252 !important;
 
       &:focus {
         outline: 2px solid var(--cds-focus);
@@ -75,52 +79,33 @@
       }
     }
 
+    .cds--select-input {
+      background-color: #262626 !important;
+      color: #f4f4f4 !important;
+      border: none !important;
+      border-bottom: 1px solid #525252 !important;
+      padding-right: 2.5rem !important; // Make room for the dropdown arrow
+
+      &:focus {
+        outline: 2px solid var(--cds-focus);
+        outline-offset: -2px;
+      }
+    }
+
+    // Position the select dropdown arrow properly
+    .cds--select__arrow {
+      right: 1rem;
+      fill: #c6c6c6;
+    }
+
     .cds--select {
       max-width: 400px;
     }
-  }
 
-  .config-section {
-    background-color: var(--cds-layer-01);
-    border-radius: 4px;
-    padding: spacing.$spacing-05;
-    max-width: 900px;
-
-    h3 {
-      color: var(--cds-text-primary);
-      font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: spacing.$spacing-04;
-    }
-
-    .config-form {
-      display: flex;
-      flex-direction: column;
-      gap: spacing.$spacing-04;
-
-      .form-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: spacing.$spacing-04;
-        margin-bottom: 0;
-
-        .cds--number-input,
-        .cds--text-input-wrapper {
-          width: 100%;
-        }
-      }
-
-      .cds--label {
-        color: #c6c6c6 !important;
-        margin-bottom: spacing.$spacing-02;
-        font-weight: 400;
-        font-size: 0.875rem;
-        display: block;
-      }
-
-      .cds--text-input,
-      .cds--text-area,
-      .cds--select-input {
+    // Number input styling
+    .cds--number-input,
+    .cds--number {
+      input[type="number"] {
         background-color: #262626 !important;
         color: #f4f4f4 !important;
         border: none !important;
@@ -131,49 +116,210 @@
           outline-offset: -2px;
         }
       }
+    }
 
-      // Number input specific styling
-      .cds--number-input,
-      .cds--number {
-        input[type="number"] {
-          background-color: #262626 !important;
-          color: #f4f4f4 !important;
-          border: none !important;
-          border-bottom: 1px solid #525252 !important;
+    .cds--number__controls,
+    .cds--number-input__controls {
+      button {
+        background-color: #393939 !important;
+        border-left: 1px solid #525252 !important;
+        color: #f4f4f4 !important;
 
-          &:focus {
-            outline: 2px solid var(--cds-focus);
-            outline-offset: -2px;
-          }
+        &:hover {
+          background-color: #525252 !important;
+        }
+
+        svg {
+          fill: #f4f4f4 !important;
+        }
+      }
+    }
+
+    .cds--checkbox-label {
+      color: #c6c6c6;
+    }
+
+    .cds--form__helper-text {
+      color: #8d8d8d;
+    }
+  }
+
+  // Configuration section - subtle visual grouping
+  .config-section {
+    margin-top: spacing.$spacing-05;
+    padding-top: spacing.$spacing-05;
+    border-top: 1px solid #393939;
+    max-width: 800px;
+
+    h3 {
+      color: #f4f4f4;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: spacing.$spacing-05;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .config-form {
+      display: flex;
+      flex-direction: column;
+      gap: spacing.$spacing-05;
+
+      // Two-column rows within config
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: spacing.$spacing-05;
+        margin-bottom: 0;
+
+        .cds--number-input,
+        .cds--text-input-wrapper {
+          width: 100%;
+        }
+
+        @media (max-width: 672px) {
+          grid-template-columns: 1fr;
         }
       }
 
-      .cds--number__controls,
-      .cds--number-input__controls {
-        button {
-          background-color: #393939 !important;
-          border-left: 1px solid #525252 !important;
-          color: #f4f4f4 !important;
+      // Parser configuration section - nested advanced config
+      .parser-config-section {
+        margin-top: spacing.$spacing-04;
+        padding: spacing.$spacing-05;
+        background-color: rgba(0, 0, 0, 0.2);
+        border: 1px solid #393939;
+        border-radius: 4px;
 
-          &:hover {
-            background-color: #525252 !important;
-          }
+        h4 {
+          color: #f4f4f4;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          margin: 0 0 spacing.$spacing-02 0;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
 
-          svg {
-            fill: #f4f4f4 !important;
+        h5 {
+          color: #c6c6c6;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          margin: 0 0 spacing.$spacing-02 0;
+        }
+
+        .helper-text {
+          color: #8d8d8d;
+          font-size: 0.75rem;
+          margin: 0 0 spacing.$spacing-04 0;
+        }
+
+        // Parser fields in a row
+        .parser-fields-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: spacing.$spacing-05;
+
+          @media (max-width: 672px) {
+            grid-template-columns: 1fr;
           }
         }
-      }
 
-      .cds--text-input__field-wrapper,
-      .cds--text-area__wrapper {
-        &:focus-within {
-          outline: none;
+        // Parse preview section
+        .parse-preview-section {
+          margin-top: spacing.$spacing-05;
+          padding-top: spacing.$spacing-05;
+          border-top: 1px solid #393939;
+
+          .preview-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: spacing.$spacing-05;
+
+            @media (max-width: 768px) {
+              grid-template-columns: 1fr;
+            }
+          }
+
+          .preview-column {
+            display: flex;
+            flex-direction: column;
+          }
+
+          .preview-label {
+            color: #c6c6c6;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-bottom: spacing.$spacing-02;
+            display: flex;
+            align-items: center;
+            gap: spacing.$spacing-02;
+
+            .path-badge {
+              background-color: #0f62fe;
+              color: #ffffff;
+              font-size: 0.6875rem;
+              padding: 2px 8px;
+              border-radius: 10px;
+              font-weight: 400;
+            }
+          }
+
+          .preview-textarea {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            background-color: #262626 !important;
+            color: #f4f4f4 !important;
+            border: 1px solid #525252 !important;
+            border-radius: 4px;
+
+            &:focus {
+              outline: 2px solid var(--cds-focus);
+              outline-offset: -2px;
+            }
+          }
+
+          .preview-output {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            background-color: #262626;
+            color: #42be65;
+            padding: spacing.$spacing-03;
+            border-radius: 4px;
+            border: 1px solid #525252;
+            margin: 0;
+            min-height: 180px;
+            max-height: 300px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+          }
+
+          .extracted-fields {
+            margin-top: spacing.$spacing-03;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: spacing.$spacing-02;
+
+            .fields-label {
+              color: #8d8d8d;
+              font-size: 0.75rem;
+            }
+
+            .field-tag {
+              background-color: #393939;
+              color: #c6c6c6;
+              font-size: 0.6875rem;
+              padding: 2px 8px;
+              border-radius: 4px;
+              font-family: 'IBM Plex Mono', monospace;
+            }
+          }
+
+          .cds--inline-notification {
+            margin: 0;
+            max-width: none;
+          }
         }
-      }
-
-      .cds--checkbox-label {
-        color: #c6c6c6;
       }
     }
   }

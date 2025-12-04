@@ -109,14 +109,38 @@ type CSVConfig struct {
 
 // SocketConfig represents configuration for socket/WebSocket streams
 type SocketConfig struct {
-	URL              string            `json:"url" bson:"url" binding:"required"`
-	Protocol         string            `json:"protocol" bson:"protocol" binding:"required,oneof=tcp udp websocket"`
-	Headers          map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`
-	ReconnectOnError bool              `json:"reconnect_on_error" bson:"reconnect_on_error"`
-	ReconnectDelay   int               `json:"reconnect_delay,omitempty" bson:"reconnect_delay,omitempty"` // milliseconds
-	PingInterval     int               `json:"ping_interval,omitempty" bson:"ping_interval,omitempty"`     // seconds
-	MessageFormat    string            `json:"message_format,omitempty" bson:"message_format,omitempty"`   // json, text, binary
-	BufferSize       int               `json:"buffer_size,omitempty" bson:"buffer_size,omitempty"`         // number of messages to buffer
+	URL              string              `json:"url" bson:"url" binding:"required"`
+	Protocol         string              `json:"protocol" bson:"protocol" binding:"required,oneof=tcp udp websocket"`
+	Headers          map[string]string   `json:"headers,omitempty" bson:"headers,omitempty"`
+	ReconnectOnError bool                `json:"reconnect_on_error" bson:"reconnect_on_error"`
+	ReconnectDelay   int                 `json:"reconnect_delay,omitempty" bson:"reconnect_delay,omitempty"` // milliseconds
+	PingInterval     int                 `json:"ping_interval,omitempty" bson:"ping_interval,omitempty"`     // seconds
+	MessageFormat    string              `json:"message_format,omitempty" bson:"message_format,omitempty"`   // json, text, binary
+	BufferSize       int                 `json:"buffer_size,omitempty" bson:"buffer_size,omitempty"`         // number of messages to buffer
+	Parser           *SocketParserConfig `json:"parser,omitempty" bson:"parser,omitempty"`                   // parser configuration
+}
+
+// SocketParserConfig specifies how to parse incoming socket messages into tabular data
+type SocketParserConfig struct {
+	// DataPath is the JSON path to the data payload (e.g., "data", "payload", "message.readings")
+	// Supports dot notation for nested paths. If empty, treats entire message as the data object.
+	DataPath string `json:"data_path,omitempty" bson:"data_path,omitempty"`
+
+	// TimestampField specifies which field contains the timestamp (default: use server receive time)
+	TimestampField string `json:"timestamp_field,omitempty" bson:"timestamp_field,omitempty"`
+
+	// TimestampFormat is the Go time format string for parsing timestamps (default: RFC3339)
+	// Common formats: "2006-01-02T15:04:05Z07:00" (RFC3339), "2006-01-02 15:04:05", unix timestamp
+	TimestampFormat string `json:"timestamp_format,omitempty" bson:"timestamp_format,omitempty"`
+
+	// FieldMappings renames fields in the output (e.g., {"temp": "temperature", "ts": "timestamp"})
+	FieldMappings map[string]string `json:"field_mappings,omitempty" bson:"field_mappings,omitempty"`
+
+	// IncludeFields limits output to only these fields (empty = include all)
+	IncludeFields []string `json:"include_fields,omitempty" bson:"include_fields,omitempty"`
+
+	// ExcludeFields removes these fields from output
+	ExcludeFields []string `json:"exclude_fields,omitempty" bson:"exclude_fields,omitempty"`
 }
 
 // APIConfig represents configuration for REST API data sources

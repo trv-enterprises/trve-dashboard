@@ -31,10 +31,18 @@
     }
   }
 
+  // Chart editor container - full width scroll, content constrained
   .chart-detail-editor {
     padding: spacing.$spacing-05;
     flex: 1;
     overflow: auto;
+
+    // Constrain chart-editor content sections to max-width
+    .chart-metadata-section,
+    .chart-editor-switcher-wrapper,
+    .tab-content {
+      max-width: var(--chart-editor-max-width, 1200px);
+    }
   }
 
   .error-message {

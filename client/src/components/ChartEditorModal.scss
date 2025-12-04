@@ -101,29 +101,70 @@
   padding-bottom: spacing.$spacing-07;
   background-color: #161616;
 
-  // ContentSwitcher styling
-  .chart-editor-switcher {
-    margin-top: spacing.$spacing-05;
+  // ContentSwitcher wrapper for border - matches ChartEditor.scss
+  .chart-editor-switcher-wrapper {
     margin-bottom: spacing.$spacing-05;
+    display: flex;
+    width: fit-content;
+    border: 1px solid var(--cds-border-strong-01);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  // ContentSwitcher styling - matches Carbon g100 theme
+  .chart-editor-switcher.cds--content-switcher {
+    background-color: transparent;
+    width: auto;
+    flex: 0 0 auto;
 
     .cds--content-switcher-btn {
-      background-color: #262626;
-      color: #c6c6c6;
-      border-color: #525252;
+      background-color: transparent;
+      border: none;
+      border-left: 1px solid var(--cds-border-subtle-01);
+      position: relative;
+      flex: 1 1 0;
+      min-width: 130px;
 
-      &:hover {
-        background-color: #353535;
+      &:first-child {
+        border-left: none;
+      }
+
+      &::before,
+      &::after {
+        display: none;
+      }
+
+      .cds--content-switcher__label {
+        color: var(--cds-text-primary);
+        background-color: transparent;
+      }
+
+      &:hover:not(.cds--content-switcher--selected) {
+        background-color: var(--cds-layer-hover-01);
+
+        .cds--content-switcher__label {
+          color: #ffffff;
+        }
       }
 
       &:focus {
-        outline: 2px solid #0f62fe;
+        outline: 2px solid var(--cds-focus);
         outline-offset: -2px;
       }
     }
 
-    .cds--content-switcher--selected {
-      background-color: #393939;
-      color: #f4f4f4;
+    .cds--content-switcher-btn.cds--content-switcher--selected {
+      background-color: #e0e0e0 !important;
+      border-left-color: transparent;
+
+      .cds--content-switcher__label {
+        color: #161616 !important;
+        background-color: transparent !important;
+      }
+    }
+
+    .cds--content-switcher-btn.cds--content-switcher--selected + .cds--content-switcher-btn {
+      border-left-color: transparent;
     }
   }
 

@@ -43,15 +43,18 @@ type DataAggregation struct {
 // ChartDataMapping defines how to map query results to chart elements
 // @Description Mapping configuration from data columns to chart axes/series
 type ChartDataMapping struct {
-	XAxis       string           `json:"x_axis" bson:"x_axis"`             // Column for X axis (categories)
-	YAxis       []string         `json:"y_axis" bson:"y_axis"`             // Columns for Y axis (values/series)
-	GroupBy     string           `json:"group_by" bson:"group_by"`         // Column to group/split series by
-	LabelCol    string           `json:"label_col" bson:"label_col"`       // Column for labels
-	Filters     []DataFilter     `json:"filters" bson:"filters"`           // Client-side filters applied after data fetch
-	Aggregation *DataAggregation `json:"aggregation" bson:"aggregation"`   // Aggregation to apply (first, last, avg, etc.)
-	SortBy      string           `json:"sort_by" bson:"sort_by"`           // Column to sort by
-	SortOrder   string           `json:"sort_order" bson:"sort_order"`     // asc or desc
-	Limit       int              `json:"limit" bson:"limit"`               // Max rows to return
+	XAxis       string           `json:"x_axis" bson:"x_axis"`               // Column for X axis (categories)
+	XAxisLabel  string           `json:"x_axis_label" bson:"x_axis_label"`   // Label for X axis (e.g., "Time", "Date")
+	XAxisFormat string           `json:"x_axis_format" bson:"x_axis_format"` // Format for X axis values: chart, chart_time, chart_date, chart_datetime, short, long, etc.
+	YAxis       []string         `json:"y_axis" bson:"y_axis"`               // Columns for Y axis (values/series)
+	YAxisLabel  string           `json:"y_axis_label" bson:"y_axis_label"`   // Label for Y axis (e.g., "Temperature (°F)", "Count")
+	GroupBy     string           `json:"group_by" bson:"group_by"`           // Column to group/split series by
+	LabelCol    string           `json:"label_col" bson:"label_col"`         // Column for labels
+	Filters     []DataFilter     `json:"filters" bson:"filters"`             // Client-side filters applied after data fetch
+	Aggregation *DataAggregation `json:"aggregation" bson:"aggregation"`     // Aggregation to apply (first, last, avg, etc.)
+	SortBy      string           `json:"sort_by" bson:"sort_by"`             // Column to sort by
+	SortOrder   string           `json:"sort_order" bson:"sort_order"`       // asc or desc
+	Limit       int              `json:"limit" bson:"limit"`                 // Max rows to return
 }
 
 // EmbeddedChart represents a chart embedded directly in a dashboard

@@ -261,4 +261,335 @@ export function getValue(data, field) {
   return data.rows[0][colIndex];
 }
 
+/**
+ * Timestamp formatting utilities
+ */
+
+/**
+ * Detect if a value is likely a timestamp
+ * @param {any} value - The value to check
+ * @returns {string|null} - 'unix_seconds', 'unix_ms', 'iso', or null
+ */
+export function detectTimestampType(value) {
+  if (value === null || value === undefined) return null;
+
+  // ISO string format
+  if (typeof value === 'string') {
+    // Check for ISO format: 2024-01-15T10:30:00Z or 2024-01-15T10:30:00.000Z
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+      return 'iso';
+    }
+    // Check for date format: 2024-01-15
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return 'iso';
+    }
+  }
+
+  // Unix timestamp
+  if (typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value))) {
+    const num = Number(value);
+    // Unix seconds (10 digits, roughly 1970-2100)
+    if (num > 946684800 && num < 4102444800) {
+      return 'unix_seconds';
+    }
+    // Unix milliseconds (13 digits)
+    if (num > 946684800000 && num < 4102444800000) {
+      return 'unix_ms';
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Parse a timestamp value into a Date object
+ * @param {any} value - The timestamp value
+ * @param {string} type - Optional type hint ('unix_seconds', 'unix_ms', 'iso')
+ * @returns {Date|null} - Parsed Date or null
+ */
+export function parseTimestamp(value, type = null) {
+  if (value === null || value === undefined) return null;
+
+  const detectedType = type || detectTimestampType(value);
+
+  switch (detectedType) {
+    case 'unix_seconds':
+      return new Date(Number(value) * 1000);
+    case 'unix_ms':
+      return new Date(Number(value));
+    case 'iso':
+      return new Date(value);
+    default:
+      // Try parsing as-is
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? null : date;
+  }
+}
+
+/**
+ * Format a timestamp for display
+ * @param {any} value - The timestamp value (unix, iso string, or Date)
+ * @param {string} format - Format type: 'short', 'long', 'time', 'date', 'relative', 'iso'
+ * @param {Object} options - Additional options
+ * @param {string} options.locale - Locale string (default: 'en-US')
+ * @param {string} options.timezone - Timezone (default: local)
+ * @returns {string} - Formatted timestamp string
+ */
+export function formatTimestamp(value, format = 'short', options = {}) {
+  const { locale = 'en-US', timezone } = options;
+
+  const date = value instanceof Date ? value : parseTimestamp(value);
+  if (!date || isNaN(date.getTime())) {
+    return String(value); // Return original if can't parse
+  }
+
+  const formatOptions = { timeZone: timezone };
+
+  switch (format) {
+    case 'short':
+      // "1/15/24, 10:30 AM"
+      return date.toLocaleString(locale, {
+        ...formatOptions,
+        month: 'numeric',
+        day: 'numeric',
+        year: '2-digit',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+
+    case 'long':
+      // "January 15, 2024 at 10:30:00 AM"
+      return date.toLocaleString(locale, {
+        ...formatOptions,
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+
+    case 'time':
+      // "10:30:00 AM"
+      return date.toLocaleTimeString(locale, {
+        ...formatOptions,
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+
+    case 'time_short':
+      // "10:30 AM"
+      return date.toLocaleTimeString(locale, {
+        ...formatOptions,
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+
+    case 'date':
+      // "January 15, 2024"
+      return date.toLocaleDateString(locale, {
+        ...formatOptions,
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      });
+
+    case 'date_short':
+      // "1/15/24"
+      return date.toLocaleDateString(locale, {
+        ...formatOptions,
+        month: 'numeric',
+        day: 'numeric',
+        year: '2-digit'
+      });
+
+    case 'relative':
+      // "5 minutes ago", "in 2 hours"
+      return formatRelativeTime(date);
+
+    case 'iso':
+      // "2024-01-15T10:30:00.000Z"
+      return date.toISOString();
+
+    case 'chart':
+      // Compact format for chart axes: "1/15 10:30" - always shows date and time
+      return date.toLocaleString(locale, {
+        ...formatOptions,
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+
+    case 'chart_time':
+      // Time only for chart axes: "10:30 AM"
+      return date.toLocaleTimeString(locale, {
+        ...formatOptions,
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+
+    case 'chart_date':
+      // Date only for chart axes: "Jan 15"
+      return date.toLocaleDateString(locale, {
+        ...formatOptions,
+        month: 'short',
+        day: 'numeric'
+      });
+
+    case 'chart_datetime':
+      // Full date/time for chart axes: "Jan 15, 10:30 AM"
+      return date.toLocaleString(locale, {
+        ...formatOptions,
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+
+    case 'chart_auto':
+      // Auto format based on data range - use when AI analyzes data spread
+      const now = new Date();
+      const diffHours = Math.abs(now.getTime() - date.getTime()) / (1000 * 60 * 60);
+      if (diffHours < 24) {
+        // Within a day - show time
+        return date.toLocaleTimeString(locale, {
+          ...formatOptions,
+          hour: 'numeric',
+          minute: '2-digit'
+        });
+      } else {
+        // Beyond a day - show date
+        return date.toLocaleDateString(locale, {
+          ...formatOptions,
+          month: 'short',
+          day: 'numeric'
+        });
+      }
+
+    default:
+      return date.toLocaleString(locale, formatOptions);
+  }
+}
+
+/**
+ * Format relative time (e.g., "5 minutes ago")
+ * @param {Date} date - The date to format
+ * @returns {string} - Relative time string
+ */
+function formatRelativeTime(date) {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  const isFuture = diffMs < 0;
+  const abs = Math.abs;
+
+  if (abs(diffSeconds) < 60) {
+    return isFuture ? 'in a moment' : 'just now';
+  } else if (abs(diffMinutes) < 60) {
+    const mins = abs(diffMinutes);
+    return isFuture
+      ? `in ${mins} minute${mins === 1 ? '' : 's'}`
+      : `${mins} minute${mins === 1 ? '' : 's'} ago`;
+  } else if (abs(diffHours) < 24) {
+    const hrs = abs(diffHours);
+    return isFuture
+      ? `in ${hrs} hour${hrs === 1 ? '' : 's'}`
+      : `${hrs} hour${hrs === 1 ? '' : 's'} ago`;
+  } else if (abs(diffDays) < 30) {
+    const days = abs(diffDays);
+    return isFuture
+      ? `in ${days} day${days === 1 ? '' : 's'}`
+      : `${days} day${days === 1 ? '' : 's'} ago`;
+  } else {
+    // Fall back to date format for longer periods
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+    });
+  }
+}
+
+/**
+ * Format a value for display in a data table cell
+ * Automatically detects and formats timestamps
+ * @param {any} value - The value to format
+ * @param {string} columnName - Column name (hints at type)
+ * @param {Object} options - Format options
+ * @returns {string} - Formatted value
+ */
+export function formatCellValue(value, columnName = '', options = {}) {
+  if (value === null || value === undefined) return '';
+
+  // Check if column name suggests it's a timestamp
+  const isTimestampColumn = /timestamp|time|date|created|updated|ts$/i.test(columnName);
+
+  // Check if value looks like a timestamp
+  const timestampType = detectTimestampType(value);
+
+  if (isTimestampColumn || timestampType) {
+    const format = options.timestampFormat || 'short';
+    return formatTimestamp(value, format, options);
+  }
+
+  // For numbers, apply basic formatting
+  if (typeof value === 'number') {
+    // Check if it's a float
+    if (!Number.isInteger(value)) {
+      return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    }
+    return value.toLocaleString('en-US');
+  }
+
+  return String(value);
+}
+
+/**
+ * Transform a dataset with formatted timestamps
+ * @param {Object} data - { columns, rows }
+ * @param {Object} options - Format options
+ * @param {string} options.timestampFormat - Format for timestamps
+ * @param {Array} options.timestampColumns - Specific columns to format as timestamps
+ * @returns {Object} - Transformed data with formatted values
+ */
+export function formatDataForDisplay(data, options = {}) {
+  if (!data || !data.rows || !data.columns) {
+    return { columns: [], rows: [], formattedRows: [] };
+  }
+
+  const { timestampFormat = 'short', timestampColumns = [] } = options;
+
+  // Detect which columns are timestamps
+  const timestampColIndices = data.columns.map((col, i) => {
+    if (timestampColumns.includes(col)) return true;
+    if (/timestamp|time|date|created|updated|ts$/i.test(col)) return true;
+    // Check first non-null value in column
+    const sampleValue = data.rows.find(row => row[i] != null)?.[i];
+    return detectTimestampType(sampleValue) !== null;
+  });
+
+  // Create formatted rows
+  const formattedRows = data.rows.map(row =>
+    row.map((value, colIndex) => {
+      if (timestampColIndices[colIndex]) {
+        return formatTimestamp(value, timestampFormat, options);
+      }
+      return formatCellValue(value, data.columns[colIndex], options);
+    })
+  );
+
+  return {
+    columns: data.columns,
+    rows: data.rows, // Original rows
+    formattedRows, // Formatted for display
+    metadata: data.metadata
+  };
+}
+
 export default transformData;

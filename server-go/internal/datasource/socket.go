@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -98,7 +99,7 @@ func (s *SocketDataSource) connectUDP() error {
 }
 
 // Query is not typically used for streaming datasources
-// Instead, it collects messages over a short time period
+// Instead, it collects messages over a short time period and flattens JSON fields into columns
 func (s *SocketDataSource) Query(ctx context.Context, query models.Query) (*models.ResultSet, error) {
 	// Start streaming
 	recordChan, err := s.Stream(ctx, query)
@@ -111,34 +112,85 @@ func (s *SocketDataSource) Query(ctx context.Context, query models.Query) (*mode
 	collectCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	resultSet := &models.ResultSet{
-		Columns:  []string{"timestamp", "data"},
-		Rows:     make([][]interface{}, 0),
-		Metadata: make(map[string]interface{}),
-	}
-
-	rowCount := 0
+	// Collect all records first to discover all fields
+	var records []models.Record
 	for {
 		select {
 		case record, ok := <-recordChan:
 			if !ok {
 				// Channel closed
-				resultSet.Metadata["row_count"] = rowCount
-				return resultSet, nil
+				break
 			}
-
-			// Convert record to row
-			timestamp := time.Now().Format(time.RFC3339)
-			dataJSON, _ := json.Marshal(record)
-			row := []interface{}{timestamp, string(dataJSON)}
-			resultSet.Rows = append(resultSet.Rows, row)
-			rowCount++
+			records = append(records, record)
 
 		case <-collectCtx.Done():
-			resultSet.Metadata["row_count"] = rowCount
-			resultSet.Metadata["collection_timeout"] = timeout.String()
-			return resultSet, nil
+			// Timeout reached, process collected records
+			goto processRecords
 		}
+	}
+
+processRecords:
+	// Build column list from all records (discover all unique fields)
+	columnSet := make(map[string]bool)
+	columnOrder := []string{"timestamp"} // timestamp always first
+	columnSet["timestamp"] = true
+
+	for _, record := range records {
+		for key := range record {
+			if !columnSet[key] {
+				columnSet[key] = true
+				columnOrder = append(columnOrder, key)
+			}
+		}
+	}
+
+	// If no records collected, return empty result with timestamp column
+	if len(records) == 0 {
+		return &models.ResultSet{
+			Columns:  []string{"timestamp"},
+			Rows:     make([][]interface{}, 0),
+			Metadata: map[string]interface{}{"row_count": 0, "collection_timeout": timeout.String()},
+		}, nil
+	}
+
+	// Build rows with flattened data
+	rows := make([][]interface{}, 0, len(records))
+	for _, record := range records {
+		row := make([]interface{}, len(columnOrder))
+		for i, col := range columnOrder {
+			if val, exists := record[col]; exists {
+				row[i] = flattenValue(val)
+			} else {
+				row[i] = nil
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	return &models.ResultSet{
+		Columns: columnOrder,
+		Rows:    rows,
+		Metadata: map[string]interface{}{
+			"row_count":          len(rows),
+			"collection_timeout": timeout.String(),
+		},
+	}, nil
+}
+
+// flattenValue converts nested objects/arrays to JSON strings, keeps primitives as-is
+func flattenValue(val interface{}) interface{} {
+	switch v := val.(type) {
+	case string, int, int64, float64, bool, nil:
+		return v
+	case map[string]interface{}, []interface{}:
+		// Nested objects/arrays - convert to JSON string
+		jsonBytes, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		return string(jsonBytes)
+	default:
+		return v
 	}
 }
 
@@ -232,7 +284,7 @@ func (s *SocketDataSource) streamTCP(ctx context.Context, recordChan chan<- mode
 	}
 }
 
-// parseMessage converts raw bytes to a Record based on MessageFormat
+// parseMessage converts raw bytes to a Record based on MessageFormat and parser config
 func (s *SocketDataSource) parseMessage(message []byte) models.Record {
 	record := make(models.Record)
 
@@ -242,6 +294,9 @@ func (s *SocketDataSource) parseMessage(message []byte) models.Record {
 			// If JSON parsing fails, store as raw data
 			record["data"] = string(message)
 			record["error"] = err.Error()
+		} else {
+			// Apply parser config if available
+			record = s.applyParserConfig(record)
 		}
 	case "text":
 		record["data"] = string(message)
@@ -252,11 +307,108 @@ func (s *SocketDataSource) parseMessage(message []byte) models.Record {
 		// Try JSON first, fallback to text
 		if err := json.Unmarshal(message, &record); err != nil {
 			record["data"] = string(message)
+		} else {
+			// Apply parser config if available
+			record = s.applyParserConfig(record)
 		}
 	}
 
 	record["timestamp"] = time.Now().Unix()
 	return record
+}
+
+// applyParserConfig applies the parser configuration to extract and transform data
+func (s *SocketDataSource) applyParserConfig(record models.Record) models.Record {
+	parser := s.config.Parser
+	if parser == nil {
+		return record
+	}
+
+	// Step 1: Extract timestamp from original record BEFORE data extraction
+	// This allows timestamp to be at a different path than the data
+	var extractedTimestamp interface{}
+	if parser.TimestampField != "" {
+		extractedTimestamp = extractByPath(record, parser.TimestampField)
+	}
+
+	// Step 2: Extract data from data_path if specified
+	if parser.DataPath != "" {
+		extracted := extractByPath(record, parser.DataPath)
+		if extracted != nil {
+			// If extraction returns a map, use it as the new record
+			if dataMap, ok := extracted.(map[string]interface{}); ok {
+				record = dataMap
+			} else {
+				// If it's not a map, wrap it
+				record = models.Record{"value": extracted}
+			}
+		}
+	}
+
+	// Step 3: Add the extracted timestamp to the record
+	if extractedTimestamp != nil {
+		record["timestamp"] = extractedTimestamp
+	}
+
+	// Apply field mappings (rename fields)
+	if len(parser.FieldMappings) > 0 {
+		for oldName, newName := range parser.FieldMappings {
+			if val, exists := record[oldName]; exists {
+				record[newName] = val
+				delete(record, oldName)
+			}
+		}
+	}
+
+	// Apply include fields filter (whitelist)
+	if len(parser.IncludeFields) > 0 {
+		filtered := make(models.Record)
+		for _, field := range parser.IncludeFields {
+			if val, exists := record[field]; exists {
+				filtered[field] = val
+			}
+		}
+		// Always preserve timestamp if it was extracted
+		if extractedTimestamp != nil {
+			filtered["timestamp"] = extractedTimestamp
+		}
+		record = filtered
+	}
+
+	// Apply exclude fields filter (blacklist)
+	if len(parser.ExcludeFields) > 0 {
+		for _, field := range parser.ExcludeFields {
+			delete(record, field)
+		}
+	}
+
+	return record
+}
+
+// extractByPath navigates a map using dot notation (e.g., "data", "payload.readings")
+func extractByPath(data map[string]interface{}, path string) interface{} {
+	if path == "" {
+		return data
+	}
+
+	parts := strings.Split(path, ".")
+	var current interface{} = data
+
+	for _, part := range parts {
+		switch v := current.(type) {
+		case map[string]interface{}:
+			val, exists := v[part]
+			if !exists {
+				return nil
+			}
+			current = val
+		default:
+			// Can't navigate further
+			return nil
+		}
+	}
+
+	return current
 }
 
 // Close closes the socket connection

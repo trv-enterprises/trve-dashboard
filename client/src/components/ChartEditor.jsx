@@ -18,7 +18,7 @@ import {
 import { Play, Add, TrashCan, ChartBar, Code, TableSplit } from '@carbon/icons-react';
 import DynamicComponentLoader from './DynamicComponentLoader';
 import SQLQueryBuilder from './SQLQueryBuilder';
-import { transformData } from '../utils/dataTransforms';
+import { transformData, formatCellValue } from '../utils/dataTransforms';
 import './ChartEditor.scss';
 
 // Chart types available
@@ -103,7 +103,10 @@ const ChartEditor = forwardRef(function ChartEditor({
 
   // Data mapping
   const [xAxisColumn, setXAxisColumn] = useState('');
+  const [xAxisLabel, setXAxisLabel] = useState(''); // Custom label for X axis
+  const [xAxisFormat, setXAxisFormat] = useState('chart'); // Default format for timestamp display
   const [yAxisColumns, setYAxisColumns] = useState([]);
+  const [yAxisLabel, setYAxisLabel] = useState(''); // Custom label for Y axis (e.g., "Temperature (°F)")
   const [groupByColumn, setGroupByColumn] = useState('');
 
   // Filters and aggregation
@@ -147,7 +150,10 @@ const ChartEditor = forwardRef(function ChartEditor({
       setQueryRaw(chart.query_config?.raw || '');
       setQueryType(chart.query_config?.type || 'sql');
       setXAxisColumn(chart.data_mapping?.x_axis || '');
+      setXAxisLabel(chart.data_mapping?.x_axis_label || '');
+      setXAxisFormat(chart.data_mapping?.x_axis_format || 'chart');
       setYAxisColumns(chart.data_mapping?.y_axis || []);
+      setYAxisLabel(chart.data_mapping?.y_axis_label || '');
       setGroupByColumn(chart.data_mapping?.group_by || '');
       setFilters(chart.data_mapping?.filters || []);
       setAggregation(chart.data_mapping?.aggregation || { type: '', sortBy: '', field: '', count: 10 });
@@ -256,7 +262,10 @@ const ChartEditor = forwardRef(function ChartEditor({
     setQueryRaw('');
     setQueryType('sql');
     setXAxisColumn('');
+    setXAxisLabel('');
+    setXAxisFormat('chart');
     setYAxisColumns([]);
+    setYAxisLabel('');
     setGroupByColumn('');
     setFilters([]);
     setAggregation({ type: '', sortBy: '', field: '', count: 10 });
@@ -283,8 +292,15 @@ const ChartEditor = forwardRef(function ChartEditor({
   };
 
   const fetchPreviewData = async () => {
-    if (!selectedDatasourceId || !queryRaw.trim()) {
-      setPreviewError('Please select a data source and enter a query');
+    if (!selectedDatasourceId) {
+      setPreviewError('Please select a data source');
+      return;
+    }
+
+    // Socket datasources don't require a query - they just capture stream data
+    const isSocket = selectedDatasource?.type === 'socket';
+    if (!isSocket && !queryRaw.trim()) {
+      setPreviewError('Please enter a query');
       return;
     }
 
@@ -297,7 +313,7 @@ const ChartEditor = forwardRef(function ChartEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: {
-            raw: queryRaw,
+            raw: isSocket ? '' : queryRaw, // Socket doesn't need a query string
             type: queryType,
             params: {}
           }
@@ -344,19 +360,31 @@ const ChartEditor = forwardRef(function ChartEditor({
       aggregation: aggregation.type ? aggregation : null,
       sortBy,
       sortOrder,
-      limit: limitRows || 0
+      limit: limitRows || 0,
+      xAxisFormat: xAxisFormat || 'chart',
+      xAxisLabel: xAxisLabel || '',
+      yAxisLabel: yAxisLabel || ''
     };
 
     return getDataDrivenChartCode(chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, yAxisColumns, transforms);
-  }, [chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, yAxisColumns, filters, aggregation, sortBy, sortOrder, limitRows, showCustomCode, componentCode]);
+  }, [chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, xAxisLabel, xAxisFormat, yAxisColumns, yAxisLabel, filters, aggregation, sortBy, sortOrder, limitRows, showCustomCode, componentCode]);
 
   const filteredPreviewData = useMemo(() => {
     if (!previewData) return null;
 
-    const hasTransforms = filters.length > 0 || aggregation?.type || sortBy || limitRows > 0;
+    // Only include filters that are "complete" (have field, operator, and value if needed)
+    const completeFilters = filters.filter(f => {
+      if (!f.field || !f.op) return false;
+      // isNull and isNotNull don't need a value
+      if (f.op === 'isNull' || f.op === 'isNotNull') return true;
+      // All other operators need a non-empty value
+      return f.value !== '' && f.value !== undefined && f.value !== null;
+    });
+
+    const hasTransforms = completeFilters.length > 0 || aggregation?.type || sortBy || limitRows > 0;
     if (!hasTransforms) return previewData;
 
-    const parsedFilters = filters.map(f => ({
+    const parsedFilters = completeFilters.map(f => ({
       field: f.field,
       op: f.op,
       value: (f.op === 'in' || f.op === 'notIn') && typeof f.value === 'string'
@@ -380,7 +408,7 @@ const ChartEditor = forwardRef(function ChartEditor({
         ...previewData.metadata,
         row_count: result.rows.length,
         original_row_count: previewData.rows?.length || 0,
-        filtered: true
+        filtered: completeFilters.length > 0
       }
     };
   }, [previewData, filters, aggregation, sortBy, sortOrder, limitRows]);
@@ -403,7 +431,10 @@ const ChartEditor = forwardRef(function ChartEditor({
       } : null,
       data_mapping: selectedDatasourceId ? {
         x_axis: xAxisColumn,
+        x_axis_label: xAxisLabel || '',
+        x_axis_format: xAxisFormat || 'chart',
         y_axis: yAxisColumns,
+        y_axis_label: yAxisLabel || '',
         group_by: groupByColumn || '',
         filters: filters.length > 0 ? filters : [],
         aggregation: aggregation.type ? aggregation : null,
@@ -550,7 +581,7 @@ const ChartEditor = forwardRef(function ChartEditor({
               <>
                 <div className="query-section">
                   <div className="query-header">
-                    <h4>Query</h4>
+                    <h4>{selectedDatasource.type === 'socket' ? 'Stream Capture' : 'Query'}</h4>
                     <div className="query-header-actions">
                       {selectedDatasource.type === 'sql' && (
                         <ContentSwitcher
@@ -563,7 +594,17 @@ const ChartEditor = forwardRef(function ChartEditor({
                           <Switch name="raw" text="Raw SQL" />
                         </ContentSwitcher>
                       )}
-                      {queryMode === 'raw' && (
+                      {selectedDatasource.type === 'socket' ? (
+                        <Button
+                          kind="tertiary"
+                          size="sm"
+                          renderIcon={Play}
+                          onClick={fetchPreviewData}
+                          disabled={previewLoading}
+                        >
+                          {previewLoading ? 'Capturing...' : 'Capture Sample (5s)'}
+                        </Button>
+                      ) : queryMode === 'raw' && (
                         <Button
                           kind="tertiary"
                           size="sm"
@@ -577,8 +618,17 @@ const ChartEditor = forwardRef(function ChartEditor({
                     </div>
                   </div>
 
-                  {/* Visual SQL Query Builder for SQL datasources */}
-                  {selectedDatasource.type === 'sql' && queryMode === 'visual' ? (
+                  {/* Socket datasource - show info message instead of unused filter field */}
+                  {selectedDatasource.type === 'socket' ? (
+                    <div className="socket-capture-info">
+                      <InlineNotification
+                        kind="info"
+                        title="Stream Preview"
+                        subtitle="Click 'Capture Sample' to collect 5 seconds of stream data for preview. This helps discover the data schema for mapping. Use client-side filters below to filter the captured data."
+                        hideCloseButton
+                      />
+                    </div>
+                  ) : selectedDatasource.type === 'sql' && queryMode === 'visual' ? (
                     <SQLQueryBuilder
                       datasourceId={selectedDatasourceId}
                       onQueryChange={(query) => setQueryRaw(query)}
@@ -664,6 +714,24 @@ const ChartEditor = forwardRef(function ChartEditor({
                             <SelectItem key={col} value={col} text={col} />
                           ))}
                         </Select>
+                      </Column>
+                      <Column lg={4} md={4} sm={4}>
+                        <TextInput
+                          id="x-axis-label"
+                          labelText="X-Axis Label (Optional)"
+                          value={xAxisLabel}
+                          onChange={(e) => setXAxisLabel(e.target.value)}
+                          placeholder="e.g., Time"
+                        />
+                      </Column>
+                      <Column lg={4} md={4} sm={4}>
+                        <TextInput
+                          id="y-axis-label"
+                          labelText="Y-Axis Label (Optional)"
+                          value={yAxisLabel}
+                          onChange={(e) => setYAxisLabel(e.target.value)}
+                          placeholder="e.g., Temperature (°F)"
+                        />
                       </Column>
                     </Grid>
                   ) : (
@@ -1007,7 +1075,7 @@ const ChartEditor = forwardRef(function ChartEditor({
                           {filteredPreviewData.rows?.slice(0, 10).map((row, i) => (
                             <tr key={i}>
                               {row.map((cell, j) => (
-                                <td key={j}>{String(cell)}</td>
+                                <td key={j}>{formatCellValue(cell, filteredPreviewData.columns?.[j])}</td>
                               ))}
                             </tr>
                           ))}
@@ -1070,7 +1138,7 @@ const ChartEditor = forwardRef(function ChartEditor({
                 size="sm"
               />
               <p className="code-help">
-                Available: useState, useEffect, useMemo, useCallback, useRef, useData, transformData, toObjects, getValue, echarts, ReactECharts
+                Available: useState, useEffect, useMemo, useCallback, useRef, useData, transformData, toObjects, getValue, formatTimestamp, formatCellValue, echarts, ReactECharts
               </p>
             </div>
             <TextArea
@@ -1242,7 +1310,7 @@ function getStaticChartCode(chartType) {
 
 function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xAxisCol, yAxisCols, transforms = {}) {
   const yAxisStr = yAxisCols.length > 0 ? yAxisCols.map(c => `'${c}'`).join(', ') : "'value'";
-  const { filters = [], aggregation = null, sortBy = '', sortOrder = 'desc', limit = 0 } = transforms;
+  const { filters = [], aggregation = null, sortBy = '', sortOrder = 'desc', limit = 0, xAxisFormat = 'chart', xAxisLabel = '', yAxisLabel = '' } = transforms;
 
   const hasTransforms = filters.length > 0 || aggregation?.type || sortBy || limit > 0;
   const transformsConfig = hasTransforms ? `
@@ -1261,6 +1329,12 @@ function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xA
   const transformed = transformData(data, transforms);
   const rows = transformed.rows;` : `
   const rows = data.rows;`;
+
+  // Helper to format x-axis values - uses the configured format
+  // Available formats: chart (date+time), chart_time, chart_date, chart_datetime, short, long, etc.
+  const xAxisFormatCode = `
+  // Format x-axis values (auto-detect timestamps, format: ${xAxisFormat})
+  const formatXValue = (val, colName) => formatCellValue(val, colName, { timestampFormat: '${xAxisFormat}' });`;
 
   const seriesCode = yAxisCols.length > 1
     ? `const yColumns = [${yAxisStr}];
@@ -1296,13 +1370,14 @@ function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xA
   if (error) return <div style={{ color: '#da1e28', padding: '1rem' }}>Error: {error.message}</div>;
   if (!data?.rows?.length) return <div style={{ color: '#6f6f6f', padding: '1rem' }}>No data</div>;
 ${transformsConfig}
+${xAxisFormatCode}
 
   const xCol = '${xAxisCol}';
   const yCol = ${yAxisStr.split(',')[0]};
   const xIdx = ${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(xCol);
   const yIdx = ${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(yCol);
 
-  const pieData = rows.map(r => ({ name: String(r[xIdx]), value: Number(r[yIdx]) }));
+  const pieData = rows.map(r => ({ name: formatXValue(r[xIdx], xCol), value: Number(r[yIdx]) }));
 
   const option = {
     tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
@@ -1373,18 +1448,19 @@ ${transformsConfig}
   if (error) return <div style={{ color: '#da1e28', padding: '1rem' }}>Error: {error.message}</div>;
   if (!data?.rows?.length) return <div style={{ color: '#6f6f6f', padding: '1rem' }}>No data</div>;
 ${transformsConfig}
+${xAxisFormatCode}
 
   const xAxisCol = '${xAxisCol}';
   const xIdx = ${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(xAxisCol);
-  const categories = rows.map(r => String(r[xIdx]));
+  const categories = rows.map(r => formatXValue(r[xIdx], xAxisCol));
 
   ${seriesCode}
 
   const option = {
     tooltip: { trigger: 'axis' },
     ${yAxisCols.length > 1 ? "legend: { data: yColumns, bottom: 0 }," : ''}
-    xAxis: { type: 'category', data: categories${chartType === 'area' ? ', boundaryGap: false' : ''} },
-    yAxis: { type: 'value' },
+    xAxis: { type: 'category', data: categories${chartType === 'area' ? ', boundaryGap: false' : ''}${xAxisLabel ? `, name: '${xAxisLabel}'` : ''} },
+    yAxis: { type: 'value'${yAxisLabel ? `, name: '${yAxisLabel}'` : ''} },
     series: series
   };
 
