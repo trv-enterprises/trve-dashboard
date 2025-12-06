@@ -3,18 +3,18 @@
 ## Implementation Status
 
 **Last Updated**: 2025-12-04
-**Current Phase**: 2 - AI Session API (Backend) - COMPLETE
-**Next Phase**: 3 - AI Agent Core (Backend)
+**Current Phase**: 7 - AIBuilderPage Component - COMPLETE
+**Next Phase**: 8 - Polish & Testing
 
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1 | Chart Versioning (Backend) | ✅ Complete |
 | 2 | AI Session API (Backend) | ✅ Complete |
-| 3 | AI Agent Core (Backend) | ⏳ Pending |
-| 4 | Frontend - Delete Dialogs | ⏳ Pending |
-| 5 | Frontend Entry Points | ⏳ Pending |
-| 6 | AIBuilderModal Component | ⏳ Pending |
-| 7 | AIBuilderPage Component | ⏳ Pending |
+| 3 | AI Agent Core (Backend) | ✅ Complete |
+| 4 | Frontend - Delete Dialogs | ✅ Complete |
+| 5 | Frontend Entry Points | ✅ Complete |
+| 6 | AIBuilderModal Component | ✅ Complete |
+| 7 | AIBuilderPage Component | ✅ Complete |
 | 8 | Polish & Testing | ⏳ Pending |
 
 ### Phase 1 Checklist (COMPLETE)
@@ -34,6 +34,92 @@
 - [x] Add chart-to-session mapping for quick lookups
 - [x] Validate chart naming on save (reject "Untitled" prefix)
 - [x] Broadcast events to SSE clients on message/chart updates
+
+### Phase 3 Checklist (COMPLETE)
+- [x] Set up LangChain Go (`langchaingo`) with Anthropic provider
+- [x] Implement `Agent` struct with conversation loop and tool execution
+- [x] Create chart editing tools (update_chart_config, update_data_mapping, etc.)
+- [x] Implement `ToolExecutor` for executing tool calls against charts
+- [x] Wire up agent to session handler with async processing
+- [x] Add SSE event broadcasting for thinking/streaming/errors
+- [x] Fix context cancellation bug in async goroutine
+- [x] Update model to `claude-sonnet-4-20250514`
+
+**Implementation Notes:**
+- Used LangChain Go (`github.com/tmc/langchaingo`) instead of direct Anthropic SDK for provider flexibility
+- Model: `claude-sonnet-4-20250514` (Claude 4 Sonnet)
+- Async processing runs in background goroutine with `context.Background()` to avoid request context cancellation
+- Tools defined in `internal/ai/tools.go`, executed by `internal/ai/tool_executor.go`
+
+### Phase 4 Checklist (COMPLETE)
+- [x] Create `ChartDeleteDialog` component with version-aware logic
+- [x] Add versioned chart API methods to `apiClient.js`
+- [x] Update `ChartsListPage` to use new delete dialog instead of `window.confirm`
+- [x] Handle three delete scenarios:
+  - Draft chart (with/without previous version)
+  - Final chart with multiple versions (choice: delete version or all)
+  - Final chart single version (permanent delete)
+
+**New Files:**
+- `client/src/components/ChartDeleteDialog.jsx` - Version-aware delete modal
+- `client/src/components/ChartDeleteDialog.scss` - Styling
+
+**API Client Methods Added:**
+- `getChartVersionInfo(id)` - Get version metadata for delete dialogs
+- `getChartVersions(id)` - List all versions
+- `getChartVersion(id, version)` - Get specific version
+- `deleteChartVersion(id, version)` - Delete specific version
+- `getChartDraft(id)` - Get draft version
+- `deleteChartDraft(id)` - Delete draft only
+
+### Phase 5 Checklist (COMPLETE)
+- [x] Add OverflowMenu to ChartsListPage with "Create" and "Create with AI" options
+- [x] Add AI edit icon (WatsonxAi) to charts list row actions
+- [x] Add dropdown menu to DashboardDetailPage panel edit with "Edit" and "Edit with AI"
+- [x] Create AIBuilderPage placeholder component with routing
+- [x] Add routes for AI builder pages (`/design/charts/ai/new` and `/design/charts/ai/:chartId`)
+
+**New Files:**
+- `client/src/pages/AIBuilderPage.jsx` - Placeholder page for AI builder
+- `client/src/pages/AIBuilderPage.scss` - Styling for AI builder page
+
+**Modified Files:**
+- `client/src/pages/ChartsListPage.jsx` - Added OverflowMenu for create, WatsonxAi icon for AI edit
+- `client/src/pages/DashboardDetailPage.jsx` - Added OverflowMenu for panel chart edit
+- `client/src/App.jsx` - Added route for AIBuilderPage
+
+### Phase 6 Checklist (COMPLETE)
+- [x] Create `useAISession` custom hook for session state and SSE management
+- [x] Create `AIBuilderModal` component with split layout (chat + preview)
+- [x] Implement SSE subscription with reconnection handling
+- [x] Build chat interface with message history and thinking indicator
+- [x] Add chart preview using `DynamicComponentLoader`
+- [x] Implement save dialog with chart name validation
+- [x] Add ECharts examples link for user inspiration
+
+**New Files:**
+- `client/src/hooks/useAISession.js` - Custom hook for AI session state and SSE
+- `client/src/components/AIBuilderModal.jsx` - Modal version of AI builder
+- `client/src/components/AIBuilderModal.scss` - Modal styling
+
+**API Client Methods Added:**
+- `createAISession(chartId)` - Create new AI session
+- `getAISession(sessionId)` - Get session state
+- `sendAIMessage(sessionId, content)` - Send message to AI
+- `saveAISession(sessionId, chartName)` - Save/publish chart
+- `cancelAISession(sessionId)` - Cancel session and delete draft
+- `getAISessionEventsURL(sessionId)` - Get SSE endpoint URL
+
+### Phase 7 Checklist (COMPLETE)
+- [x] Update `AIBuilderPage` to full-page version with same functionality as modal
+- [x] Add header with back button, title, and save/cancel actions
+- [x] Implement discard confirmation dialog for unsaved changes
+- [x] Style full-page layout with responsive split panels
+- [x] Wire up all AI session functionality from `useAISession` hook
+
+**Updated Files:**
+- `client/src/pages/AIBuilderPage.jsx` - Full-page AI builder implementation
+- `client/src/pages/AIBuilderPage.scss` - Full-page styling
 
 ### Phase 2 New API Endpoints
 | Method | Endpoint | Description |
@@ -946,9 +1032,10 @@ Always be helpful and suggest improvements when appropriate.`
 
 ### Go Packages
 ```go
-// Anthropic Go SDK
-github.com/anthropics/anthropic-sdk-go
+// LangChain Go - LLM framework with multi-provider support
+github.com/tmc/langchaingo
 
+// Supports Anthropic, OpenAI, Ollama, and other providers
 // SSE support (already have gin)
 // Redis pub/sub (already have)
 ```

@@ -240,6 +240,39 @@
       max-height: 800px;
       overflow-y: auto;
 
+      // Thumbnail capture mode - hide design elements, show clean preview
+      &.thumbnail-capture {
+        .panel-grid {
+          background-image: none; // Hide grid lines
+
+          .panel-item {
+            background-color: var(--cds-layer-01);
+            border-color: #525252;
+
+            .panel-header {
+              display: none; // Hide header with drag handle
+            }
+
+            .resize-handle {
+              display: none; // Hide resize handle
+            }
+
+            .design-body {
+              .empty-panel-actions {
+                display: none; // Hide "New Chart" / "Select Existing" buttons
+              }
+
+              .chart-info {
+                // Show just the chart icon, not the edit menu
+                .chart-edit-menu {
+                  display: none;
+                }
+              }
+            }
+          }
+        }
+      }
+
       .panel-grid {
         display: grid;
         background-color: #262626;

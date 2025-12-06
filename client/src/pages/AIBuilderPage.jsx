@@ -1,0 +1,397 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  Button,
+  TextArea,
+  Loading,
+  InlineNotification,
+  Tag,
+  TextInput,
+  Modal,
+  Link
+} from '@carbon/react';
+import {
+  ArrowLeft,
+  Send,
+  WatsonxAi,
+  User,
+  Save,
+  Close,
+  Information
+} from '@carbon/icons-react';
+import AIChartPreview from '../components/AIChartPreview';
+import { useAISession } from '../hooks/useAISession';
+import apiClient from '../api/client';
+import './AIBuilderPage.scss';
+
+/**
+ * AIBuilderPage Component
+ *
+ * Full-page AI builder for creating and editing charts with AI assistance.
+ * Features:
+ * - Split layout: Chat panel (left) + Preview panel (right)
+ * - Real-time updates via SSE
+ * - Message history with user/assistant messages
+ * - Live chart preview
+ * - Save/discard actions
+ *
+ * Routes:
+ * - /design/charts/ai/new - Create new chart with AI
+ * - /design/charts/ai/:chartId - Edit existing chart with AI
+ */
+function AIBuilderPage() {
+  const { chartId } = useParams();
+  const navigate = useNavigate();
+  const isNewChart = chartId === 'new';
+
+  const [input, setInput] = useState('');
+  const [chartName, setChartName] = useState('');
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const {
+    session,
+    messages,
+    chart,
+    loading,
+    sending,
+    error,
+    thinking,
+    connected,
+    startSession,
+    sendMessage,
+    saveSession,
+    cancelSession,
+    clearError
+  } = useAISession(isNewChart ? null : chartId);
+
+  // Start session when page loads
+  useEffect(() => {
+    if (!session) {
+      startSession();
+    }
+  }, [session, startSession]);
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, thinking]);
+
+  // Update chart name from chart data
+  useEffect(() => {
+    if (chart?.name && !chartName) {
+      setChartName(chart.name);
+    }
+  }, [chart?.name, chartName]);
+
+  const handleSend = useCallback(() => {
+    if (input.trim() && !sending) {
+      sendMessage(input);
+      setInput('');
+    }
+  }, [input, sending, sendMessage]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleSave = async () => {
+    if (!chartName.trim()) return;
+
+    setSaving(true);
+    try {
+      await saveSession(chartName.trim());
+      navigate('/design/charts');
+    } catch (err) {
+      // Error is handled by the hook
+    } finally {
+      setSaving(false);
+      setShowSaveDialog(false);
+    }
+  };
+
+  const handleDiscard = async () => {
+    await cancelSession();
+    navigate('/design/charts');
+  };
+
+  const handleBack = () => {
+    if (messages.length > 0 || chart) {
+      setShowDiscardDialog(true);
+    } else {
+      navigate('/design/charts');
+    }
+  };
+
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderMessage = (message, index) => {
+    // Guard against undefined messages
+    if (!message) return null;
+
+    const isUser = message.role === 'user';
+    const isAssistant = message.role === 'assistant';
+    const isSystem = message.role === 'system';
+
+    return (
+      <div
+        key={message.id || index}
+        className={`message ${isUser ? 'user' : ''} ${isAssistant ? 'assistant' : ''} ${isSystem ? 'system' : ''}`}
+      >
+        <div className="message-avatar">
+          {isUser ? <User size={20} /> : <WatsonxAi size={20} />}
+        </div>
+        <div className="message-content">
+          <div className="message-header">
+            <span className="message-role">{isUser ? 'You' : 'AI Assistant'}</span>
+            <span className="message-time">{formatTimestamp(message.timestamp)}</span>
+          </div>
+          <div className="message-text">{message.content}</div>
+          {message.tool_calls && message.tool_calls.length > 0 && (
+            <div className="tool-calls">
+              {message.tool_calls.map((tool, i) => (
+                <Tag key={i} type="blue" size="sm">
+                  {tool.name}
+                </Tag>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="ai-builder-page">
+      {/* Page Header */}
+      <div className="page-header-bar">
+        <div className="header-left">
+          <Button
+            kind="ghost"
+            renderIcon={ArrowLeft}
+            onClick={handleBack}
+            size="md"
+          >
+            Back
+          </Button>
+          <h1>
+            <WatsonxAi size={24} />
+            {isNewChart ? 'Create Chart with AI' : 'Edit Chart with AI'}
+          </h1>
+          {connected && <Tag type="green" size="sm">Connected</Tag>}
+        </div>
+        <div className="header-actions">
+          <Button
+            kind="secondary"
+            renderIcon={Close}
+            onClick={handleBack}
+            size="md"
+          >
+            Cancel
+          </Button>
+          <Button
+            kind="primary"
+            renderIcon={Save}
+            onClick={() => setShowSaveDialog(true)}
+            disabled={loading || !chart}
+            size="md"
+          >
+            Save Chart
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="ai-builder-content">
+        {/* Chat Panel (Left) */}
+        <div className="chat-panel">
+          {/* Messages Area */}
+          <div className="messages-container">
+            {loading ? (
+              <div className="loading-container">
+                <Loading description="Starting AI session..." withOverlay={false} />
+              </div>
+            ) : (
+              <>
+                {/* Welcome message if no messages */}
+                {messages.length === 0 && (
+                  <div className="welcome-message">
+                    <WatsonxAi size={48} />
+                    <h3>Welcome to AI Chart Builder</h3>
+                    <p>
+                      Describe the chart you want to create, and I'll help you build it.
+                      You can specify chart type, data source, styling, and more.
+                    </p>
+                    <div className="suggestions">
+                      <p className="suggestions-label">Try one of these:</p>
+                      <div className="suggestion-buttons">
+                        <button
+                          className="suggestion-btn"
+                          onClick={() => setInput('Create a bar chart showing sales by region')}
+                        >
+                          Bar chart for sales by region
+                        </button>
+                        <button
+                          className="suggestion-btn"
+                          onClick={() => setInput('Make a line chart for temperature over time')}
+                        >
+                          Line chart for temperature
+                        </button>
+                        <button
+                          className="suggestion-btn"
+                          onClick={() => setInput('Show a pie chart of market share')}
+                        >
+                          Pie chart for market share
+                        </button>
+                        <button
+                          className="suggestion-btn"
+                          onClick={() => setInput('List available data sources')}
+                        >
+                          List data sources
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Message history */}
+                {messages.map(renderMessage)}
+
+                {/* Thinking indicator */}
+                {thinking && (
+                  <div className="message assistant thinking">
+                    <div className="message-avatar">
+                      <WatsonxAi size={20} />
+                    </div>
+                    <div className="message-content">
+                      <div className="thinking-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </>
+            )}
+          </div>
+
+          {/* Error notification */}
+          {error && (
+            <InlineNotification
+              kind="error"
+              title="Error"
+              subtitle={error}
+              onCloseButtonClick={clearError}
+              lowContrast
+            />
+          )}
+
+          {/* Input Area */}
+          <div className="input-area">
+            <TextArea
+              id="ai-input"
+              labelText=""
+              placeholder="Describe what you want to create or modify..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={loading || sending}
+              rows={3}
+            />
+            <Button
+              kind="primary"
+              size="lg"
+              renderIcon={Send}
+              onClick={handleSend}
+              disabled={!input.trim() || loading || sending}
+            >
+              Send
+            </Button>
+          </div>
+
+          {/* ECharts reference link */}
+          <div className="echarts-link">
+            <Information size={16} />
+            <span>Browse </span>
+            <Link
+              href="https://echarts.apache.org/examples/en/index.html"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ECharts Examples
+            </Link>
+            <span> for inspiration</span>
+          </div>
+        </div>
+
+        {/* Preview Panel (Right) */}
+        <div className="preview-panel">
+          <AIChartPreview
+            chart={chart}
+            onNameChange={(newName) => setChartName(newName)}
+          />
+        </div>
+      </div>
+
+      {/* Save Dialog */}
+      {showSaveDialog && (
+        <Modal
+          open={true}
+          onRequestClose={() => setShowSaveDialog(false)}
+          onRequestSubmit={handleSave}
+          modalHeading="Save Chart"
+          primaryButtonText={saving ? 'Saving...' : 'Save'}
+          secondaryButtonText="Cancel"
+          primaryButtonDisabled={!chartName.trim() || chartName.toLowerCase().startsWith('untitled') || saving}
+          size="sm"
+        >
+          <TextInput
+            id="chart-name"
+            labelText="Chart Name"
+            placeholder="Enter a name for your chart"
+            value={chartName}
+            onChange={(e) => setChartName(e.target.value)}
+            invalid={chartName.toLowerCase().startsWith('untitled')}
+            invalidText="Please provide a proper name for the chart"
+          />
+          <p className="save-dialog-note">
+            This will save your chart and make it available in the charts library.
+          </p>
+        </Modal>
+      )}
+
+      {/* Discard Dialog */}
+      {showDiscardDialog && (
+        <Modal
+          open={true}
+          onRequestClose={() => setShowDiscardDialog(false)}
+          onRequestSubmit={handleDiscard}
+          modalHeading="Discard Changes?"
+          primaryButtonText="Discard"
+          secondaryButtonText="Keep Editing"
+          danger
+          size="sm"
+        >
+          <p>
+            You have unsaved changes. Are you sure you want to discard them?
+            This action cannot be undone.
+          </p>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+export default AIBuilderPage;

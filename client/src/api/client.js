@@ -132,6 +132,35 @@ class APIClient {
     });
   }
 
+  // Chart versioning endpoints
+  async getChartVersionInfo(id) {
+    return this.request(`/api/charts/${id}/version-info`);
+  }
+
+  async getChartVersions(id) {
+    return this.request(`/api/charts/${id}/versions`);
+  }
+
+  async getChartVersion(id, version) {
+    return this.request(`/api/charts/${id}/versions/${version}`);
+  }
+
+  async deleteChartVersion(id, version) {
+    return this.request(`/api/charts/${id}/versions/${version}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getChartDraft(id) {
+    return this.request(`/api/charts/${id}/draft`);
+  }
+
+  async deleteChartDraft(id) {
+    return this.request(`/api/charts/${id}/draft`, {
+      method: 'DELETE',
+    });
+  }
+
   // Dashboard endpoints
   async getDashboards(filters = {}) {
     const params = new URLSearchParams(filters);
@@ -181,6 +210,47 @@ class APIClient {
 
   async getDatasourceSchema(id) {
     return this.request(`/api/datasources/${id}/schema`);
+  }
+
+  // AI Session endpoints
+  async createAISession(chartId = null) {
+    const payload = chartId ? { chart_id: chartId } : {};
+    return this.request('/api/ai/sessions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getAISession(sessionId) {
+    return this.request(`/api/ai/sessions/${sessionId}`);
+  }
+
+  async sendAIMessage(sessionId, content) {
+    return this.request(`/api/ai/sessions/${sessionId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async saveAISession(sessionId, chartName) {
+    return this.request(`/api/ai/sessions/${sessionId}/save`, {
+      method: 'POST',
+      body: JSON.stringify({ name: chartName }),
+    });
+  }
+
+  async cancelAISession(sessionId) {
+    return this.request(`/api/ai/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Returns WebSocket URL for AI session events
+  getAISessionWebSocketURL(sessionId) {
+    // Convert http(s) to ws(s)
+    const wsProtocol = this.baseURL.startsWith('https') ? 'wss' : 'ws';
+    const host = this.baseURL.replace(/^https?:\/\//, '');
+    return `${wsProtocol}://${host}/api/ai/sessions/${sessionId}/ws`;
   }
 }
 

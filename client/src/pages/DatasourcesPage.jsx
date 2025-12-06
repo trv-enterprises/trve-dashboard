@@ -130,7 +130,7 @@ function DatasourcesPage() {
       let bVal = b[sortKey] || '';
 
       // Handle date sorting
-      if (sortKey === 'updated') {
+      if (sortKey === 'updated_at') {
         aVal = new Date(aVal).getTime() || 0;
         bVal = new Date(bVal).getTime() || 0;
       } else {
@@ -150,7 +150,7 @@ function DatasourcesPage() {
     { key: 'name', header: 'Name', isSortable: true },
     { key: 'type', header: 'Type', isSortable: true },
     { key: 'description', header: 'Description', isSortable: false },
-    { key: 'updated', header: 'Last modified', isSortable: true },
+    { key: 'updated_at', header: 'Last modified', isSortable: true },
     { key: 'actions', header: '', isSortable: false }
   ];
 
@@ -159,7 +159,7 @@ function DatasourcesPage() {
     name: datasource.name,
     type: datasource.type,
     description: datasource.description || '',
-    updated: formatDate(datasource.updated)
+    updated_at: formatDate(datasource.updated_at)
   }));
 
   const getDatasourceById = (id) => datasources.find(d => d.id === id);

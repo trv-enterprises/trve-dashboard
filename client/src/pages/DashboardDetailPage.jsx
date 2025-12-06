@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import html2canvas from 'html2canvas';
 import {
   Button,
   Loading,
@@ -9,7 +10,9 @@ import {
   SelectItem,
   Checkbox,
   NumberInput,
-  IconButton
+  IconButton,
+  OverflowMenu,
+  OverflowMenuItem
 } from '@carbon/react';
 import {
   Save,
@@ -19,7 +22,8 @@ import {
   Edit,
   View,
   ChartBar,
-  Catalog
+  Catalog,
+  WatsonxAi
 } from '@carbon/icons-react';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import ChartEditorModal from '../components/ChartEditorModal';
@@ -59,6 +63,7 @@ function DashboardDetailPage() {
   // Dashboard state
   const [dashboard, setDashboard] = useState(null);
   const [name, setName] = useState('');
+  const [nameError, setNameError] = useState('');
   const [description, setDescription] = useState('');
   const [panels, setPanels] = useState([]); // Panel positions/sizes with chart_id references
   const [chartsMap, setChartsMap] = useState({}); // Chart data keyed by chart_id (for rendering)
@@ -93,6 +98,7 @@ function DashboardDetailPage() {
   const [resizingPanel, setResizingPanel] = useState(null);
   const [drawingPanel, setDrawingPanel] = useState(null);
   const gridRef = useRef(null);
+  const thumbnailCaptureRef = useRef(null);
 
   // Grid configuration
   const GRID_COLS = 12;
@@ -104,6 +110,29 @@ function DashboardDetailPage() {
       fetchDashboard();
     }
   }, [id]);
+
+  // Check for duplicate dashboard name on blur
+  const checkDuplicateDashboardName = async (nameToCheck) => {
+    if (!nameToCheck || !nameToCheck.trim()) {
+      setNameError('');
+      return;
+    }
+    try {
+      const dashboards = await apiClient.getDashboards();
+      const duplicate = dashboards.find(db =>
+        db.name.toLowerCase() === nameToCheck.trim().toLowerCase() &&
+        db.id !== id
+      );
+      if (duplicate) {
+        setNameError('A dashboard with this name already exists');
+      } else {
+        setNameError('');
+      }
+    } catch (err) {
+      console.error('Error checking dashboard name:', err);
+      setNameError('');
+    }
+  };
 
   const fetchDashboard = async () => {
     try {
@@ -198,6 +227,18 @@ function DashboardDetailPage() {
     setEditingPanelId(panelId);
     setEditingChart(chart);
     setChartEditorOpen(true);
+  };
+
+  // Open AI editor for creating/editing a chart with AI
+  const openAIEditor = (panelId) => {
+    const panel = panels.find(p => p.id === panelId);
+    const chartId = panel?.chart_id;
+    if (chartId) {
+      navigate(`/design/charts/ai/${chartId}`);
+    } else {
+      // Navigate to create new chart with AI
+      navigate('/design/charts/ai/new');
+    }
   };
 
   const closeChartEditor = () => {
@@ -354,15 +395,53 @@ function DashboardDetailPage() {
     setResizingPanel({ id: panel.id });
   };
 
+  // Capture thumbnail of the dashboard grid (in preview style, not design mode)
+  const captureThumbnail = async () => {
+    if (!thumbnailCaptureRef.current) return null;
+
+    try {
+      // Add thumbnail-capture class to hide design mode elements
+      thumbnailCaptureRef.current.classList.add('thumbnail-capture');
+
+      // Wait for CSS to apply
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      const canvas = await html2canvas(thumbnailCaptureRef.current, {
+        scale: 0.5,
+        backgroundColor: '#161616',
+        logging: false,
+        useCORS: true,
+        allowTaint: true
+      });
+
+      // Remove the class
+      thumbnailCaptureRef.current.classList.remove('thumbnail-capture');
+
+      const dataUrl = canvas.toDataURL('image/png', 0.8);
+      return dataUrl;
+    } catch (err) {
+      console.error('Failed to capture thumbnail:', err);
+      // Ensure we remove the class even if there's an error
+      if (thumbnailCaptureRef.current) {
+        thumbnailCaptureRef.current.classList.remove('thumbnail-capture');
+      }
+      return null;
+    }
+  };
+
   // Save dashboard
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Capture thumbnail from the grid
+      const thumbnail = await captureThumbnail();
+
       // Panels already contain chart_id references, no need to embed charts
       const payload = {
         name,
         description,
         panels, // Each panel has: id, x, y, w, h, chart_id (optional)
+        thumbnail, // Base64 encoded thumbnail image
         settings: {
           theme,
           refresh_interval: refreshInterval,
@@ -457,8 +536,12 @@ function DashboardDetailPage() {
             onChange={(e) => {
               setName(e.target.value);
               setHasChanges(true);
+              if (nameError) setNameError('');
             }}
+            onBlur={(e) => checkDuplicateDashboardName(e.target.value)}
             placeholder="Enter dashboard name"
+            invalid={!!nameError}
+            invalidText={nameError}
           />
         </div>
 
@@ -551,7 +634,7 @@ function DashboardDetailPage() {
         </div>
 
         {/* Visual grid layout */}
-        <div className="panel-grid-container">
+        <div className="panel-grid-container" ref={thumbnailCaptureRef}>
           <div
             ref={gridRef}
             className={`panel-grid mode-${editorMode}`}
@@ -621,10 +704,24 @@ function DashboardDetailPage() {
                     ) : isDesignMode ? (
                       <div className="design-body">
                         {hasChart ? (
-                          <div className="chart-info" onClick={() => openChartEditor(panel.id)}>
+                          <div className="chart-info">
                             <ChartBar size={24} />
                             <span className="chart-name">{chart.name}</span>
-                            <span className="edit-hint">Click to edit</span>
+                            <OverflowMenu
+                              size="sm"
+                              flipped
+                              iconDescription="Edit chart"
+                              className="chart-edit-menu"
+                            >
+                              <OverflowMenuItem
+                                itemText="Edit"
+                                onClick={() => openChartEditor(panel.id)}
+                              />
+                              <OverflowMenuItem
+                                itemText="Edit with AI"
+                                onClick={() => openAIEditor(panel.id)}
+                              />
+                            </OverflowMenu>
                           </div>
                         ) : (
                           <div className="empty-panel-actions">

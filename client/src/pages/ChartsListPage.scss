@@ -144,10 +144,18 @@
     }
   }
 
-  // Actions cell
+  // Actions cell (td) - keep normal table cell behavior
   .actions-cell {
-    width: 48px;
     text-align: right;
+    padding-right: 8px !important;
+  }
+
+  // Actions wrapper (div inside td) - flexbox for horizontal layout
+  .actions-wrapper {
+    display: inline-flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
 
     .cds--btn--icon-only {
       color: #f4f4f4 !important;
@@ -157,12 +165,27 @@
       }
 
       &:hover {
-        color: #fa4d56 !important;
-        background-color: rgba(218, 30, 40, 0.1);
+        background-color: rgba(255, 255, 255, 0.1);
+      }
+    }
 
-        svg {
-          fill: #fa4d56 !important;
-        }
+    // Delete button hover - red
+    .cds--btn--icon-only:last-child:hover {
+      color: #fa4d56 !important;
+      background-color: rgba(218, 30, 40, 0.1);
+
+      svg {
+        fill: #fa4d56 !important;
+      }
+    }
+
+    // AI edit button hover - blue
+    .cds--btn--icon-only:first-child:hover {
+      color: #78a9ff !important;
+      background-color: rgba(15, 98, 254, 0.1);
+
+      svg {
+        fill: #78a9ff !important;
       }
     }
   }

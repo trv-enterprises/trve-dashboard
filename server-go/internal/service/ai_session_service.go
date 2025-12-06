@@ -2,22 +2,25 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 	"github.com/tviviano/dashboard/internal/models"
 	"github.com/tviviano/dashboard/internal/repository"
 )
 
-// SSEClient represents a connected SSE client
-type SSEClient struct {
+// WSClient represents a connected WebSocket client
+type WSClient struct {
 	ID        string
 	SessionID string
-	Events    chan *models.AIEvent
+	Conn      *websocket.Conn
 	Done      chan struct{}
+	mu        sync.Mutex // protects Conn writes
 }
 
 // AISessionService handles AI session business logic
@@ -25,8 +28,8 @@ type AISessionService struct {
 	sessionRepo *repository.AISessionRepository
 	chartRepo   *repository.ChartRepository
 
-	// SSE client management
-	clients   map[string]map[string]*SSEClient // sessionID -> clientID -> client
+	// WebSocket client management
+	clients   map[string]map[string]*WSClient // sessionID -> clientID -> client
 	clientsMu sync.RWMutex
 }
 
@@ -35,7 +38,7 @@ func NewAISessionService(sessionRepo *repository.AISessionRepository, chartRepo 
 	return &AISessionService{
 		sessionRepo: sessionRepo,
 		chartRepo:   chartRepo,
-		clients:     make(map[string]map[string]*SSEClient),
+		clients:     make(map[string]map[string]*WSClient),
 	}
 }
 
@@ -266,7 +269,7 @@ func (s *AISessionService) UpdateChartDraft(ctx context.Context, sessionID strin
 }
 
 // SaveSession publishes the draft as a new final version
-func (s *AISessionService) SaveSession(ctx context.Context, sessionID string) (*models.Chart, error) {
+func (s *AISessionService) SaveSession(ctx context.Context, sessionID string, chartName string) (*models.Chart, error) {
 	session, err := s.sessionRepo.FindByID(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving session: %w", err)
@@ -284,9 +287,23 @@ func (s *AISessionService) SaveSession(ctx context.Context, sessionID string) (*
 		return nil, fmt.Errorf("draft not found")
 	}
 
+	// Update the chart name if provided
+	if chartName != "" {
+		draft.Name = chartName
+	}
+
 	// Validate that the chart has been given a proper name
 	if strings.HasPrefix(draft.Name, "Untitled") {
 		return nil, fmt.Errorf("please provide a name for your chart before saving")
+	}
+
+	// Validate name uniqueness across different chart IDs
+	existingChart, err := s.chartRepo.FindByName(ctx, draft.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error checking name uniqueness: %w", err)
+	}
+	if existingChart != nil && existingChart.ID != draft.ID {
+		return nil, fmt.Errorf("a chart with name '%s' already exists", draft.Name)
 	}
 
 	// Update draft to final
@@ -356,12 +373,12 @@ func (s *AISessionService) CancelSession(ctx context.Context, sessionID string) 
 	return nil
 }
 
-// RegisterClient registers an SSE client for a session
-func (s *AISessionService) RegisterClient(sessionID string) *SSEClient {
-	client := &SSEClient{
+// RegisterWSClient registers a WebSocket client for a session
+func (s *AISessionService) RegisterWSClient(sessionID string, conn *websocket.Conn) *WSClient {
+	client := &WSClient{
 		ID:        uuid.New().String(),
 		SessionID: sessionID,
-		Events:    make(chan *models.AIEvent, 100),
+		Conn:      conn,
 		Done:      make(chan struct{}),
 	}
 
@@ -369,15 +386,18 @@ func (s *AISessionService) RegisterClient(sessionID string) *SSEClient {
 	defer s.clientsMu.Unlock()
 
 	if s.clients[sessionID] == nil {
-		s.clients[sessionID] = make(map[string]*SSEClient)
+		s.clients[sessionID] = make(map[string]*WSClient)
 	}
 	s.clients[sessionID][client.ID] = client
+
+	fmt.Printf("[WS] Client %s registered for session %s (total: %d)\n",
+		client.ID, sessionID, len(s.clients[sessionID]))
 
 	return client
 }
 
-// UnregisterClient removes an SSE client
-func (s *AISessionService) UnregisterClient(client *SSEClient) {
+// UnregisterWSClient removes a WebSocket client
+func (s *AISessionService) UnregisterWSClient(client *WSClient) {
 	s.clientsMu.Lock()
 	defer s.clientsMu.Unlock()
 
@@ -386,27 +406,52 @@ func (s *AISessionService) UnregisterClient(client *SSEClient) {
 		if len(sessionClients) == 0 {
 			delete(s.clients, client.SessionID)
 		}
+		fmt.Printf("[WS] Client %s unregistered from session %s\n", client.ID, client.SessionID)
 	}
-	close(client.Done)
+	// Check if channel is already closed to prevent panic
+	select {
+	case <-client.Done:
+		// Already closed
+	default:
+		close(client.Done)
+	}
 }
 
-// BroadcastEvent sends an event to all clients of a session
+// BroadcastEvent sends an event to all WebSocket clients of a session
 func (s *AISessionService) BroadcastEvent(sessionID string, event *models.AIEvent) {
 	s.clientsMu.RLock()
-	defer s.clientsMu.RUnlock()
+	sessionClients := s.clients[sessionID]
+	s.clientsMu.RUnlock()
 
-	if sessionClients, ok := s.clients[sessionID]; ok {
-		for _, client := range sessionClients {
-			select {
-			case client.Events <- event:
-			default:
-				// Client buffer full, skip
-			}
+	if len(sessionClients) == 0 {
+		fmt.Printf("[WS Broadcast] No clients registered for session %s\n", sessionID)
+		return
+	}
+
+	// Serialize event once
+	jsonData, err := json.Marshal(event)
+	if err != nil {
+		fmt.Printf("[WS Broadcast] Error marshaling event: %v\n", err)
+		return
+	}
+
+	fmt.Printf("[WS Broadcast] Session %s has %d clients, broadcasting event type: %s\n",
+		sessionID, len(sessionClients), event.Type)
+
+	for _, client := range sessionClients {
+		client.mu.Lock()
+		err := client.Conn.WriteMessage(websocket.TextMessage, jsonData)
+		client.mu.Unlock()
+
+		if err != nil {
+			fmt.Printf("[WS Broadcast] Error sending to client %s: %v\n", client.ID, err)
+		} else {
+			fmt.Printf("[WS Broadcast] Sent event to client %s\n", client.ID)
 		}
 	}
 }
 
-// CloseSessionClients closes all SSE connections for a session
+// CloseSessionClients closes all WebSocket connections for a session
 func (s *AISessionService) CloseSessionClients(sessionID string) {
 	s.clientsMu.Lock()
 	clients := s.clients[sessionID]
@@ -414,7 +459,13 @@ func (s *AISessionService) CloseSessionClients(sessionID string) {
 	s.clientsMu.Unlock()
 
 	for _, client := range clients {
-		close(client.Done)
+		client.Conn.Close()
+		select {
+		case <-client.Done:
+			// Already closed
+		default:
+			close(client.Done)
+		}
 	}
 }
 

@@ -171,6 +171,9 @@ func (r *DashboardRepository) Update(ctx context.Context, id string, req *models
 	if req.Panels != nil {
 		setFields["panels"] = *req.Panels
 	}
+	if req.Thumbnail != nil {
+		setFields["thumbnail"] = *req.Thumbnail
+	}
 	if req.Settings != nil {
 		setFields["settings"] = *req.Settings
 	}

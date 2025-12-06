@@ -22,9 +22,11 @@ import DatasourcesPage from './pages/DatasourcesPage';
 import DatasourceDetailPage from './pages/DatasourceDetailPage';
 import ChartsListPage from './pages/ChartsListPage';
 import ChartDetailPage from './pages/ChartDetailPage';
+import AIBuilderPage from './pages/AIBuilderPage';
 import DashboardsListPage from './pages/DashboardsListPage';
 import DashboardDetailPage from './pages/DashboardDetailPage';
 import DashboardViewerPage from './pages/DashboardViewerPage';
+import DashboardTileViewPage from './pages/DashboardTileViewPage';
 import ModeToggle from './components/mode/ModeToggle';
 import DesignModeNav from './components/navigation/DesignModeNav';
 import ViewModeNav from './components/navigation/ViewModeNav';
@@ -141,16 +143,19 @@ function AppContent() {
         )}
       />
 
-      <SideNav
-        aria-label="Side navigation"
-        expanded={isSideNavExpanded}
-        isPersistent={true}
-        onOverlayClick={() => setIsSideNavExpanded(false)}
-      >
-        {renderNavigation()}
-      </SideNav>
+      {/* Hide sidebar in View mode - uses tile view instead */}
+      {currentMode !== MODES.VIEW && (
+        <SideNav
+          aria-label="Side navigation"
+          expanded={isSideNavExpanded}
+          isPersistent={true}
+          onOverlayClick={() => setIsSideNavExpanded(false)}
+        >
+          {renderNavigation()}
+        </SideNav>
+      )}
 
-      <Content className={`app-content ${isSideNavExpanded ? '' : 'app-content--nav-collapsed'}`}>
+      <Content className={`app-content ${currentMode !== MODES.VIEW && isSideNavExpanded ? '' : 'app-content--nav-collapsed'}`}>
         <Routes>
           {/* Default route redirects to View mode - first dashboard or fallback */}
           <Route path="/" element={
@@ -167,17 +172,13 @@ function AppContent() {
           <Route path="/design/datasources" element={<DatasourcesPage />} />
           <Route path="/design/datasources/:id" element={<DatasourceDetailPage />} />
           <Route path="/design/charts" element={<ChartsListPage />} />
+          <Route path="/design/charts/ai/:chartId" element={<AIBuilderPage />} />
           <Route path="/design/charts/:id" element={<ChartDetailPage />} />
           <Route path="/design/dashboards" element={<DashboardsListPage />} />
           <Route path="/design/dashboards/:id" element={<DashboardDetailPage />} />
 
           {/* View Mode Routes */}
-          <Route path="/view/dashboards" element={
-            <div className="view-welcome">
-              <h2>Select a Dashboard</h2>
-              <p>Choose a dashboard from the sidebar to view it.</p>
-            </div>
-          } />
+          <Route path="/view/dashboards" element={<DashboardTileViewPage />} />
           <Route path="/view/dashboards/:id" element={<DashboardViewerPage />} />
 
           {/* Manage Mode Routes */}

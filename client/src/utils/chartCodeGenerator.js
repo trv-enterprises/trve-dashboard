@@ -1,0 +1,471 @@
+/**
+ * Chart Code Generator
+ *
+ * Generates executable React component code from chart configuration.
+ * Supports ANY ECharts configuration - not limited to predefined chart types.
+ *
+ * Used by:
+ * - AIBuilderModal (preview panel)
+ * - ChartEditor (preview tab)
+ * - DashboardViewerPage (rendering charts)
+ */
+
+/**
+ * Generate chart component code from chart configuration
+ *
+ * @param {Object} chart - Chart configuration object
+ * @param {string} chart.chart_type - Chart type (bar, line, pie, custom, etc.)
+ * @param {string} chart.datasource_id - Data source ID for data fetching
+ * @param {Object} chart.query_config - Query configuration {raw, type, params}
+ * @param {Object} chart.data_mapping - Data mapping {x_axis, y_axis, filters, etc.}
+ * @param {Object} chart.options - ECharts options (can be ANY valid ECharts config)
+ * @param {string} chart.component_code - Custom component code (if use_custom_code)
+ * @param {boolean} chart.use_custom_code - Whether to use custom code
+ * @returns {string|null} - Generated component code or null
+ */
+export function generateChartCode(chart) {
+  if (!chart) return null;
+
+  // If using custom component code, return it directly
+  if (chart.use_custom_code && chart.component_code) {
+    return chart.component_code;
+  }
+
+  // If there's component_code (legacy), use it
+  if (chart.component_code) {
+    return chart.component_code;
+  }
+
+  // PRIORITY: If there's data mapping with a datasource, generate data-driven code
+  // This takes precedence over raw options since AI typically sets both
+  if (chart.datasource_id && chart.data_mapping) {
+    return generateDataDrivenCode(chart);
+  }
+
+  // If there are ECharts options (without datasource), generate wrapper code
+  if (chart.options && Object.keys(chart.options).length > 0) {
+    return generateFromOptions(chart);
+  }
+
+  // If just chart_type is set, generate static preview
+  if (chart.chart_type) {
+    return generateStaticCode(chart.chart_type);
+  }
+
+  return null;
+}
+
+/**
+ * Generate code from ECharts options object
+ * This supports ANY ECharts configuration the AI creates
+ */
+function generateFromOptions(chart) {
+  const { options, datasource_id, query_config, data_mapping } = chart;
+
+  // If no datasource, render static options
+  if (!datasource_id) {
+    return `const Component = () => {
+  const option = ${JSON.stringify(options, null, 2)};
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`;
+  }
+
+  // With datasource - fetch data and merge with options
+  const queryRaw = query_config?.raw || '';
+  const queryType = query_config?.type || 'sql';
+  const xAxis = data_mapping?.x_axis || '';
+  const yAxis = data_mapping?.y_axis || [];
+  const transforms = buildTransformsConfig(data_mapping);
+
+  return `const Component = () => {
+  const { data, loading, error } = useData({
+    datasourceId: '${datasource_id}',
+    query: {
+      raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
+      type: '${queryType}',
+      params: {}
+    },
+    refreshInterval: 30000
+  });
+
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--cds-text-secondary)' }}>Loading...</div>;
+  if (error) return <div style={{ color: 'var(--cds-text-error)', padding: '1rem' }}>Error: {error.message}</div>;
+  if (!data?.rows?.length) return <div style={{ color: 'var(--cds-text-secondary)', padding: '1rem' }}>No data available</div>;
+
+  ${transforms ? `// Apply client-side transforms
+  const transforms = ${JSON.stringify(transforms)};
+  const transformed = transformData(data, transforms);
+  const rows = transformed.rows;
+  const columns = transformed.columns;` : `const rows = data.rows;
+  const columns = data.columns;`}
+
+  // Extract data for chart
+  ${xAxis ? `const xIdx = columns.indexOf('${xAxis}');
+  const xData = rows.map(r => formatCellValue(r[xIdx], '${xAxis}'));` : ''}
+  ${yAxis.length > 0 ? `const yColumns = ${JSON.stringify(yAxis)};
+  const seriesData = yColumns.map(col => ({
+    name: col,
+    data: rows.map(r => r[columns.indexOf(col)])
+  }));` : ''}
+
+  // Base options from AI configuration
+  const baseOption = ${JSON.stringify(options, null, 2)};
+
+  // Merge with data if available
+  const option = {
+    ...baseOption,
+    ${xAxis ? `xAxis: { ...baseOption.xAxis, data: xData },` : ''}
+    ${yAxis.length > 0 ? `series: seriesData.map((s, i) => ({
+      ...(baseOption.series?.[i] || baseOption.series?.[0] || {}),
+      name: s.name,
+      data: s.data
+    }))` : ''}
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`;
+}
+
+/**
+ * Generate data-driven chart code from data mapping
+ */
+function generateDataDrivenCode(chart) {
+  const { chart_type, datasource_id, query_config, data_mapping } = chart;
+  const queryRaw = query_config?.raw || '';
+  const queryType = query_config?.type || 'sql';
+  const xAxis = data_mapping?.x_axis || '';
+  const yAxis = data_mapping?.y_axis || [];
+  const xAxisLabel = data_mapping?.x_axis_label || '';
+  const yAxisLabel = data_mapping?.y_axis_label || '';
+  const xAxisFormat = data_mapping?.x_axis_format || 'chart';
+
+  const transforms = buildTransformsConfig(data_mapping);
+  const hasTransforms = !!transforms;
+
+  const yAxisStr = yAxis.length > 0 ? yAxis.map(c => `'${c}'`).join(', ') : "'value'";
+
+  // Handle pie charts
+  if (chart_type === 'pie') {
+    return generatePieCode(datasource_id, queryRaw, queryType, xAxis, yAxis[0], transforms, xAxisFormat);
+  }
+
+  // Handle gauge charts
+  if (chart_type === 'gauge') {
+    return generateGaugeCode(datasource_id, queryRaw, queryType, yAxis[0], transforms);
+  }
+
+  // Handle scatter charts
+  if (chart_type === 'scatter') {
+    return generateScatterCode(datasource_id, queryRaw, queryType, xAxis, yAxis[0], transforms, xAxisLabel, yAxisLabel);
+  }
+
+  // Standard axis-based charts (bar, line, area)
+  const chartTypeForSeries = chart_type === 'area' ? 'line' : (chart_type || 'bar');
+  const areaStyle = chart_type === 'area' ? 'areaStyle: {},' : '';
+  const smooth = (chart_type === 'line' || chart_type === 'area') ? 'smooth: true,' : '';
+
+  const seriesCode = yAxis.length > 1
+    ? `const yColumns = [${yAxisStr}];
+    const series = yColumns.map((col) => ({
+      name: col,
+      data: rows.map(r => r[${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(col)]),
+      type: '${chartTypeForSeries}',
+      ${areaStyle}
+      ${smooth}
+    }));`
+    : `const series = [{
+      data: rows.map(r => r[${hasTransforms ? 'transformed' : 'data'}.columns.indexOf('${yAxis[0] || 'value'}')]),
+      type: '${chartTypeForSeries}',
+      ${areaStyle}
+      ${smooth}
+      itemStyle: { color: '#0f62fe' }
+    }];`;
+
+  return `const Component = () => {
+  const { data, loading, error } = useData({
+    datasourceId: '${datasource_id}',
+    query: {
+      raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
+      type: '${queryType}',
+      params: {}
+    },
+    refreshInterval: 30000
+  });
+
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--cds-text-secondary)' }}>Loading...</div>;
+  if (error) return <div style={{ color: 'var(--cds-text-error)', padding: '1rem' }}>Error: {error.message}</div>;
+  if (!data?.rows?.length) return <div style={{ color: 'var(--cds-text-secondary)', padding: '1rem' }}>No data available</div>;
+
+  ${hasTransforms ? `// Apply client-side transforms
+  const transforms = ${JSON.stringify(transforms)};
+  const transformed = transformData(data, transforms);
+  const rows = transformed.rows;` : `const rows = data.rows;`}
+
+  // Format x-axis values
+  const xAxisCol = '${xAxis}';
+  const xIdx = ${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(xAxisCol);
+  const categories = rows.map(r => formatCellValue(r[xIdx], xAxisCol, { timestampFormat: '${xAxisFormat}' }));
+
+  ${seriesCode}
+
+  const option = {
+    tooltip: { trigger: 'axis' },
+    ${yAxis.length > 1 ? `legend: { data: [${yAxisStr}], bottom: 0 },` : ''}
+    xAxis: { type: 'category', data: categories${chart_type === 'area' ? ', boundaryGap: false' : ''}${xAxisLabel ? `, name: '${xAxisLabel}'` : ''} },
+    yAxis: { type: 'value'${yAxisLabel ? `, name: '${yAxisLabel}'` : ''} },
+    series: series
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`;
+}
+
+/**
+ * Generate static chart code (no data source)
+ */
+function generateStaticCode(chartType) {
+  const templates = {
+    bar: `const Component = () => {
+  const option = {
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: ['Jan', 'Feb', 'Mar', 'Apr', 'May'] },
+    yAxis: { type: 'value' },
+    series: [{ data: [400, 300, 500, 280, 590], type: 'bar', itemStyle: { color: '#0f62fe' } }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`,
+    line: `const Component = () => {
+  const option = {
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: ['Jan', 'Feb', 'Mar', 'Apr', 'May'] },
+    yAxis: { type: 'value' },
+    series: [{ data: [400, 300, 500, 280, 590], type: 'line', smooth: true, itemStyle: { color: '#0f62fe' } }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`,
+    area: `const Component = () => {
+  const option = {
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: ['Jan', 'Feb', 'Mar', 'Apr', 'May'], boundaryGap: false },
+    yAxis: { type: 'value' },
+    series: [{ data: [400, 300, 500, 280, 590], type: 'line', areaStyle: {}, smooth: true, itemStyle: { color: '#0f62fe' } }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`,
+    pie: `const Component = () => {
+  const option = {
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    series: [{
+      type: 'pie',
+      radius: '70%',
+      data: [
+        { name: 'Category A', value: 400 },
+        { name: 'Category B', value: 300 },
+        { name: 'Category C', value: 200 },
+        { name: 'Category D', value: 100 }
+      ],
+      emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`,
+    scatter: `const Component = () => {
+  const option = {
+    tooltip: { trigger: 'item' },
+    xAxis: { type: 'value' },
+    yAxis: { type: 'value' },
+    series: [{ data: [[10, 20], [20, 30], [30, 25], [40, 45], [50, 35]], type: 'scatter', symbolSize: 15, itemStyle: { color: '#0f62fe' } }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`,
+    gauge: `const Component = () => {
+  const option = {
+    series: [{
+      type: 'gauge',
+      progress: { show: true, width: 18 },
+      axisLine: { lineStyle: { width: 18 } },
+      axisTick: { show: false },
+      splitLine: { length: 15, lineStyle: { width: 2, color: '#999' } },
+      axisLabel: { distance: 25, color: '#999', fontSize: 14 },
+      anchor: { show: true, showAbove: true, size: 25, itemStyle: { borderWidth: 10 } },
+      title: { show: false },
+      detail: { valueAnimation: true, fontSize: 40, offsetCenter: [0, '70%'] },
+      data: [{ value: 72, name: 'Score' }]
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`,
+    custom: `const Component = () => {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--cds-text-secondary)' }}>
+      <p>Custom chart - configure options or data source</p>
+    </div>
+  );
+};`
+  };
+
+  return templates[chartType] || templates.bar;
+}
+
+// Helper functions for specific chart types
+function generatePieCode(datasourceId, queryRaw, queryType, xAxis, yAxis, transforms, xAxisFormat) {
+  const hasTransforms = !!transforms;
+  return `const Component = () => {
+  const { data, loading, error } = useData({
+    datasourceId: '${datasourceId}',
+    query: {
+      raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
+      type: '${queryType}',
+      params: {}
+    },
+    refreshInterval: 30000
+  });
+
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--cds-text-secondary)' }}>Loading...</div>;
+  if (error) return <div style={{ color: 'var(--cds-text-error)', padding: '1rem' }}>Error: {error.message}</div>;
+  if (!data?.rows?.length) return <div style={{ color: 'var(--cds-text-secondary)', padding: '1rem' }}>No data available</div>;
+
+  ${hasTransforms ? `const transforms = ${JSON.stringify(transforms)};
+  const transformed = transformData(data, transforms);
+  const rows = transformed.rows;
+  const columns = transformed.columns;` : `const rows = data.rows;
+  const columns = data.columns;`}
+
+  const xIdx = columns.indexOf('${xAxis}');
+  const yIdx = columns.indexOf('${yAxis || 'value'}');
+  const pieData = rows.map(r => ({
+    name: formatCellValue(r[xIdx], '${xAxis}', { timestampFormat: '${xAxisFormat}' }),
+    value: Number(r[yIdx])
+  }));
+
+  const option = {
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    series: [{
+      type: 'pie',
+      radius: '70%',
+      data: pieData,
+      emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`;
+}
+
+function generateGaugeCode(datasourceId, queryRaw, queryType, yAxis, transforms) {
+  const hasTransforms = !!transforms;
+  return `const Component = () => {
+  const { data, loading, error } = useData({
+    datasourceId: '${datasourceId}',
+    query: {
+      raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
+      type: '${queryType}',
+      params: {}
+    },
+    refreshInterval: 30000
+  });
+
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--cds-text-secondary)' }}>Loading...</div>;
+  if (error) return <div style={{ color: 'var(--cds-text-error)', padding: '1rem' }}>Error: {error.message}</div>;
+  if (!data?.rows?.length) return <div style={{ color: 'var(--cds-text-secondary)', padding: '1rem' }}>No data available</div>;
+
+  ${hasTransforms ? `const transforms = ${JSON.stringify(transforms)};
+  const transformed = transformData(data, transforms);
+  const rows = transformed.rows;
+  const columns = transformed.columns;` : `const rows = data.rows;
+  const columns = data.columns;`}
+
+  const yIdx = columns.indexOf('${yAxis || 'value'}');
+  const value = rows.length > 0 ? Number(rows[0][yIdx]) : 0;
+
+  const option = {
+    series: [{
+      type: 'gauge',
+      progress: { show: true, width: 18 },
+      axisLine: { lineStyle: { width: 18 } },
+      axisTick: { show: false },
+      splitLine: { length: 15, lineStyle: { width: 2, color: '#999' } },
+      axisLabel: { distance: 25, color: '#999', fontSize: 14 },
+      anchor: { show: true, showAbove: true, size: 25, itemStyle: { borderWidth: 10 } },
+      title: { show: false },
+      detail: { valueAnimation: true, fontSize: 40, offsetCenter: [0, '70%'] },
+      data: [{ value: value, name: '${yAxis || 'Value'}' }]
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`;
+}
+
+function generateScatterCode(datasourceId, queryRaw, queryType, xAxis, yAxis, transforms, xAxisLabel, yAxisLabel) {
+  const hasTransforms = !!transforms;
+  return `const Component = () => {
+  const { data, loading, error } = useData({
+    datasourceId: '${datasourceId}',
+    query: {
+      raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
+      type: '${queryType}',
+      params: {}
+    },
+    refreshInterval: 30000
+  });
+
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--cds-text-secondary)' }}>Loading...</div>;
+  if (error) return <div style={{ color: 'var(--cds-text-error)', padding: '1rem' }}>Error: {error.message}</div>;
+  if (!data?.rows?.length) return <div style={{ color: 'var(--cds-text-secondary)', padding: '1rem' }}>No data available</div>;
+
+  ${hasTransforms ? `const transforms = ${JSON.stringify(transforms)};
+  const transformed = transformData(data, transforms);
+  const rows = transformed.rows;
+  const columns = transformed.columns;` : `const rows = data.rows;
+  const columns = data.columns;`}
+
+  const xIdx = columns.indexOf('${xAxis}');
+  const yIdx = columns.indexOf('${yAxis || 'value'}');
+  const scatterData = rows.map(r => [Number(r[xIdx]), Number(r[yIdx])]);
+
+  const option = {
+    tooltip: { trigger: 'item' },
+    xAxis: { type: 'value'${xAxisLabel ? `, name: '${xAxisLabel}'` : ''} },
+    yAxis: { type: 'value'${yAxisLabel ? `, name: '${yAxisLabel}'` : ''} },
+    series: [{ data: scatterData, type: 'scatter', symbolSize: 15, itemStyle: { color: '#0f62fe' } }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`;
+}
+
+/**
+ * Build transforms configuration from data_mapping
+ */
+function buildTransformsConfig(dataMapping) {
+  if (!dataMapping) return null;
+
+  const { filters, aggregation, sort_by, sort_order, limit } = dataMapping;
+  const hasTransforms = (filters?.length > 0) || aggregation?.type || sort_by || (limit > 0);
+
+  if (!hasTransforms) return null;
+
+  return {
+    filters: (filters || []).map(f => ({
+      field: f.field,
+      op: f.op,
+      value: (f.op === 'in' || f.op === 'notIn') && typeof f.value === 'string'
+        ? f.value.split(',').map(v => v.trim())
+        : f.value
+    })),
+    aggregation: aggregation?.type ? aggregation : null,
+    sortBy: sort_by || null,
+    sortOrder: sort_order || 'desc',
+    limit: limit || 0
+  };
+}
+
+export default generateChartCode;

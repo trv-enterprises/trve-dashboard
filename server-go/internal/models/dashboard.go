@@ -77,7 +77,8 @@ type Dashboard struct {
 	ID          string                 `json:"id" bson:"_id"`
 	Name        string                 `json:"name" bson:"name" binding:"required"`
 	Description string                 `json:"description" bson:"description"`
-	Panels      []DashboardPanel       `json:"panels" bson:"panels"` // Panels with chart_id references
+	Panels      []DashboardPanel       `json:"panels" bson:"panels"`           // Panels with chart_id references
+	Thumbnail   string                 `json:"thumbnail" bson:"thumbnail"`     // Base64 encoded thumbnail image
 	Settings    DashboardSettings      `json:"settings" bson:"settings"`
 	Metadata    map[string]interface{} `json:"metadata,omitempty" bson:"metadata,omitempty"`
 	Created     time.Time              `json:"created" bson:"created"`
@@ -111,6 +112,7 @@ type UpdateDashboardRequest struct {
 	Name        *string                 `json:"name,omitempty"`
 	Description *string                 `json:"description,omitempty"`
 	Panels      *[]DashboardPanel       `json:"panels,omitempty"` // Panels with optional chart_id
+	Thumbnail   *string                 `json:"thumbnail,omitempty"`
 	Settings    *DashboardSettings      `json:"settings,omitempty"`
 	Metadata    *map[string]interface{} `json:"metadata,omitempty"`
 }

@@ -13,8 +13,10 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/tviviano/dashboard/config"
+	"github.com/tviviano/dashboard/internal/ai"
 	"github.com/tviviano/dashboard/internal/database"
 	"github.com/tviviano/dashboard/internal/handlers"
+	"github.com/tviviano/dashboard/internal/hub"
 	"github.com/tviviano/dashboard/internal/mcp"
 	"github.com/tviviano/dashboard/internal/repository"
 	"github.com/tviviano/dashboard/internal/service"
@@ -104,13 +106,30 @@ func main() {
 	dashboardService := service.NewDashboardService(dashboardRepo)
 	aiSessionService := service.NewAISessionService(aiSessionRepo, chartRepo)
 
+	// Get the global ChartHub for real-time chart update broadcasts
+	chartHub := hub.GetChartHub()
+	fmt.Println("✓ ChartHub initialized for real-time chart updates")
+
+	// Initialize AI agent (optional - requires ANTHROPIC_API_KEY)
+	toolExecutor := ai.NewToolExecutor(chartRepo, datasourceRepo, datasourceService, chartHub)
+	var aiAgent *ai.Agent
+	agent, err := ai.NewAgent(toolExecutor, aiSessionService, nil) // nil uses default config
+	if err != nil {
+		log.Printf("⚠️  AI Agent disabled: %v", err)
+		log.Printf("   Set ANTHROPIC_API_KEY environment variable to enable AI features")
+	} else {
+		aiAgent = agent
+		fmt.Println("✓ AI Agent enabled (Anthropic SDK)")
+	}
+
 	// Initialize handlers
 	layoutHandler := handlers.NewLayoutHandler(layoutService)
 	datasourceHandler := handlers.NewDatasourceHandler(datasourceService)
 	componentHandler := handlers.NewComponentHandler(componentService)
 	chartHandler := handlers.NewChartHandler(chartService)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
-	aiSessionHandler := handlers.NewAISessionHandler(aiSessionService)
+	aiSessionHandler := handlers.NewAISessionHandler(aiSessionService, aiAgent, chartHub)
+	debugHandler := handlers.NewDebugHandler()
 
 	// Initialize MCP
 	mcpRegistry := mcp.NewToolRegistry(datasourceService, dashboardService, chartService)
@@ -191,9 +210,16 @@ func main() {
 			aiSessions.POST("", aiSessionHandler.CreateSession)
 			aiSessions.GET("/:id", aiSessionHandler.GetSession)
 			aiSessions.POST("/:id/messages", aiSessionHandler.SendMessage)
-			aiSessions.GET("/:id/events", aiSessionHandler.StreamEvents)
+			aiSessions.GET("/:id/ws", aiSessionHandler.HandleWebSocket)
 			aiSessions.POST("/:id/save", aiSessionHandler.SaveSession)
 			aiSessions.DELETE("/:id", aiSessionHandler.CancelSession)
+		}
+
+		// AI Debug routes
+		aiDebug := api.Group("/ai/debug")
+		{
+			aiDebug.GET("", debugHandler.HandleDebugWebSocket)
+			aiDebug.GET("/status", debugHandler.GetDebugStatus)
 		}
 	}
 
@@ -207,6 +233,7 @@ func main() {
 	}
 
 	fmt.Println("✓ MCP SSE endpoint enabled at http://localhost:3001/mcp/sse")
+	fmt.Println("✓ AI Debug WebSocket enabled at ws://localhost:3001/api/ai/debug")
 
 	// Create HTTP server
 	srv := &http.Server{

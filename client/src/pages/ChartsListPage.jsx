@@ -16,10 +16,13 @@ import {
   IconButton,
   Loading,
   Tag,
-  Link
+  Link,
+  OverflowMenu,
+  OverflowMenuItem
 } from '@carbon/react';
-import { Add, TrashCan, ChartLineSmooth } from '@carbon/icons-react';
+import { Add, TrashCan, ChartLineSmooth, WatsonxAi } from '@carbon/icons-react';
 import apiClient from '../api/client';
+import ChartDeleteDialog from '../components/ChartDeleteDialog';
 import './ChartsListPage.scss';
 
 /**
@@ -39,6 +42,8 @@ function ChartsListPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortKey, setSortKey] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [chartToDelete, setChartToDelete] = useState(null);
 
   // Fetch charts from API
   useEffect(() => {
@@ -68,20 +73,34 @@ function ChartsListPage() {
     navigate('/design/charts/new');
   };
 
+  const handleCreateWithAI = () => {
+    navigate('/design/charts/ai/new');
+  };
+
   const handleRowClick = (chart) => {
     navigate(`/design/charts/${chart.id}`);
   };
 
-  const handleDelete = async (e, chart) => {
+  const handleAIEdit = (e, chart) => {
     e.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete "${chart.name}"?`)) {
-      try {
-        await apiClient.deleteChart(chart.id);
-        fetchCharts();
-      } catch (err) {
-        alert(`Error: ${err.message}`);
-      }
-    }
+    navigate(`/design/charts/ai/${chart.id}`);
+  };
+
+  const handleDelete = (e, chart) => {
+    e.stopPropagation();
+    setChartToDelete(chart);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    setDeleteDialogOpen(false);
+    setChartToDelete(null);
+    fetchCharts();
+  };
+
+  const handleDeleteClose = () => {
+    setDeleteDialogOpen(false);
+    setChartToDelete(null);
   };
 
   const formatDate = (dateString) => {
@@ -152,6 +171,7 @@ function ChartsListPage() {
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
     { key: 'chart_type', header: 'Type', isSortable: true },
+    { key: 'status', header: 'Status', isSortable: true },
     { key: 'description', header: 'Description', isSortable: false },
     { key: 'updated', header: 'Last modified', isSortable: true },
     { key: 'actions', header: '', isSortable: false }
@@ -161,6 +181,7 @@ function ChartsListPage() {
     id: chart.id,
     name: chart.name,
     chart_type: chart.chart_type,
+    status: chart.status || 'draft',
     description: chart.description || '',
     updated: formatDate(chart.updated)
   }));
@@ -209,14 +230,22 @@ function ChartsListPage() {
                   placeholder="Search"
                   persistent
                 />
-                <Button
+                <OverflowMenu
                   renderIcon={Add}
-                  onClick={handleCreate}
                   size="md"
-                  kind="primary"
+                  flipped
+                  menuOptionsClass="create-menu-options"
+                  iconDescription="Create chart"
                 >
-                  Create
-                </Button>
+                  <OverflowMenuItem
+                    itemText="Create"
+                    onClick={handleCreate}
+                  />
+                  <OverflowMenuItem
+                    itemText="Create with AI"
+                    onClick={handleCreateWithAI}
+                  />
+                </OverflowMenu>
               </TableToolbarContent>
             </TableToolbar>
             <Table {...getTableProps()}>
@@ -271,17 +300,37 @@ function ChartsListPage() {
                               </TableCell>
                             );
                           }
+                          if (cell.info.header === 'status') {
+                            const statusColor = cell.value === 'final' ? 'green' : 'gray';
+                            return (
+                              <TableCell key={cell.id}>
+                                <Tag type={statusColor} size="md">
+                                  {cell.value?.toUpperCase() || 'DRAFT'}
+                                </Tag>
+                              </TableCell>
+                            );
+                          }
                           if (cell.info.header === 'actions') {
                             return (
                               <TableCell key={cell.id} className="actions-cell">
-                                <IconButton
-                                  kind="ghost"
-                                  label="Delete"
-                                  onClick={(e) => handleDelete(e, chart)}
-                                  size="sm"
-                                >
-                                  <TrashCan size={16} />
-                                </IconButton>
+                                <div className="actions-wrapper">
+                                  <IconButton
+                                    kind="ghost"
+                                    label="Edit with AI"
+                                    onClick={(e) => handleAIEdit(e, chart)}
+                                    size="sm"
+                                  >
+                                    <WatsonxAi size={16} />
+                                  </IconButton>
+                                  <IconButton
+                                    kind="ghost"
+                                    label="Delete"
+                                    onClick={(e) => handleDelete(e, chart)}
+                                    size="sm"
+                                  >
+                                    <TrashCan size={16} />
+                                  </IconButton>
+                                </div>
                               </TableCell>
                             );
                           }
@@ -296,6 +345,14 @@ function ChartsListPage() {
           </TableContainer>
         )}
       </DataTable>
+
+      {/* Delete Confirmation Dialog */}
+      <ChartDeleteDialog
+        open={deleteDialogOpen}
+        chart={chartToDelete}
+        onClose={handleDeleteClose}
+        onDelete={handleDeleteConfirm}
+      />
     </div>
   );
 }

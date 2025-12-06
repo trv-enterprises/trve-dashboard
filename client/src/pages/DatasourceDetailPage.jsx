@@ -33,6 +33,7 @@ function DatasourceDetailPage() {
 
   const [datasource, setDatasource] = useState(null);
   const [name, setName] = useState('');
+  const [nameError, setNameError] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState('sql');
   const [config, setConfig] = useState({});
@@ -76,6 +77,31 @@ function DatasourceDetailPage() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Check for duplicate datasource name on blur
+  const checkDuplicateDatasourceName = async (nameToCheck) => {
+    if (!nameToCheck || !nameToCheck.trim()) {
+      setNameError('');
+      return;
+    }
+    try {
+      const response = await fetch('http://localhost:3001/api/datasources');
+      if (!response.ok) throw new Error('Failed to fetch data sources');
+      const datasources = await response.json();
+      const duplicate = datasources.find(ds =>
+        ds.name.toLowerCase() === nameToCheck.trim().toLowerCase() &&
+        ds.id !== id
+      );
+      if (duplicate) {
+        setNameError('A data source with this name already exists');
+      } else {
+        setNameError('');
+      }
+    } catch (err) {
+      console.error('Error checking data source name:', err);
+      setNameError('');
     }
   };
 
@@ -703,8 +729,12 @@ function DatasourceDetailPage() {
             onChange={(e) => {
               setName(e.target.value);
               setHasChanges(true);
+              if (nameError) setNameError('');
             }}
+            onBlur={(e) => checkDuplicateDatasourceName(e.target.value)}
             placeholder="Enter data source name"
+            invalid={!!nameError}
+            invalidText={nameError}
           />
         </div>
 

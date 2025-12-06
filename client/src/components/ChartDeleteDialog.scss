@@ -1,0 +1,57 @@
+@use '@carbon/styles/scss/spacing' as spacing;
+@use '@carbon/styles/scss/type' as type;
+
+.chart-delete-dialog {
+  .delete-dialog-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: spacing.$spacing-05;
+    min-height: 80px;
+  }
+
+  .delete-dialog-content {
+    p {
+      @include type.type-style('body-01');
+      color: var(--cds-text-primary);
+      margin-bottom: spacing.$spacing-05;
+
+      strong {
+        font-weight: 600;
+      }
+    }
+
+    .cds--radio-button-group {
+      margin-top: spacing.$spacing-03;
+    }
+
+    .radio-label {
+      display: flex;
+      flex-direction: column;
+      gap: spacing.$spacing-01;
+
+      strong {
+        font-weight: 600;
+        color: var(--cds-text-primary);
+      }
+
+      .radio-description {
+        @include type.type-style('helper-text-01');
+        color: var(--cds-text-secondary);
+      }
+    }
+  }
+
+  .delete-dialog-error {
+    margin-top: spacing.$spacing-04;
+    padding: spacing.$spacing-03;
+    background-color: var(--cds-notification-error-background);
+    border-left: 3px solid var(--cds-support-error);
+
+    p {
+      @include type.type-style('body-compact-01');
+      color: var(--cds-text-error);
+      margin: 0;
+    }
+  }
+}

@@ -157,6 +157,36 @@ catch (err) {
 - Never hardcode colors - use Carbon tokens
 - Minimal inline styles (only for truly dynamic values like dimensions)
 
+**Carbon Token Hierarchy (prefer abstract tokens):**
+
+Use the most abstract (semantic) token available. This ensures theme compatibility if switching between light/dark modes:
+
+| Level | Example | When to Use |
+|-------|---------|-------------|
+| **Semantic tokens** (best) | `theme.$button-disabled`, `var(--cds-text-primary)` | Always prefer - adapts to theme |
+| **Role tokens** | `var(--cds-layer-01)`, `var(--cds-border-subtle-01)` | For layout/structural elements |
+| **Primitive colors** (avoid) | `$gray-70`, `#525252` | Only when no semantic token exists |
+
+**SCSS Pattern for Theme Tokens:**
+```scss
+@use 'sass:map';
+@use '@carbon/styles/scss/themes' as themes;
+@use '@carbon/styles/scss/theme' as theme with (
+  $theme: themes.$g100
+);
+
+// Good - extract from theme map (theme-aware, change themes.$g100 to switch themes)
+--cds-button-disabled: #{map.get(themes.$g100, 'button-disabled')};
+
+// Bad - hardcoded hex value
+--cds-button-disabled: #525252;
+```
+
+**CSS Variable Overrides:**
+- Set global overrides on `:root` in `App.scss` (not component-level) for portal compatibility
+- Use `map.get(themes.$g100, 'token-name')` to extract values from the theme map
+- To switch themes, change `themes.$g100` to `themes.$white`, `themes.$g10`, or `themes.$g90`
+
 ---
 
 ## Project Overview
@@ -323,6 +353,12 @@ dashboard/
 | GET | `/api/components/:id` | Get component |
 | PUT | `/api/components/:id` | Update component |
 | DELETE | `/api/components/:id` | Delete component |
+| **Charts** |||
+| GET | `/api/charts` | List charts |
+| POST | `/api/charts` | Create chart |
+| GET | `/api/charts/:id` | Get chart |
+| PUT | `/api/charts/:id` | Update chart |
+| DELETE | `/api/charts/:id` | Delete chart |
 | **Dashboards** |||
 | GET | `/api/dashboards` | List dashboards |
 | POST | `/api/dashboards` | Create dashboard |
@@ -432,28 +468,34 @@ const Component = () => {
 └───────────────────────────────┴────────────────────────────────┘
 ```
 
-## Current Status (2025-11-25)
+## Current Status (2025-12-04)
 
 ### ✅ Completed
-- Go backend with MongoDB (layouts, data sources, components, dashboards)
+- Go backend with MongoDB (layouts, data sources, components, dashboards, charts)
 - React frontend with three modes (Design, View, Manage placeholder)
 - Design Mode: All CRUD pages for layouts, data sources, charts, dashboards
 - View Mode: Dashboard viewer with real-time refresh, sidebar tiles
 - MCP Server for AI component generation
-- Carbon Design System theming throughout
+- Carbon Design System theming throughout (g100 dark theme)
 - Auto-redirect to first dashboard on app load
+- **Chart Editor**: Full chart builder with live preview, data mapping, filters, aggregation
+- **Socket Data Sources**: WebSocket connections with parser config (data_path extraction, JSON/regex parsing)
+- **Axis Labels**: Configurable X/Y axis labels for charts (e.g., "Temperature (°F)")
+- **Timestamp Formatting**: Utility functions for consistent date/time display in charts
 
 ### 🚧 In Progress
-- Chart building pipeline and rendering in chart design tool, dashboard designer, and viewer
+- AI chat integration for component generation
+- Streaming architecture: Backend WebSocket proxy with /api/datasources/:id/stream endpoint
 - Fix three-dot overflow menu in list views (not currently functional)
-- Config API for user/system settings
 
 ### 📋 Planned
 - **Data Source Testing in Editor**: Add connection test capability to data source editor UI (backend API already exists at `/api/datasources/test`)
 - Manage Mode implementation
-- AI chat integration for component generation
 - User authentication
 - EdgeLake integration
+- ModeContext for shared state (replace localStorage-based mode switching)
+- ErrorBoundary component for crash recovery
+- Entity-specific hooks (useDashboard, useCharts, etc.)
 - **Versioning for Dashboards and Charts**:
   - Add `version` field to dashboards and charts (composite key: id + version)
   - UI should expose version number and auto-increment on save
@@ -463,7 +505,8 @@ const Component = () => {
     - How to handle name changes between versions?
     - Should chart names be unique per ID (allowing different names across versions)?
     - Version history UI design
-
+- **Dashboard Design Preset Sizes**
+  - Decide how to implement a solution that restricts the overall layout to certain dimensions or aspect ratios to account for the full screen view fitage. Or figure out how to make the designed dashboard fit the monitor without scrolling.
 ---
 
 ## Key Files to Understand
@@ -484,5 +527,5 @@ const Component = () => {
 
 ---
 
-**Last Updated**: 2025-12-03
-**Build**: 124
+**Last Updated**: 2025-12-04
+**Build**: 137

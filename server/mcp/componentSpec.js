@@ -4,8 +4,8 @@
  */
 
 export const componentSpec = {
-  version: '1.0.0',
-  lastUpdated: '2025-11-13',
+  version: '2.0.0',
+  lastUpdated: '2025-12-04',
 
   /**
    * Available APIs in component scope
@@ -29,7 +29,7 @@ export const componentSpec = {
 
     useData: {
       description: 'Custom hook for fetching data from datasources with caching',
-      signature: 'useData({ datasourceId, query, refreshInterval, enabled })',
+      signature: 'useData({ datasourceId, query, refreshInterval, useCache })',
       parameters: {
         datasourceId: {
           type: 'string',
@@ -41,14 +41,9 @@ export const componentSpec = {
           required: true,
           description: 'Query parameters for the datasource',
           properties: {
-            table: { type: 'string', description: 'Table name' },
-            metric: { type: 'string', description: 'Metric to query' },
-            aggregation: { type: 'string', enum: ['avg', 'sum', 'min', 'max', 'count'] },
-            interval: { type: 'string', description: 'Time bucket (e.g., "1m", "5m", "1h")' },
-            startTime: { type: 'Date|string', description: 'Start time for query' },
-            endTime: { type: 'Date|string', description: 'End time for query' },
-            groupBy: { type: 'string', description: 'Field to group by' },
-            where: { type: 'string', description: 'SQL WHERE clause' }
+            raw: { type: 'string', description: 'Query string (SQL, API path, etc.)' },
+            type: { type: 'string', enum: ['sql', 'api', 'csv', 'socket'], description: 'Query type' },
+            params: { type: 'object', description: 'Optional query parameters' }
           }
         },
         refreshInterval: {
@@ -56,31 +51,73 @@ export const componentSpec = {
           required: false,
           description: 'Auto-refresh interval in milliseconds (e.g., 5000 for 5 seconds)'
         },
-        enabled: {
+        useCache: {
           type: 'boolean',
           required: false,
           default: true,
-          description: 'Whether to execute the query'
+          description: 'Whether to use cached data'
         }
       },
       returns: {
-        data: 'Array of query results',
+        data: 'Columnar data: { columns: [...], rows: [[...], [...]], metadata: {...} }',
         loading: 'Boolean indicating loading state',
         error: 'Error object if query failed, null otherwise',
-        refetch: 'Function to manually trigger a refetch'
+        refetch: 'Function to manually trigger a refetch',
+        source: 'Data source: "api", "cache", "partial-cache"',
+        cached: 'Boolean if data came from cache'
       },
       example: `const { data, loading, error } = useData({
-  datasourceId: 'prod-cluster-uuid',
+  datasourceId: 'datasource-uuid',
   query: {
-    table: 'sensor_data',
-    metric: 'temperature',
-    aggregation: 'avg',
-    interval: '5m',
-    startTime: new Date(Date.now() - 3600000),
-    endTime: new Date()
+    raw: '/readings',
+    type: 'api',
+    params: {}
   },
   refreshInterval: 5000
 });`
+    },
+
+    transformUtilities: {
+      description: 'Client-side data transformation utilities',
+      apis: {
+        toObjects: {
+          description: 'Convert columnar data to array of objects',
+          signature: 'toObjects(data)',
+          example: 'const objects = toObjects(data); // [{col1: val1, col2: val2}, ...]'
+        },
+        getValue: {
+          description: 'Get single value from first row',
+          signature: 'getValue(data, fieldName)',
+          example: 'const temp = getValue(data, "temperature"); // Returns the value'
+        },
+        transformData: {
+          description: 'Apply client-side filters and aggregations',
+          signature: 'transformData(data, { filters, aggregation, sortBy, sortOrder, limit })',
+          parameters: {
+            filters: 'Array of { field, op, value } - Operators: eq, neq, gt, gte, lt, lte, contains, startsWith, endsWith, in, notIn, isNull, isNotNull',
+            aggregation: '{ type, sortBy, field } - Types: first, last, min, max, avg, sum, count, limit',
+            sortBy: 'Column name to sort by',
+            sortOrder: '"asc" or "desc"',
+            limit: 'Max rows to return'
+          },
+          example: `const filtered = transformData(data, {
+  filters: [{ field: 'sensor_id', op: 'eq', value: 'sensor-001' }],
+  aggregation: { type: 'last', sortBy: 'timestamp', field: 'value' },
+  limit: 100
+});`
+        },
+        formatTimestamp: {
+          description: 'Format timestamp values (auto-detects Unix seconds/ms, ISO)',
+          signature: "formatTimestamp(value, format, options)",
+          formats: ['short', 'long', 'time', 'time_short', 'date', 'date_short', 'relative', 'iso', 'chart', 'chart_time', 'chart_date', 'chart_datetime', 'chart_auto'],
+          example: 'formatTimestamp(1704067200, "short") // "1/1/24, 12:00 PM"'
+        },
+        formatCellValue: {
+          description: 'Auto-format cell values (detects timestamps, formats numbers)',
+          signature: 'formatCellValue(value, columnName, options)',
+          example: 'formatCellValue(value, "created_at") // Formatted string'
+        }
+      }
     },
 
     echarts: {

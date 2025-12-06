@@ -26,6 +26,10 @@ func NewChartRepository(db *mongo.Database) *ChartRepository {
 
 // CreateIndexes creates necessary indexes for the charts collection
 func (r *ChartRepository) CreateIndexes(ctx context.Context) error {
+	// First, drop old unique index on name if it exists
+	// This is needed because versioning now allows same name across versions
+	r.collection.Indexes().DropOne(ctx, "name_1")
+
 	indexes := []mongo.IndexModel{
 		// Composite primary key: (id, version) - unique
 		{
@@ -40,7 +44,7 @@ func (r *ChartRepository) CreateIndexes(ctx context.Context) error {
 		{
 			Keys: bson.D{{Key: "id", Value: 1}, {Key: "status", Value: 1}},
 		},
-		// Name uniqueness per id (not globally unique anymore)
+		// Name index for search (NOT unique - same name allowed across versions)
 		{
 			Keys: bson.D{{Key: "name", Value: 1}},
 		},

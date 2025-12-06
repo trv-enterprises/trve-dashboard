@@ -19,6 +19,7 @@ import { Play, Add, TrashCan, ChartBar, Code, TableSplit } from '@carbon/icons-r
 import DynamicComponentLoader from './DynamicComponentLoader';
 import SQLQueryBuilder from './SQLQueryBuilder';
 import { transformData, formatCellValue } from '../utils/dataTransforms';
+import apiClient from '../api/client';
 import './ChartEditor.scss';
 
 // Chart types available
@@ -89,6 +90,7 @@ const ChartEditor = forwardRef(function ChartEditor({
 }, ref) {
   // Basic info
   const [name, setName] = useState('');
+  const [nameError, setNameError] = useState('');
   const [description, setDescription] = useState('');
   const [chartType, setChartType] = useState('bar');
 
@@ -133,6 +135,29 @@ const ChartEditor = forwardRef(function ChartEditor({
   const [activeTab, setActiveTab] = useState(0);
   const [hasChanges, setHasChanges] = useState(false);
   const [initialState, setInitialState] = useState(null);
+
+  // Check for duplicate chart name on blur
+  const checkDuplicateChartName = async (nameToCheck) => {
+    if (!nameToCheck || !nameToCheck.trim()) {
+      setNameError('');
+      return;
+    }
+    try {
+      const charts = await apiClient.getCharts();
+      const duplicate = charts.find(c =>
+        c.name.toLowerCase() === nameToCheck.trim().toLowerCase() &&
+        c.id !== chart?.id
+      );
+      if (duplicate) {
+        setNameError(`A chart with this name already exists`);
+      } else {
+        setNameError('');
+      }
+    } catch (err) {
+      console.error('Error checking chart name:', err);
+      setNameError('');
+    }
+  };
 
   // Fetch datasources on mount
   useEffect(() => {
@@ -503,9 +528,15 @@ const ChartEditor = forwardRef(function ChartEditor({
             id="chart-name"
             labelText="Chart Name"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (nameError) setNameError('');
+            }}
+            onBlur={(e) => checkDuplicateChartName(e.target.value)}
             placeholder="Enter chart name"
             size="md"
+            invalid={!!nameError}
+            invalidText={nameError}
           />
           <Select
             id="chart-type"
@@ -626,6 +657,7 @@ const ChartEditor = forwardRef(function ChartEditor({
                         title="Stream Preview"
                         subtitle="Click 'Capture Sample' to collect 5 seconds of stream data for preview. This helps discover the data schema for mapping. Use client-side filters below to filter the captured data."
                         hideCloseButton
+                        lowContrast
                       />
                     </div>
                   ) : selectedDatasource.type === 'sql' && queryMode === 'visual' ? (
@@ -1111,7 +1143,10 @@ const ChartEditor = forwardRef(function ChartEditor({
                     <span className="preview-chart-name">{name || 'Untitled Chart'}</span>
                   </div>
                   <div className="preview-chart-body">
-                    <DynamicComponentLoader code={generatedCode} props={{}} />
+                    <DynamicComponentLoader
+                      code={generatedCode}
+                      props={showCustomCode && filteredPreviewData ? { data: filteredPreviewData } : {}}
+                    />
                   </div>
                 </>
               ) : (
