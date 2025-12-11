@@ -71,9 +71,7 @@ func (m *MongoDB) Collection(name string) *mongo.Collection {
 // Collections returns collection helpers
 func (m *MongoDB) Collections() Collections {
 	return Collections{
-		Layouts:      m.Collection("layouts"),
 		Datasources:  m.Collection("datasources"),
-		Components:   m.Collection("components"),
 		Dashboards:   m.Collection("dashboards"),
 		ChatSessions: m.Collection("chat_sessions"),
 	}
@@ -81,9 +79,7 @@ func (m *MongoDB) Collections() Collections {
 
 // Collections holds references to all collections
 type Collections struct {
-	Layouts      *mongo.Collection
 	Datasources  *mongo.Collection
-	Components   *mongo.Collection
 	Dashboards   *mongo.Collection
 	ChatSessions *mongo.Collection
 }
@@ -92,19 +88,9 @@ type Collections struct {
 func (m *MongoDB) CreateIndexes(ctx context.Context) error {
 	collections := m.Collections()
 
-	// Layouts indexes
-	if err := createIndexes(ctx, collections.Layouts, layoutIndexes()); err != nil {
-		return fmt.Errorf("layouts indexes: %w", err)
-	}
-
 	// Datasources indexes
 	if err := createIndexes(ctx, collections.Datasources, datasourceIndexes()); err != nil {
 		return fmt.Errorf("datasources indexes: %w", err)
-	}
-
-	// Components indexes
-	if err := createIndexes(ctx, collections.Components, componentIndexes()); err != nil {
-		return fmt.Errorf("components indexes: %w", err)
 	}
 
 	// Dashboards indexes
@@ -131,18 +117,6 @@ func createIndexes(ctx context.Context, collection *mongo.Collection, models []m
 }
 
 // Index model helpers
-func layoutIndexes() []mongo.IndexModel {
-	return []mongo.IndexModel{
-		{
-			Keys:    map[string]interface{}{"name": 1},
-			Options: options.Index().SetUnique(true),
-		},
-		{
-			Keys: map[string]interface{}{"created_at": -1},
-		},
-	}
-}
-
 func datasourceIndexes() []mongo.IndexModel {
 	return []mongo.IndexModel{
 		{
@@ -158,36 +132,11 @@ func datasourceIndexes() []mongo.IndexModel {
 	}
 }
 
-func componentIndexes() []mongo.IndexModel {
-	return []mongo.IndexModel{
-		{
-			Keys: []bson.E{
-				{Key: "system", Value: 1},
-				{Key: "source", Value: 1},
-				{Key: "name", Value: 1},
-			},
-			Options: options.Index().SetUnique(true),
-		},
-		{
-			Keys: map[string]interface{}{"ai_generated": 1},
-		},
-		{
-			Keys: map[string]interface{}{"validation.status": 1},
-		},
-		{
-			Keys: map[string]interface{}{"created_at": -1},
-		},
-	}
-}
-
 func dashboardIndexes() []mongo.IndexModel {
 	return []mongo.IndexModel{
 		{
 			Keys:    map[string]interface{}{"name": 1},
 			Options: options.Index().SetUnique(true),
-		},
-		{
-			Keys: map[string]interface{}{"layout_id": 1},
 		},
 		{
 			Keys: map[string]interface{}{"panels.chart_id": 1},

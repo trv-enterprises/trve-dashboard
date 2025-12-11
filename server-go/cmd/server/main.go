@@ -89,9 +89,7 @@ func main() {
 	router.GET("/health", healthCheck(mongodb, redisClient))
 
 	// Initialize repositories
-	layoutRepo := repository.NewLayoutRepository(mongodb.Database)
 	datasourceRepo := repository.NewDatasourceRepository(mongodb.Database)
-	componentRepo := repository.NewComponentRepository(mongodb.Database)
 	chartRepo := repository.NewChartRepository(mongodb.Database)
 	dashboardRepo := repository.NewDashboardRepository(mongodb.Database)
 	aiSessionRepo := repository.NewAISessionRepository(redisClient.Client)
@@ -108,9 +106,7 @@ func main() {
 	}
 
 	// Initialize services
-	layoutService := service.NewLayoutService(layoutRepo)
 	datasourceService := service.NewDatasourceService(datasourceRepo)
-	componentService := service.NewComponentService(componentRepo)
 	chartService := service.NewChartService(chartRepo)
 	dashboardService := service.NewDashboardService(dashboardRepo, mongodb.Database)
 	aiSessionService := service.NewAISessionService(aiSessionRepo, chartRepo)
@@ -137,9 +133,7 @@ func main() {
 	}
 
 	// Initialize handlers
-	layoutHandler := handlers.NewLayoutHandler(layoutService)
 	datasourceHandler := handlers.NewDatasourceHandler(datasourceService)
-	componentHandler := handlers.NewComponentHandler(componentService)
 	chartHandler := handlers.NewChartHandler(chartService)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
 	aiSessionHandler := handlers.NewAISessionHandler(aiSessionService, aiAgent, chartHub)
@@ -157,16 +151,6 @@ func main() {
 		// Health check
 		api.GET("/health", healthCheck(mongodb, redisClient))
 
-		// Layout routes
-		layouts := api.Group("/layouts")
-		{
-			layouts.POST("", layoutHandler.CreateLayout)
-			layouts.GET("", layoutHandler.ListLayouts)
-			layouts.GET("/:id", layoutHandler.GetLayout)
-			layouts.PUT("/:id", layoutHandler.UpdateLayout)
-			layouts.DELETE("/:id", layoutHandler.DeleteLayout)
-		}
-
 		// Datasource routes
 		datasources := api.Group("/datasources")
 		{
@@ -182,17 +166,6 @@ func main() {
 			datasources.GET("/:id/schema", datasourceHandler.GetDatasourceSchema)
 			datasources.GET("/:id/stream", streamHandler.StreamDatasource)       // SSE streaming
 			datasources.GET("/:id/stream/status", streamHandler.GetStreamStatus) // Stream status
-		}
-
-		// Component routes (legacy - being replaced by charts)
-		components := api.Group("/components")
-		{
-			components.GET("/systems", componentHandler.GetSystems)
-			components.POST("", componentHandler.CreateComponent)
-			components.GET("", componentHandler.ListComponents)
-			components.GET("/:id", componentHandler.GetComponent)
-			components.PUT("/:id", componentHandler.UpdateComponent)
-			components.DELETE("/:id", componentHandler.DeleteComponent)
 		}
 
 		// Chart routes
@@ -246,8 +219,6 @@ func main() {
 		{
 			configRoutes.GET("/system", configHandler.GetSystemConfig)
 			configRoutes.PUT("/system", configHandler.UpdateSystemConfig)
-			configRoutes.PUT("/system/dimension", configHandler.SetCurrentDimension)
-			configRoutes.GET("/dimensions", configHandler.GetLayoutDimensions)
 			configRoutes.GET("/user/:user_id", configHandler.GetUserConfig)
 			configRoutes.PUT("/user/:user_id", configHandler.UpdateUserConfig)
 		}

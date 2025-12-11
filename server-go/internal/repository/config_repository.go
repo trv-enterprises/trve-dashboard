@@ -47,16 +47,21 @@ func (r *ConfigRepository) GetSystemConfig(ctx context.Context) (*models.AppConf
 	return &config, nil
 }
 
-// UpsertSystemConfig updates or creates the system configuration
+// UpsertSystemConfig updates or creates the system configuration (merges settings)
 func (r *ConfigRepository) UpsertSystemConfig(ctx context.Context, settings map[string]interface{}) (*models.AppConfig, error) {
 	now := time.Now()
 
+	// Build $set for each key in settings to merge instead of replace
+	setFields := bson.M{
+		"updated": now,
+	}
+	for key, value := range settings {
+		setFields["settings."+key] = value
+	}
+
 	filter := bson.M{"scope": models.ConfigScopeSystem}
 	update := bson.M{
-		"$set": bson.M{
-			"settings": settings,
-			"updated":  now,
-		},
+		"$set": setFields,
 		"$setOnInsert": bson.M{
 			"_id":     "system",
 			"scope":   models.ConfigScopeSystem,
@@ -126,19 +131,24 @@ func (r *ConfigRepository) GetUserConfig(ctx context.Context, userID string) (*m
 	return &config, nil
 }
 
-// UpsertUserConfig updates or creates user configuration
+// UpsertUserConfig updates or creates user configuration (merges settings)
 func (r *ConfigRepository) UpsertUserConfig(ctx context.Context, userID string, settings map[string]interface{}) (*models.AppConfig, error) {
 	now := time.Now()
+
+	// Build $set for each key in settings to merge instead of replace
+	setFields := bson.M{
+		"updated": now,
+	}
+	for key, value := range settings {
+		setFields["settings."+key] = value
+	}
 
 	filter := bson.M{
 		"scope":   models.ConfigScopeUser,
 		"user_id": userID,
 	}
 	update := bson.M{
-		"$set": bson.M{
-			"settings": settings,
-			"updated":  now,
-		},
+		"$set": setFields,
 		"$setOnInsert": bson.M{
 			"_id":     "user_" + userID,
 			"scope":   models.ConfigScopeUser,

@@ -32,7 +32,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CreateAISessionRequest"
+                            "$ref": "#/definitions/models.CreateAISessionRequest"
                         }
                     }
                 ],
@@ -40,7 +40,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.AISessionResponse"
+                            "$ref": "#/definitions/models.AISessionResponse"
                         }
                     },
                     "400": {
@@ -83,7 +83,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.AISessionResponse"
+                            "$ref": "#/definitions/models.AISessionResponse"
                         }
                     },
                     "404": {
@@ -138,45 +138,9 @@
                 }
             }
         },
-        "/ai/sessions/{id}/events": {
-            "get": {
-                "description": "Subscribe to real-time updates for an AI session via Server-Sent Events",
-                "produces": [
-                    "text/event-stream"
-                ],
-                "tags": [
-                    "ai"
-                ],
-                "summary": "Subscribe to AI session events",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Session ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "SSE stream",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
         "/ai/sessions/{id}/messages": {
             "post": {
-                "description": "Send a user message to an AI session",
+                "description": "Send a user message to an AI session. The AI agent will process the message asynchronously.",
                 "consumes": [
                     "application/json"
                 ],
@@ -201,15 +165,16 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SendMessageRequest"
+                            "$ref": "#/definitions/models.SendMessageRequest"
                         }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Message accepted for processing",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.AIMessage"
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "400": {
@@ -239,6 +204,9 @@
         "/ai/sessions/{id}/save": {
             "post": {
                 "description": "Save the AI session by publishing the draft as a new final version",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -253,13 +221,29 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Chart name",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SaveSessionRequest"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     },
                     "404": {
@@ -271,6 +255,80 @@
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/ai/sessions/{id}/ws": {
+            "get": {
+                "description": "Subscribe to real-time updates for an AI session via WebSocket",
+                "tags": [
+                    "ai"
+                ],
+                "summary": "Subscribe to AI session events via WebSocket",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "101": {
+                        "description": "Switching Protocols",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ai/debug": {
+            "get": {
+                "description": "Stream real-time debug events from the AI agent including LLM requests, responses, and tool calls",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "debug"
+                ],
+                "summary": "Connect to AI debug WebSocket",
+                "responses": {
+                    "101": {
+                        "description": "Switching Protocols",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/ai/debug/status": {
+            "get": {
+                "description": "Get the current status of the AI debug system",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "debug"
+                ],
+                "summary": "Get debug status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -333,7 +391,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartListResponse"
+                            "$ref": "#/definitions/models.ChartListResponse"
                         }
                     },
                     "400": {
@@ -371,7 +429,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CreateChartRequest"
+                            "$ref": "#/definitions/models.CreateChartRequest"
                         }
                     }
                 ],
@@ -379,7 +437,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     },
                     "400": {
@@ -424,7 +482,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartSummary"
+                                "$ref": "#/definitions/models.ChartSummary"
                             }
                         }
                     },
@@ -461,7 +519,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     },
                     "404": {
@@ -506,7 +564,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateChartRequest"
+                            "$ref": "#/definitions/models.UpdateChartRequest"
                         }
                     }
                 ],
@@ -514,7 +572,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     },
                     "400": {
@@ -599,7 +657,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     },
                     "404": {
@@ -677,7 +735,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartVersionInfo"
+                            "$ref": "#/definitions/models.ChartVersionInfo"
                         }
                     },
                     "404": {
@@ -771,7 +829,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     },
                     "404": {
@@ -833,197 +891,36 @@
                 }
             }
         },
-        "/components": {
+        "/config/system": {
             "get": {
-                "description": "Get a paginated list of components with optional filtering",
+                "description": "Retrieves system-wide configuration including layout dimensions",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "components"
+                    "config"
                 ],
-                "summary": "List components",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Filter by system",
-                        "name": "system",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by source",
-                        "name": "source",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by category",
-                        "name": "category",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by tag",
-                        "name": "tag",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Page number",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Page size",
-                        "name": "page_size",
-                        "in": "query"
-                    }
-                ],
+                "summary": "Get system configuration",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ComponentListResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/models.SystemConfigResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Create a new dashboard component or chart",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "components"
-                ],
-                "summary": "Create a new component",
-                "parameters": [
-                    {
-                        "description": "Component data",
-                        "name": "component",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CreateComponentRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Component"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/components/systems": {
-            "get": {
-                "description": "Get all component systems and sources with counts",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "components"
-                ],
-                "summary": "Get component systems",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ComponentSystemsResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/components/{id}": {
-            "get": {
-                "description": "Get a component by ID",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "components"
-                ],
-                "summary": "Get a component",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Component ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Component"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
             },
             "put": {
-                "description": "Update an existing component",
+                "description": "Updates system-wide configuration settings",
                 "consumes": [
                     "application/json"
                 ],
@@ -1031,24 +928,17 @@
                     "application/json"
                 ],
                 "tags": [
-                    "components"
+                    "config"
                 ],
-                "summary": "Update a component",
+                "summary": "Update system configuration",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Component ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Component update data",
-                        "name": "component",
+                        "description": "Configuration settings to update",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateComponentRequest"
+                            "$ref": "#/definitions/models.UpdateConfigRequest"
                         }
                     }
                 ],
@@ -1056,63 +946,120 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Component"
+                            "$ref": "#/definitions/models.SystemConfigResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
-            },
-            "delete": {
-                "description": "Delete a component by ID",
-                "tags": [
-                    "components"
+            }
+        },
+        "/config/user/{user_id}": {
+            "get": {
+                "description": "Retrieves configuration for a specific user",
+                "produces": [
+                    "application/json"
                 ],
-                "summary": "Delete a component",
+                "tags": [
+                    "config"
+                ],
+                "summary": "Get user configuration",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Component ID",
-                        "name": "id",
+                        "description": "User ID",
+                        "name": "user_id",
                         "in": "path",
                         "required": true
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "404": {
-                        "description": "Not Found",
+                    "200": {
+                        "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/models.UserConfigResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Updates configuration for a specific user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "config"
+                ],
+                "summary": "Update user configuration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Configuration settings to update",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UpdateConfigRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.UserConfigResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }
@@ -1120,7 +1067,7 @@
         },
         "/dashboards": {
             "get": {
-                "description": "Get a paginated list of dashboards with optional filtering",
+                "description": "Get a paginated list of dashboards with optional filtering. Use include_datasources=true to get data source names for each dashboard.",
                 "produces": [
                     "application/json"
                 ],
@@ -1142,6 +1089,12 @@
                         "in": "query"
                     },
                     {
+                        "type": "boolean",
+                        "description": "Include data source names from charts",
+                        "name": "include_datasources",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "default": 1,
                         "description": "Page number",
@@ -1158,9 +1111,9 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Response when include_datasources=true",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardListResponse"
+                            "$ref": "#/definitions/models.DashboardSummaryListResponse"
                         }
                     },
                     "400": {
@@ -1198,7 +1151,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CreateDashboardRequest"
+                            "$ref": "#/definitions/models.CreateDashboardRequest"
                         }
                     }
                 ],
@@ -1206,7 +1159,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard"
+                            "$ref": "#/definitions/models.Dashboard"
                         }
                     },
                     "400": {
@@ -1249,7 +1202,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard"
+                            "$ref": "#/definitions/models.Dashboard"
                         }
                     },
                     "404": {
@@ -1294,7 +1247,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateDashboardRequest"
+                            "$ref": "#/definitions/models.UpdateDashboardRequest"
                         }
                     }
                 ],
@@ -1302,7 +1255,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard"
+                            "$ref": "#/definitions/models.Dashboard"
                         }
                     },
                     "400": {
@@ -1425,7 +1378,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CreateDatasourceRequest"
+                            "$ref": "#/definitions/models.CreateDatasourceRequest"
                         }
                     }
                 ],
@@ -1433,7 +1386,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Datasource"
+                            "$ref": "#/definitions/models.Datasource"
                         }
                     },
                     "400": {
@@ -1445,6 +1398,27 @@
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/datasources/streams": {
+            "get": {
+                "description": "Get a list of all active streaming connections",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "datasources"
+                ],
+                "summary": "List active streams",
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -1473,7 +1447,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.TestDatasourceRequest"
+                            "$ref": "#/definitions/models.TestDatasourceRequest"
                         }
                     }
                 ],
@@ -1481,7 +1455,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.TestDatasourceResponse"
+                            "$ref": "#/definitions/models.TestDatasourceResponse"
                         }
                     },
                     "400": {
@@ -1517,7 +1491,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Datasource"
+                            "$ref": "#/definitions/models.Datasource"
                         }
                     },
                     "400": {
@@ -1562,7 +1536,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateDatasourceRequest"
+                            "$ref": "#/definitions/models.UpdateDatasourceRequest"
                         }
                     }
                 ],
@@ -1570,7 +1544,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Datasource"
+                            "$ref": "#/definitions/models.Datasource"
                         }
                     },
                     "400": {
@@ -1655,7 +1629,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.HealthInfo"
+                            "$ref": "#/definitions/models.HealthInfo"
                         }
                     },
                     "400": {
@@ -1702,7 +1676,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.QueryRequest"
+                            "$ref": "#/definitions/models.QueryRequest"
                         }
                     }
                 ],
@@ -1710,7 +1684,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.QueryResponse"
+                            "$ref": "#/definitions/models.QueryResponse"
                         }
                     },
                     "400": {
@@ -1753,7 +1727,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SchemaResponse"
+                            "$ref": "#/definitions/models.SchemaResponse"
                         }
                     },
                     "400": {
@@ -1761,6 +1735,92 @@
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/datasources/{id}/stream": {
+            "get": {
+                "description": "Opens an SSE connection to stream real-time data from a socket datasource",
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "datasources"
+                ],
+                "summary": "Stream data from a socket datasource",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Datasource ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE stream",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/datasources/{id}/stream/status": {
+            "get": {
+                "description": "Get status information for an active stream",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "datasources"
+                ],
+                "summary": "Get stream status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Datasource ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/streaming.StreamStatus"
                         }
                     },
                     "404": {
@@ -1801,227 +1861,6 @@
                 }
             }
         },
-        "/layouts": {
-            "get": {
-                "description": "Retrieve all layouts with pagination",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "layouts"
-                ],
-                "summary": "List all layouts",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "default": 20,
-                        "description": "Number of items per page",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "Number of items to skip",
-                        "name": "offset",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "Create a new dashboard layout with grid configuration and panels",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "layouts"
-                ],
-                "summary": "Create a new layout",
-                "parameters": [
-                    {
-                        "description": "Layout to create",
-                        "name": "layout",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CreateLayoutRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Layout"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
-        "/layouts/{id}": {
-            "get": {
-                "description": "Retrieve a single layout by its ID",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "layouts"
-                ],
-                "summary": "Get a layout by ID",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Layout ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Layout"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
-            "put": {
-                "description": "Update an existing layout by ID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "layouts"
-                ],
-                "summary": "Update a layout",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Layout ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Layout updates",
-                        "name": "layout",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateLayoutRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Layout"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Delete a layout by ID",
-                "tags": [
-                    "layouts"
-                ],
-                "summary": "Delete a layout",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Layout ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
         "/mcp/message": {
             "post": {
                 "description": "Process a JSON-RPC message for MCP protocol",
@@ -2042,7 +1881,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_mcp.JSONRPCRequest"
+                            "$ref": "#/definitions/mcp.JSONRPCRequest"
                         }
                     }
                 ],
@@ -2050,19 +1889,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_mcp.JSONRPCResponse"
+                            "$ref": "#/definitions/mcp.JSONRPCResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_mcp.JSONRPCResponse"
+                            "$ref": "#/definitions/mcp.JSONRPCResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_mcp.JSONRPCResponse"
+                            "$ref": "#/definitions/mcp.JSONRPCResponse"
                         }
                     }
                 }
@@ -2090,7 +1929,56 @@
         }
     },
     "definitions": {
-        "github_com_tviviano_dashboard_internal_models.AIMessage": {
+        "handlers.SaveSessionRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "mcp.JSONRPCError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {},
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "mcp.JSONRPCRequest": {
+            "type": "object",
+            "properties": {
+                "id": {},
+                "jsonrpc": {
+                    "type": "string"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "params": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "mcp.JSONRPCResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/mcp.JSONRPCError"
+                },
+                "id": {},
+                "jsonrpc": {
+                    "type": "string"
+                },
+                "result": {}
+            }
+        },
+        "models.AIMessage": {
             "description": "A message in the AI conversation",
             "type": "object",
             "properties": {
@@ -2110,12 +1998,12 @@
                 "tool_calls": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ToolCall"
+                        "$ref": "#/definitions/models.ToolCall"
                     }
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.AISession": {
+        "models.AISession": {
             "description": "AI session for chart creation/editing",
             "type": "object",
             "properties": {
@@ -2138,7 +2026,7 @@
                     "description": "Conversation history",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.AIMessage"
+                        "$ref": "#/definitions/models.AIMessage"
                     }
                 },
                 "status": {
@@ -2150,7 +2038,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.AISessionResponse": {
+        "models.AISessionResponse": {
             "description": "Response containing AI session state",
             "type": "object",
             "properties": {
@@ -2158,16 +2046,16 @@
                     "description": "Current chart state (draft)",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     ]
                 },
                 "session": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.AISession"
+                    "$ref": "#/definitions/models.AISession"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.APIConfig": {
+        "models.APIConfig": {
             "type": "object",
             "required": [
                 "method",
@@ -2210,7 +2098,7 @@
                     }
                 },
                 "response_config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.APIResponseConfig"
+                    "$ref": "#/definitions/models.APIResponseConfig"
                 },
                 "retry_count": {
                     "type": "integer"
@@ -2228,7 +2116,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.APIResponseConfig": {
+        "models.APIResponseConfig": {
             "type": "object",
             "properties": {
                 "data_path": {
@@ -2237,7 +2125,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.CSVConfig": {
+        "models.CSVConfig": {
             "type": "object",
             "required": [
                 "path"
@@ -2270,7 +2158,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.Chart": {
+        "models.Chart": {
             "description": "Chart with data source binding, query config, and visualization settings",
             "type": "object",
             "required": [
@@ -2296,7 +2184,7 @@
                     "description": "How to map data to chart",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartDataMapping"
+                            "$ref": "#/definitions/models.ChartDataMapping"
                         }
                     ]
                 },
@@ -2323,7 +2211,7 @@
                     "description": "How to query data",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartQueryConfig"
+                            "$ref": "#/definitions/models.ChartQueryConfig"
                         }
                     ]
                 },
@@ -2355,7 +2243,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ChartDataMapping": {
+        "models.ChartDataMapping": {
             "description": "Mapping configuration from data columns to chart axes/series",
             "type": "object",
             "properties": {
@@ -2363,7 +2251,7 @@
                     "description": "Aggregation to apply (first, last, avg, etc.)",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DataAggregation"
+                            "$ref": "#/definitions/models.DataAggregation"
                         }
                     ]
                 },
@@ -2371,7 +2259,7 @@
                     "description": "Client-side filters applied after data fetch",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DataFilter"
+                        "$ref": "#/definitions/models.DataFilter"
                     }
                 },
                 "group_by": {
@@ -2419,14 +2307,14 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ChartListResponse": {
+        "models.ChartListResponse": {
             "description": "Response containing a list of charts with pagination",
             "type": "object",
             "properties": {
                 "charts": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                        "$ref": "#/definitions/models.Chart"
                     }
                 },
                 "page": {
@@ -2440,7 +2328,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ChartQueryConfig": {
+        "models.ChartQueryConfig": {
             "description": "Query configuration for fetching chart data",
             "type": "object",
             "properties": {
@@ -2459,7 +2347,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ChartSummary": {
+        "models.ChartSummary": {
             "description": "Minimal chart info for selection cards and lists",
             "type": "object",
             "properties": {
@@ -2495,7 +2383,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ChartVersionInfo": {
+        "models.ChartVersionInfo": {
             "description": "Version info for a chart",
             "type": "object",
             "properties": {
@@ -2518,7 +2406,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ColumnInfo": {
+        "models.ColumnInfo": {
             "type": "object",
             "properties": {
                 "default": {
@@ -2543,140 +2431,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.Component": {
-            "description": "Component model for dashboard charts and widgets",
-            "type": "object",
-            "required": [
-                "component_code",
-                "name",
-                "source",
-                "system"
-            ],
-            "properties": {
-                "component_code": {
-                    "type": "string"
-                },
-                "created": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ComponentMetadata"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "source": {
-                    "type": "string"
-                },
-                "system": {
-                    "type": "string"
-                },
-                "updated": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.ComponentListResponse": {
-            "description": "Response containing a list of components with pagination",
-            "type": "object",
-            "properties": {
-                "components": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Component"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.ComponentMetadata": {
-            "description": "Metadata for component categorization and configuration",
-            "type": "object",
-            "properties": {
-                "category": {
-                    "type": "string"
-                },
-                "custom": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "datasourceType": {
-                    "type": "string"
-                },
-                "refreshInterval": {
-                    "type": "integer"
-                },
-                "requiredApis": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "visualization": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.VisualizationConfig"
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.ComponentSource": {
-            "description": "Source category containing component count",
-            "type": "object",
-            "properties": {
-                "component_count": {
-                    "type": "integer"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.ComponentSystem": {
-            "description": "System category containing multiple sources",
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "sources": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ComponentSource"
-                    }
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.ComponentSystemsResponse": {
-            "description": "Response containing component organization hierarchy",
-            "type": "object",
-            "properties": {
-                "systems": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ComponentSystem"
-                    }
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.CreateAISessionRequest": {
+        "models.CreateAISessionRequest": {
             "description": "Request body for creating a new AI session",
             "type": "object",
             "properties": {
@@ -2690,7 +2445,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.CreateChartRequest": {
+        "models.CreateChartRequest": {
             "description": "Request body for creating a new chart",
             "type": "object",
             "required": [
@@ -2704,7 +2459,7 @@
                     "type": "string"
                 },
                 "data_mapping": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartDataMapping"
+                    "$ref": "#/definitions/models.ChartDataMapping"
                 },
                 "datasource_id": {
                     "type": "string"
@@ -2720,7 +2475,7 @@
                     "additionalProperties": true
                 },
                 "query_config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartQueryConfig"
+                    "$ref": "#/definitions/models.ChartQueryConfig"
                 },
                 "tags": {
                     "type": "array",
@@ -2736,37 +2491,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.CreateComponentRequest": {
-            "description": "Request body for creating a new component",
-            "type": "object",
-            "required": [
-                "component_code",
-                "name",
-                "source",
-                "system"
-            ],
-            "properties": {
-                "component_code": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ComponentMetadata"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "source": {
-                    "type": "string"
-                },
-                "system": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.CreateDashboardRequest": {
+        "models.CreateDashboardRequest": {
             "description": "Request body for creating a new dashboard",
             "type": "object",
             "required": [
@@ -2787,15 +2512,15 @@
                     "description": "Panels with optional chart_id",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardPanel"
+                        "$ref": "#/definitions/models.DashboardPanel"
                     }
                 },
                 "settings": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSettings"
+                    "$ref": "#/definitions/models.DashboardSettings"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.CreateDatasourceRequest": {
+        "models.CreateDatasourceRequest": {
             "type": "object",
             "required": [
                 "config",
@@ -2804,7 +2529,7 @@
             ],
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig"
+                    "$ref": "#/definitions/models.DatasourceConfig"
                 },
                 "description": {
                     "type": "string"
@@ -2827,36 +2552,13 @@
                     ],
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceType"
+                            "$ref": "#/definitions/models.DatasourceType"
                         }
                     ]
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.CreateLayoutRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "grid": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.GridConfig"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "panels": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Panel"
-                    }
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.Dashboard": {
+        "models.Dashboard": {
             "description": "Dashboard with panels that reference standalone charts",
             "type": "object",
             "required": [
@@ -2883,25 +2585,29 @@
                     "description": "Panels with chart_id references",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardPanel"
+                        "$ref": "#/definitions/models.DashboardPanel"
                     }
                 },
                 "settings": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSettings"
+                    "$ref": "#/definitions/models.DashboardSettings"
+                },
+                "thumbnail": {
+                    "description": "Base64 encoded thumbnail image",
+                    "type": "string"
                 },
                 "updated": {
                     "type": "string"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DashboardListResponse": {
+        "models.DashboardListResponse": {
             "description": "Response containing a list of dashboards with pagination",
             "type": "object",
             "properties": {
                 "dashboards": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard"
+                        "$ref": "#/definitions/models.Dashboard"
                     }
                 },
                 "page": {
@@ -2915,7 +2621,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DashboardPanel": {
+        "models.DashboardPanel": {
             "description": "Panel position and size in the grid with optional chart reference",
             "type": "object",
             "properties": {
@@ -2940,7 +2646,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DashboardSettings": {
+        "models.DashboardSettings": {
             "description": "Dashboard settings and preferences",
             "type": "object",
             "properties": {
@@ -2953,6 +2659,9 @@
                 "is_public": {
                     "type": "boolean"
                 },
+                "layout_dimension": {
+                    "type": "string"
+                },
                 "refresh_interval": {
                     "type": "integer"
                 },
@@ -2964,7 +2673,65 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DataAggregation": {
+        "models.DashboardSummary": {
+            "description": "Dashboard info with optional data source names for display in tiles",
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "string"
+                },
+                "datasource_names": {
+                    "description": "Unique data source names used by charts",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "panel_count": {
+                    "type": "integer"
+                },
+                "settings": {
+                    "$ref": "#/definitions/models.DashboardSettings"
+                },
+                "thumbnail": {
+                    "type": "string"
+                },
+                "updated": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.DashboardSummaryListResponse": {
+            "description": "Response containing dashboard summaries with optional data source info",
+            "type": "object",
+            "properties": {
+                "dashboards": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.DashboardSummary"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.DataAggregation": {
             "description": "Aggregation configuration for data transformation",
             "type": "object",
             "properties": {
@@ -2986,7 +2753,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DataFilter": {
+        "models.DataFilter": {
             "description": "Filter condition for data transformation",
             "type": "object",
             "properties": {
@@ -3003,7 +2770,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.Datasource": {
+        "models.Datasource": {
             "type": "object",
             "required": [
                 "config",
@@ -3012,7 +2779,7 @@
             ],
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig"
+                    "$ref": "#/definitions/models.DatasourceConfig"
                 },
                 "created_at": {
                     "type": "string"
@@ -3021,7 +2788,7 @@
                     "type": "string"
                 },
                 "health": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.HealthInfo"
+                    "$ref": "#/definitions/models.HealthInfo"
                 },
                 "id": {
                     "type": "string"
@@ -3044,7 +2811,7 @@
                     ],
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceType"
+                            "$ref": "#/definitions/models.DatasourceType"
                         }
                     ]
                 },
@@ -3053,24 +2820,24 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DatasourceConfig": {
+        "models.DatasourceConfig": {
             "type": "object",
             "properties": {
                 "api": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.APIConfig"
+                    "$ref": "#/definitions/models.APIConfig"
                 },
                 "csv": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CSVConfig"
+                    "$ref": "#/definitions/models.CSVConfig"
                 },
                 "socket": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SocketConfig"
+                    "$ref": "#/definitions/models.SocketConfig"
                 },
                 "sql": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SQLConfig"
+                    "$ref": "#/definitions/models.SQLConfig"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DatasourceType": {
+        "models.DatasourceType": {
             "type": "string",
             "enum": [
                 "sql",
@@ -3085,32 +2852,7 @@
                 "DatasourceTypeAPI"
             ]
         },
-        "github_com_tviviano_dashboard_internal_models.GridConfig": {
-            "type": "object",
-            "properties": {
-                "columns": {
-                    "description": "Number of columns (e.g., 12)",
-                    "type": "integer"
-                },
-                "compact_type": {
-                    "description": "\"vertical\", \"horizontal\", or null",
-                    "type": "string"
-                },
-                "grid_unit": {
-                    "description": "Base spacing unit (32px = $spacing-08)",
-                    "type": "integer"
-                },
-                "max_rows": {
-                    "description": "Maximum number of rows",
-                    "type": "integer"
-                },
-                "row_height": {
-                    "description": "Height of each row in pixels",
-                    "type": "integer"
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.HealthInfo": {
+        "models.HealthInfo": {
             "type": "object",
             "properties": {
                 "error_message": {
@@ -3127,11 +2869,11 @@
                     "type": "integer"
                 },
                 "status": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.HealthStatus"
+                    "$ref": "#/definitions/models.HealthStatus"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.HealthStatus": {
+        "models.HealthStatus": {
             "type": "string",
             "enum": [
                 "unknown",
@@ -3146,123 +2888,21 @@
                 "HealthStatusDegraded"
             ]
         },
-        "github_com_tviviano_dashboard_internal_models.Layout": {
+        "models.LayoutDimensionDTO": {
             "type": "object",
-            "required": [
-                "name"
-            ],
             "properties": {
-                "created_at": {
-                    "type": "string"
+                "max_height": {
+                    "type": "integer"
                 },
-                "description": {
-                    "type": "string"
-                },
-                "grid": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.GridConfig"
-                },
-                "id": {
-                    "type": "string"
+                "max_width": {
+                    "type": "integer"
                 },
                 "name": {
                     "type": "string"
-                },
-                "panels": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Panel"
-                    }
-                },
-                "updated_at": {
-                    "type": "string"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.Panel": {
-            "type": "object",
-            "required": [
-                "h",
-                "id",
-                "w",
-                "x",
-                "y"
-            ],
-            "properties": {
-                "content": {
-                    "description": "Panel content reference",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.PanelContent"
-                        }
-                    ]
-                },
-                "h": {
-                    "description": "Height in rows",
-                    "type": "integer",
-                    "minimum": 1
-                },
-                "id": {
-                    "description": "Unique panel identifier",
-                    "type": "string"
-                },
-                "max_h": {
-                    "description": "Maximum height",
-                    "type": "integer"
-                },
-                "max_w": {
-                    "description": "Maximum width",
-                    "type": "integer"
-                },
-                "min_h": {
-                    "description": "Minimum height",
-                    "type": "integer"
-                },
-                "min_w": {
-                    "description": "Minimum width",
-                    "type": "integer"
-                },
-                "static": {
-                    "description": "Cannot be moved/resized",
-                    "type": "boolean"
-                },
-                "w": {
-                    "description": "Width in columns",
-                    "type": "integer",
-                    "minimum": 1
-                },
-                "x": {
-                    "description": "Column position (0-indexed)",
-                    "type": "integer"
-                },
-                "y": {
-                    "description": "Row position (0-indexed)",
-                    "type": "integer"
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.PanelContent": {
-            "type": "object",
-            "properties": {
-                "chart_id": {
-                    "description": "Reference to chart component",
-                    "type": "string"
-                },
-                "component_id": {
-                    "description": "Reference to custom component",
-                    "type": "string"
-                },
-                "config": {
-                    "description": "Panel-specific configuration",
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "type": {
-                    "description": "\"chart\", \"text\", \"image\", \"custom\"",
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.Query": {
+        "models.Query": {
             "type": "object",
             "properties": {
                 "params": {
@@ -3278,24 +2918,24 @@
                     "description": "Query type",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.QueryType"
+                            "$ref": "#/definitions/models.QueryType"
                         }
                     ]
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.QueryRequest": {
+        "models.QueryRequest": {
             "type": "object",
             "required": [
                 "query"
             ],
             "properties": {
                 "query": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Query"
+                    "$ref": "#/definitions/models.Query"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.QueryResponse": {
+        "models.QueryResponse": {
             "type": "object",
             "properties": {
                 "duration": {
@@ -3306,14 +2946,14 @@
                     "type": "string"
                 },
                 "result_set": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ResultSet"
+                    "$ref": "#/definitions/models.ResultSet"
                 },
                 "success": {
                     "type": "boolean"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.QueryType": {
+        "models.QueryType": {
             "type": "string",
             "enum": [
                 "sql",
@@ -3328,7 +2968,7 @@
                 "QueryTypeAPI"
             ]
         },
-        "github_com_tviviano_dashboard_internal_models.ResultSet": {
+        "models.ResultSet": {
             "type": "object",
             "properties": {
                 "columns": {
@@ -3353,7 +2993,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SQLConfig": {
+        "models.SQLConfig": {
             "type": "object",
             "required": [
                 "connection_string",
@@ -3406,7 +3046,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SchemaInfo": {
+        "models.SchemaInfo": {
             "type": "object",
             "properties": {
                 "database": {
@@ -3417,12 +3057,12 @@
                     "description": "Tables in the database",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.TableInfo"
+                        "$ref": "#/definitions/models.TableInfo"
                     }
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SchemaResponse": {
+        "models.SchemaResponse": {
             "type": "object",
             "properties": {
                 "duration": {
@@ -3433,14 +3073,14 @@
                     "type": "string"
                 },
                 "schema": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SchemaInfo"
+                    "$ref": "#/definitions/models.SchemaInfo"
                 },
                 "success": {
                     "type": "boolean"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SendMessageRequest": {
+        "models.SendMessageRequest": {
             "description": "Request body for sending a user message",
             "type": "object",
             "required": [
@@ -3453,7 +3093,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SocketConfig": {
+        "models.SocketConfig": {
             "type": "object",
             "required": [
                 "protocol",
@@ -3478,7 +3118,7 @@
                     "description": "parser configuration",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SocketParserConfig"
+                            "$ref": "#/definitions/models.SocketParserConfig"
                         }
                     ]
                 },
@@ -3506,7 +3146,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SocketParserConfig": {
+        "models.SocketParserConfig": {
             "type": "object",
             "properties": {
                 "data_path": {
@@ -3544,14 +3184,36 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.TableInfo": {
+        "models.SystemConfigResponse": {
+            "type": "object",
+            "properties": {
+                "config_refresh_interval": {
+                    "description": "seconds - how often frontend should refresh dashboard/chart config",
+                    "type": "integer"
+                },
+                "default_dimension": {
+                    "type": "string"
+                },
+                "layout_dimensions": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/models.LayoutDimensionDTO"
+                    }
+                },
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "models.TableInfo": {
             "type": "object",
             "properties": {
                 "columns": {
                     "description": "Columns in the table",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ColumnInfo"
+                        "$ref": "#/definitions/models.ColumnInfo"
                     }
                 },
                 "name": {
@@ -3564,7 +3226,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.TestDatasourceRequest": {
+        "models.TestDatasourceRequest": {
             "type": "object",
             "required": [
                 "config",
@@ -3572,7 +3234,7 @@
             ],
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig"
+                    "$ref": "#/definitions/models.DatasourceConfig"
                 },
                 "type": {
                     "enum": [
@@ -3583,13 +3245,13 @@
                     ],
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceType"
+                            "$ref": "#/definitions/models.DatasourceType"
                         }
                     ]
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.TestDatasourceResponse": {
+        "models.TestDatasourceResponse": {
             "type": "object",
             "properties": {
                 "data": {},
@@ -3601,14 +3263,14 @@
                     "type": "integer"
                 },
                 "status": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.HealthStatus"
+                    "$ref": "#/definitions/models.HealthStatus"
                 },
                 "success": {
                     "type": "boolean"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ToolCall": {
+        "models.ToolCall": {
             "description": "A tool call made by the AI",
             "type": "object",
             "properties": {
@@ -3628,7 +3290,7 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UpdateChartRequest": {
+        "models.UpdateChartRequest": {
             "description": "Request body for updating an existing chart",
             "type": "object",
             "properties": {
@@ -3639,7 +3301,7 @@
                     "type": "string"
                 },
                 "data_mapping": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartDataMapping"
+                    "$ref": "#/definitions/models.ChartDataMapping"
                 },
                 "datasource_id": {
                     "type": "string"
@@ -3655,7 +3317,7 @@
                     "additionalProperties": true
                 },
                 "query_config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartQueryConfig"
+                    "$ref": "#/definitions/models.ChartQueryConfig"
                 },
                 "tags": {
                     "type": "array",
@@ -3671,22 +3333,19 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UpdateComponentRequest": {
-            "description": "Request body for updating an existing component",
+        "models.UpdateConfigRequest": {
             "type": "object",
+            "required": [
+                "settings"
+            ],
             "properties": {
-                "component_code": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ComponentMetadata"
+                "settings": {
+                    "type": "object",
+                    "additionalProperties": true
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UpdateDashboardRequest": {
+        "models.UpdateDashboardRequest": {
             "description": "Request body for updating an existing dashboard",
             "type": "object",
             "properties": {
@@ -3704,19 +3363,22 @@
                     "description": "Panels with optional chart_id",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardPanel"
+                        "$ref": "#/definitions/models.DashboardPanel"
                     }
                 },
                 "settings": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSettings"
+                    "$ref": "#/definitions/models.DashboardSettings"
+                },
+                "thumbnail": {
+                    "type": "string"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UpdateDatasourceRequest": {
+        "models.UpdateDatasourceRequest": {
             "type": "object",
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig"
+                    "$ref": "#/definitions/models.DatasourceConfig"
                 },
                 "description": {
                     "type": "string"
@@ -3732,79 +3394,34 @@
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UpdateLayoutRequest": {
+        "models.UserConfigResponse": {
             "type": "object",
             "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "grid": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.GridConfig"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "panels": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Panel"
-                    }
-                }
-            }
-        },
-        "github_com_tviviano_dashboard_internal_models.VisualizationConfig": {
-            "description": "Configuration for visualization components",
-            "type": "object",
-            "properties": {
-                "library": {
-                    "description": "echarts, d3, custom",
-                    "type": "string"
-                },
-                "type": {
-                    "description": "bar, line, pie, gauge, etc.",
-                    "type": "string"
-                }
-            }
-        },
-        "internal_mcp.JSONRPCError": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {},
-                "message": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_mcp.JSONRPCRequest": {
-            "type": "object",
-            "properties": {
-                "id": {},
-                "jsonrpc": {
-                    "type": "string"
-                },
-                "method": {
-                    "type": "string"
-                },
-                "params": {
+                "settings": {
                     "type": "object",
                     "additionalProperties": true
+                },
+                "user_id": {
+                    "type": "string"
                 }
             }
         },
-        "internal_mcp.JSONRPCResponse": {
+        "streaming.StreamStatus": {
             "type": "object",
             "properties": {
-                "error": {
-                    "$ref": "#/definitions/internal_mcp.JSONRPCError"
+                "bufferCount": {
+                    "type": "integer"
                 },
-                "id": {},
-                "jsonrpc": {
+                "connected": {
+                    "type": "boolean"
+                },
+                "datasourceID": {
                     "type": "string"
                 },
-                "result": {}
+                "lastError": {},
+                "subscriberCount": {
+                    "type": "integer"
+                }
             }
         }
     }

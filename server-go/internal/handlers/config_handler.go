@@ -63,67 +63,6 @@ func (h *ConfigHandler) UpdateSystemConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, config)
 }
 
-// SetCurrentDimensionRequest is the request body for setting current dimension
-type SetCurrentDimensionRequest struct {
-	Dimension string `json:"dimension" binding:"required"`
-}
-
-// SetCurrentDimension godoc
-// @Summary Set current layout dimension
-// @Description Sets the current layout dimension preset
-// @Tags config
-// @Accept json
-// @Produce json
-// @Param request body SetCurrentDimensionRequest true "Dimension to set"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /config/system/dimension [put]
-func (h *ConfigHandler) SetCurrentDimension(c *gin.Context) {
-	var req SetCurrentDimensionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	err := h.service.SetCurrentDimension(c.Request.Context(), req.Dimension)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"dimension": req.Dimension, "message": "Dimension updated successfully"})
-}
-
-// GetLayoutDimensions godoc
-// @Summary Get available layout dimensions
-// @Description Returns all available layout dimension presets
-// @Tags config
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Router /config/dimensions [get]
-func (h *ConfigHandler) GetLayoutDimensions(c *gin.Context) {
-	dimensions := h.service.GetLayoutDimensions()
-	order := h.service.GetLayoutDimensionOrder()
-
-	// Build ordered response
-	result := make([]map[string]interface{}, 0, len(order))
-	for _, name := range order {
-		if dim, exists := dimensions[name]; exists {
-			result = append(result, map[string]interface{}{
-				"name":       name,
-				"max_width":  dim.MaxWidth,
-				"max_height": dim.MaxHeight,
-			})
-		}
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"dimensions": result,
-		"default":    order[0],
-	})
-}
-
 // GetUserConfig godoc
 // @Summary Get user configuration
 // @Description Retrieves configuration for a specific user

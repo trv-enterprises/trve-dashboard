@@ -211,7 +211,7 @@ function DashboardDetailPage() {
     }
 
     try {
-      await apiClient.setCurrentDimension(newDimension);
+      await apiClient.updateSystemConfig({ current_layout_dimension: newDimension });
       setCurrentDimension(newDimension);
     } catch (err) {
       console.error('Failed to set dimension:', err);

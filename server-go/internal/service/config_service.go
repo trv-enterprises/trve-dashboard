@@ -98,16 +98,6 @@ func (s *ConfigService) UpdateSystemConfig(ctx context.Context, settings map[str
 	return s.GetSystemConfig(ctx)
 }
 
-// SetCurrentDimension sets the current layout dimension
-func (s *ConfigService) SetCurrentDimension(ctx context.Context, dimensionName string) error {
-	// Validate dimension exists
-	if _, valid := s.layoutDimensions[dimensionName]; !valid {
-		return fmt.Errorf("invalid dimension: %s", dimensionName)
-	}
-
-	return s.repo.UpdateSystemConfigKey(ctx, models.ConfigKeyCurrentDimension, dimensionName)
-}
-
 // GetCurrentDimension gets the current layout dimension
 func (s *ConfigService) GetCurrentDimension(ctx context.Context) (string, *config.LayoutDimension, error) {
 	appConfig, err := s.repo.GetSystemConfig(ctx)
@@ -136,18 +126,8 @@ func (s *ConfigService) GetCurrentDimension(ctx context.Context) (string, *confi
 	return dimName, &dim, nil
 }
 
-// GetLayoutDimensions returns all available layout dimensions
-func (s *ConfigService) GetLayoutDimensions() map[string]config.LayoutDimension {
-	return s.layoutDimensions
-}
-
-// GetLayoutDimensionOrder returns the ordered list of dimension names
-func (s *ConfigService) GetLayoutDimensionOrder() []string {
-	return s.dimensionOrder
-}
-
 // ValidatePanelBounds checks if panels fit within the given dimension
-func (s *ConfigService) ValidatePanelBounds(panels []models.Panel, dimensionName string) error {
+func (s *ConfigService) ValidatePanelBounds(panels []models.DashboardPanel, dimensionName string) error {
 	dim, exists := s.layoutDimensions[dimensionName]
 	if !exists {
 		return fmt.Errorf("invalid dimension: %s", dimensionName)
@@ -155,8 +135,8 @@ func (s *ConfigService) ValidatePanelBounds(panels []models.Panel, dimensionName
 
 	for _, panel := range panels {
 		// Check if panel exceeds dimension bounds
-		panelRight := panel.X + panel.Width
-		panelBottom := panel.Y + panel.Height
+		panelRight := panel.X + panel.W
+		panelBottom := panel.Y + panel.H
 
 		if panelRight > dim.MaxWidth {
 			return fmt.Errorf("panel '%s' exceeds max width: panel ends at %d, max is %d",

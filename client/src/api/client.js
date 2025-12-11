@@ -39,40 +39,6 @@ class APIClient {
     }
   }
 
-  // Component endpoints
-  async getComponents(filters = {}) {
-    const params = new URLSearchParams(filters);
-    return this.request(`/api/components?${params}`);
-  }
-
-  async getComponent(id) {
-    return this.request(`/api/components/${id}`);
-  }
-
-  async getComponentByPath(system, source, name) {
-    return this.request(`/api/components/by-path/${system}/${source}/${name}`);
-  }
-
-  async createComponent(component) {
-    return this.request('/api/components', {
-      method: 'POST',
-      body: JSON.stringify(component),
-    });
-  }
-
-  async updateComponent(id, updates) {
-    return this.request(`/api/components/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
-  }
-
-  async deleteComponent(system, source, name) {
-    return this.request(`/api/components/${system}/${source}/${name}`, {
-      method: 'DELETE',
-    });
-  }
-
   // Data source endpoints
   async getSystems() {
     return this.request('/api/datasources');
@@ -283,17 +249,6 @@ class APIClient {
       method: 'PUT',
       body: JSON.stringify({ settings }),
     });
-  }
-
-  async setCurrentDimension(dimension) {
-    return this.request('/api/config/system/dimension', {
-      method: 'PUT',
-      body: JSON.stringify({ dimension }),
-    });
-  }
-
-  async getLayoutDimensions() {
-    return this.request('/api/config/dimensions');
   }
 
   async getUserConfig(userId) {
