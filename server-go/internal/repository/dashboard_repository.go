@@ -230,3 +230,156 @@ func (r *DashboardRepository) FindByChartID(ctx context.Context, chartID string)
 
 	return dashboards, nil
 }
+
+// ListWithDatasources retrieves dashboard summaries with data source names using aggregation
+// This performs a multi-collection join: dashboards -> charts -> datasources
+func (r *DashboardRepository) ListWithDatasources(ctx context.Context, params models.DashboardQueryParams, db *mongo.Database) ([]models.DashboardSummary, int64, error) {
+	// Build filter
+	filter := bson.M{}
+	if params.Name != "" {
+		filter["name"] = bson.M{"$regex": params.Name, "$options": "i"}
+	}
+	if params.IsPublic != nil {
+		filter["settings.is_public"] = *params.IsPublic
+	}
+	if params.ChartID != "" {
+		filter["panels.chart_id"] = params.ChartID
+	}
+
+	// Count total documents (without aggregation for performance)
+	total, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count dashboards: %w", err)
+	}
+
+	// Calculate pagination
+	page := params.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := params.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	skip := int64((page - 1) * pageSize)
+	limit := int64(pageSize)
+
+	// Aggregation pipeline to get dashboards with data source names
+	pipeline := mongo.Pipeline{
+		// Match filter
+		{{Key: "$match", Value: filter}},
+		// Sort by name
+		{{Key: "$sort", Value: bson.D{{Key: "name", Value: 1}}}},
+		// Pagination
+		{{Key: "$skip", Value: skip}},
+		{{Key: "$limit", Value: limit}},
+		// Extract chart_ids from panels
+		{{Key: "$addFields", Value: bson.D{
+			{Key: "chart_ids", Value: bson.D{
+				{Key: "$filter", Value: bson.D{
+					{Key: "input", Value: "$panels.chart_id"},
+					{Key: "as", Value: "cid"},
+					{Key: "cond", Value: bson.D{
+						{Key: "$and", Value: bson.A{
+							bson.D{{Key: "$ne", Value: bson.A{"$$cid", ""}}},
+							bson.D{{Key: "$ne", Value: bson.A{"$$cid", nil}}},
+						}},
+					}},
+				}},
+			}},
+		}}},
+		// Lookup charts by ID (charts use "id" field, not "_id")
+		{{Key: "$lookup", Value: bson.D{
+			{Key: "from", Value: "charts"},
+			{Key: "let", Value: bson.D{{Key: "chartIds", Value: "$chart_ids"}}},
+			{Key: "pipeline", Value: bson.A{
+				bson.D{{Key: "$match", Value: bson.D{
+					{Key: "$expr", Value: bson.D{
+						{Key: "$and", Value: bson.A{
+							bson.D{{Key: "$in", Value: bson.A{"$id", "$$chartIds"}}},
+							bson.D{{Key: "$eq", Value: bson.A{"$status", "final"}}}, // Only final charts
+						}},
+					}},
+				}}},
+				bson.D{{Key: "$project", Value: bson.D{
+					{Key: "datasource_id", Value: 1},
+				}}},
+			}},
+			{Key: "as", Value: "matched_charts"},
+		}}},
+		// Extract unique datasource_ids from matched charts
+		{{Key: "$addFields", Value: bson.D{
+			{Key: "datasource_ids", Value: bson.D{
+				{Key: "$setUnion", Value: bson.A{
+					bson.D{{Key: "$filter", Value: bson.D{
+						{Key: "input", Value: "$matched_charts.datasource_id"},
+						{Key: "as", Value: "dsid"},
+						{Key: "cond", Value: bson.D{
+							{Key: "$and", Value: bson.A{
+								bson.D{{Key: "$ne", Value: bson.A{"$$dsid", ""}}},
+								bson.D{{Key: "$ne", Value: bson.A{"$$dsid", nil}}},
+							}},
+						}},
+					}}},
+				}},
+			}},
+		}}},
+		// Convert string IDs to ObjectIds for datasource lookup
+		{{Key: "$addFields", Value: bson.D{
+			{Key: "datasource_object_ids", Value: bson.D{
+				{Key: "$map", Value: bson.D{
+					{Key: "input", Value: "$datasource_ids"},
+					{Key: "as", Value: "dsid"},
+					{Key: "in", Value: bson.D{
+						{Key: "$toObjectId", Value: "$$dsid"},
+					}},
+				}},
+			}},
+		}}},
+		// Lookup datasources to get their names
+		{{Key: "$lookup", Value: bson.D{
+			{Key: "from", Value: "datasources"},
+			{Key: "let", Value: bson.D{{Key: "dsIds", Value: "$datasource_object_ids"}}},
+			{Key: "pipeline", Value: bson.A{
+				bson.D{{Key: "$match", Value: bson.D{
+					{Key: "$expr", Value: bson.D{
+						{Key: "$in", Value: bson.A{"$_id", "$$dsIds"}},
+					}},
+				}}},
+				bson.D{{Key: "$project", Value: bson.D{
+					{Key: "name", Value: 1},
+				}}},
+			}},
+			{Key: "as", Value: "matched_datasources"},
+		}}},
+		// Project final shape
+		{{Key: "$project", Value: bson.D{
+			{Key: "id", Value: "$_id"},
+			{Key: "name", Value: 1},
+			{Key: "description", Value: 1},
+			{Key: "thumbnail", Value: 1},
+			{Key: "settings", Value: 1},
+			{Key: "panel_count", Value: bson.D{{Key: "$size", Value: bson.D{{Key: "$ifNull", Value: bson.A{"$panels", bson.A{}}}}}}},
+			{Key: "datasource_names", Value: "$matched_datasources.name"},
+			{Key: "created", Value: 1},
+			{Key: "updated", Value: 1},
+		}}},
+	}
+
+	cursor, err := r.collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to aggregate dashboards: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var summaries []models.DashboardSummary
+	if err := cursor.All(ctx, &summaries); err != nil {
+		return nil, 0, fmt.Errorf("failed to decode dashboard summaries: %w", err)
+	}
+
+	return summaries, total, nil
+}

@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,6 +22,7 @@ import (
 	"github.com/tviviano/dashboard/internal/mcp"
 	"github.com/tviviano/dashboard/internal/repository"
 	"github.com/tviviano/dashboard/internal/service"
+	"github.com/tviviano/dashboard/internal/streaming"
 
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -92,10 +95,16 @@ func main() {
 	chartRepo := repository.NewChartRepository(mongodb.Database)
 	dashboardRepo := repository.NewDashboardRepository(mongodb.Database)
 	aiSessionRepo := repository.NewAISessionRepository(redisClient.Client)
+	configRepo := repository.NewConfigRepository(mongodb.Database)
 
 	// Create chart indexes
 	if err := chartRepo.CreateIndexes(ctx); err != nil {
 		log.Printf("Warning: Failed to create chart indexes: %v", err)
+	}
+
+	// Create config indexes
+	if err := configRepo.CreateIndexes(ctx); err != nil {
+		log.Printf("Warning: Failed to create config indexes: %v", err)
 	}
 
 	// Initialize services
@@ -103,12 +112,17 @@ func main() {
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	componentService := service.NewComponentService(componentRepo)
 	chartService := service.NewChartService(chartRepo)
-	dashboardService := service.NewDashboardService(dashboardRepo)
+	dashboardService := service.NewDashboardService(dashboardRepo, mongodb.Database)
 	aiSessionService := service.NewAISessionService(aiSessionRepo, chartRepo)
+	configService := service.NewConfigService(configRepo, cfg)
 
 	// Get the global ChartHub for real-time chart update broadcasts
 	chartHub := hub.GetChartHub()
 	fmt.Println("✓ ChartHub initialized for real-time chart updates")
+
+	// Initialize StreamManager for socket datasource streaming
+	streamManager := streaming.NewManager(datasourceRepo, streaming.DefaultManagerConfig())
+	fmt.Println("✓ StreamManager initialized for socket datasource streaming")
 
 	// Initialize AI agent (optional - requires ANTHROPIC_API_KEY)
 	toolExecutor := ai.NewToolExecutor(chartRepo, datasourceRepo, datasourceService, chartHub)
@@ -130,6 +144,8 @@ func main() {
 	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
 	aiSessionHandler := handlers.NewAISessionHandler(aiSessionService, aiAgent, chartHub)
 	debugHandler := handlers.NewDebugHandler()
+	streamHandler := handlers.NewStreamHandler(streamManager)
+	configHandler := handlers.NewConfigHandler(configService)
 
 	// Initialize MCP
 	mcpRegistry := mcp.NewToolRegistry(datasourceService, dashboardService, chartService)
@@ -156,6 +172,7 @@ func main() {
 		{
 			datasources.POST("", datasourceHandler.CreateDatasource)
 			datasources.GET("", datasourceHandler.ListDatasources)
+			datasources.GET("/streams", streamHandler.ListActiveStreams) // Before /:id to avoid conflict
 			datasources.GET("/:id", datasourceHandler.GetDatasource)
 			datasources.PUT("/:id", datasourceHandler.UpdateDatasource)
 			datasources.DELETE("/:id", datasourceHandler.DeleteDatasource)
@@ -163,6 +180,8 @@ func main() {
 			datasources.POST("/:id/health", datasourceHandler.CheckDatasourceHealth)
 			datasources.POST("/:id/query", datasourceHandler.QueryDatasource)
 			datasources.GET("/:id/schema", datasourceHandler.GetDatasourceSchema)
+			datasources.GET("/:id/stream", streamHandler.StreamDatasource)       // SSE streaming
+			datasources.GET("/:id/stream/status", streamHandler.GetStreamStatus) // Stream status
 		}
 
 		// Component routes (legacy - being replaced by charts)
@@ -221,6 +240,17 @@ func main() {
 			aiDebug.GET("", debugHandler.HandleDebugWebSocket)
 			aiDebug.GET("/status", debugHandler.GetDebugStatus)
 		}
+
+		// Config routes
+		configRoutes := api.Group("/config")
+		{
+			configRoutes.GET("/system", configHandler.GetSystemConfig)
+			configRoutes.PUT("/system", configHandler.UpdateSystemConfig)
+			configRoutes.PUT("/system/dimension", configHandler.SetCurrentDimension)
+			configRoutes.GET("/dimensions", configHandler.GetLayoutDimensions)
+			configRoutes.GET("/user/:user_id", configHandler.GetUserConfig)
+			configRoutes.PUT("/user/:user_id", configHandler.UpdateUserConfig)
+		}
 	}
 
 	// MCP routes (outside /api group)
@@ -234,6 +264,48 @@ func main() {
 
 	fmt.Println("✓ MCP SSE endpoint enabled at http://localhost:3001/mcp/sse")
 	fmt.Println("✓ AI Debug WebSocket enabled at ws://localhost:3001/api/ai/debug")
+
+	// Static file serving for SPA (production mode)
+	if cfg.StaticFiles.Enabled {
+		staticPath := cfg.StaticFiles.Path
+		if !filepath.IsAbs(staticPath) {
+			// Make relative paths relative to the server-go directory
+			staticPath = filepath.Join(".", staticPath)
+		}
+
+		// Verify the static files directory exists
+		if _, err := os.Stat(staticPath); os.IsNotExist(err) {
+			log.Printf("⚠️  Static files directory not found: %s", staticPath)
+			log.Printf("   Run 'npm run build' in the client directory to create it")
+		} else {
+			// Serve static files for any route not matched by API endpoints
+			router.NoRoute(func(c *gin.Context) {
+				path := c.Request.URL.Path
+
+				// Skip API routes - they should return 404 if not found
+				if strings.HasPrefix(path, "/api/") || strings.HasPrefix(path, "/mcp/") || strings.HasPrefix(path, "/swagger/") {
+					c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+					return
+				}
+
+				// Try to serve the exact file
+				filePath := filepath.Join(staticPath, path)
+				if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
+					c.File(filePath)
+					return
+				}
+
+				// For SPA routing: serve index.html for all other routes
+				indexPath := filepath.Join(staticPath, "index.html")
+				c.File(indexPath)
+			})
+
+			// Serve static assets directory
+			router.Static("/assets", filepath.Join(staticPath, "assets"))
+
+			fmt.Printf("✓ Static file serving enabled from %s\n", staticPath)
+		}
+	}
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -262,6 +334,10 @@ func main() {
 	<-quit
 
 	fmt.Println("\n🛑 Shutting down server...")
+
+	// Stop StreamManager
+	streamManager.Stop()
+	fmt.Println("✓ StreamManager stopped")
 
 	// Graceful shutdown
 	ctx, cancel = context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)

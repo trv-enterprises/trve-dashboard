@@ -10,17 +10,31 @@ import (
 
 // Config holds all configuration
 type Config struct {
-	Server     ServerConfig     `mapstructure:"server"`
-	MongoDB    MongoDBConfig    `mapstructure:"mongodb"`
-	Redis      RedisConfig      `mapstructure:"redis"`
-	Asynq      AsynqConfig      `mapstructure:"asynq"`
-	WebSocket  WebSocketConfig  `mapstructure:"websocket"`
-	LLM        LLMConfig        `mapstructure:"llm"`
-	Validation ValidationConfig `mapstructure:"validation"`
-	Layout     LayoutConfig     `mapstructure:"layout"`
-	Logging    LoggingConfig    `mapstructure:"logging"`
-	CORS       CORSConfig       `mapstructure:"cors"`
-	Swagger    SwaggerConfig    `mapstructure:"swagger"`
+	Server           ServerConfig                `mapstructure:"server"`
+	MongoDB          MongoDBConfig               `mapstructure:"mongodb"`
+	Redis            RedisConfig                 `mapstructure:"redis"`
+	Asynq            AsynqConfig                 `mapstructure:"asynq"`
+	WebSocket        WebSocketConfig             `mapstructure:"websocket"`
+	LLM              LLMConfig                   `mapstructure:"llm"`
+	Validation       ValidationConfig            `mapstructure:"validation"`
+	Dashboard        DashboardConfig             `mapstructure:"dashboard"`
+	Layout           LayoutConfig                `mapstructure:"layout"`
+	LayoutDimensions map[string]LayoutDimension  `mapstructure:"layout_dimensions"`
+	Logging          LoggingConfig               `mapstructure:"logging"`
+	CORS             CORSConfig                  `mapstructure:"cors"`
+	Swagger          SwaggerConfig               `mapstructure:"swagger"`
+	StaticFiles      StaticFilesConfig           `mapstructure:"static_files"`
+}
+
+// DashboardConfig holds dashboard-specific settings
+type DashboardConfig struct {
+	ConfigRefreshInterval int `mapstructure:"config_refresh_interval" json:"config_refresh_interval"` // seconds
+}
+
+// LayoutDimension represents a preset layout dimension
+type LayoutDimension struct {
+	MaxWidth  int `mapstructure:"max_width" json:"max_width"`
+	MaxHeight int `mapstructure:"max_height" json:"max_height"`
 }
 
 type ServerConfig struct {
@@ -118,6 +132,11 @@ type SwaggerConfig struct {
 	Schemes      []string `mapstructure:"schemes"`
 	ContactName  string   `mapstructure:"contact_name"`
 	ContactEmail string   `mapstructure:"contact_email"`
+}
+
+type StaticFilesConfig struct {
+	Enabled bool   `mapstructure:"enabled"`
+	Path    string `mapstructure:"path"`
 }
 
 // Load loads configuration from file and environment variables

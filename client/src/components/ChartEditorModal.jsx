@@ -29,13 +29,22 @@ function ChartEditorModal({ open, onClose, onSave, chart, panelId }) {
   const handleSave = async (chartPayload) => {
     setSaving(true);
     try {
+      // Capture thumbnail now that "Saving..." is visible
+      let thumbnail = null;
+      if (editorRef.current?.captureThumbnail) {
+        thumbnail = await editorRef.current.captureThumbnail();
+      }
+
+      // Add thumbnail to payload
+      const payloadWithThumbnail = { ...chartPayload, thumbnail };
+
       let savedChart;
       if (chart?.id) {
         // Update existing chart
-        savedChart = await apiClient.updateChart(chart.id, chartPayload);
+        savedChart = await apiClient.updateChart(chart.id, payloadWithThumbnail);
       } else {
         // Create new chart
-        savedChart = await apiClient.createChart(chartPayload);
+        savedChart = await apiClient.createChart(payloadWithThumbnail);
       }
 
       // Return the saved chart with panel_id for dashboard to link

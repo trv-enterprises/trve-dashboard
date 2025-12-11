@@ -227,13 +227,6 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
               │ MongoDB  │   │  Redis   │   │ Data Sources  │
               │   7.x    │   │   7.x    │   │ SQL/API/CSV/WS│
               └──────────┘   └──────────┘   └───────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      MCP SERVER (Port 3002)                                  │
-│                    Node.js + Express (AI Integration)                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  /mcp/sse        │  /mcp/message       │  AI Component Generation           │
-└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Technology Stack
@@ -256,12 +249,6 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
 | MongoDB | 7.x | Primary Database |
 | Redis | 7.x | Caching |
 | Swaggo | 1.8.x | API Documentation |
-
-### MCP Server (Node.js)
-| Technology | Purpose |
-|------------|---------|
-| Express | HTTP Server for MCP |
-| SSE | Real-time communication |
 
 ## Application Modes
 
@@ -301,24 +288,19 @@ dashboard/
 │   ├── build.json            # Build number tracker
 │   └── package.json
 │
-├── server-go/                 # Go Backend (Main API)
+├── server-go/                 # Go Backend (Main API + AI Integration)
 │   ├── cmd/server/main.go    # Entry point
 │   ├── config/               # Configuration (Viper)
 │   ├── internal/
+│   │   ├── ai/               # AI agent, tools, system prompt
 │   │   ├── database/         # MongoDB, Redis connections
 │   │   ├── datasource/       # SQL, API, CSV, Socket adapters
 │   │   ├── handlers/         # HTTP handlers
+│   │   ├── mcp/              # MCP SSE endpoint
 │   │   ├── models/           # Data models
 │   │   ├── repository/       # Database operations
 │   │   └── service/          # Business logic
 │   └── docs/                  # Swagger documentation
-│
-├── server/                    # MCP Server (AI Integration)
-│   ├── mcp/
-│   │   ├── componentSpec.js  # Component specification for AI
-│   │   ├── mcpServer.js      # MCP tools and handlers
-│   │   └── mcpSSE.js         # SSE transport
-│   └── server.js             # MCP server entry point
 │
 └── docs/                      # Documentation
     ├── ARCHITECTURE.md
@@ -366,14 +348,16 @@ dashboard/
 | GET | `/api/dashboards/:id/details` | Get with expanded data |
 | PUT | `/api/dashboards/:id` | Update dashboard |
 | DELETE | `/api/dashboards/:id` | Delete dashboard |
-
-### MCP Server (Port 3002)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
+| **AI Sessions** |||
+| POST | `/api/ai/sessions` | Create AI session |
+| GET | `/api/ai/sessions/:id` | Get session state |
+| POST | `/api/ai/sessions/:id/messages` | Send message (SSE streaming) |
+| GET | `/api/ai/sessions/:id/ws` | WebSocket connection |
+| POST | `/api/ai/sessions/:id/save` | Save session |
+| DELETE | `/api/ai/sessions/:id` | Cancel session |
+| **MCP** |||
 | GET | `/mcp/sse` | SSE connection for MCP |
 | POST | `/mcp/message` | Send MCP message |
-| GET | `/health` | Health check |
 
 ## Development Setup
 
@@ -399,18 +383,12 @@ go build -o bin/server cmd/server/main.go && ./bin/server
 cd client
 npm install
 npm run dev
-
-# Optional: Start MCP server (Terminal 3)
-cd server
-npm install
-npm run dev
 ```
 
 ### URLs
 - Frontend: http://localhost:5173
 - Go API: http://localhost:3001
 - Swagger UI: http://localhost:3001/swagger/index.html
-- MCP Server: http://localhost:3002
 
 ## UI Framework: Carbon Design System
 
@@ -468,45 +446,39 @@ const Component = () => {
 └───────────────────────────────┴────────────────────────────────┘
 ```
 
-## Current Status (2025-12-04)
+## Current Status (2025-12-06)
 
 ### ✅ Completed
 - Go backend with MongoDB (layouts, data sources, components, dashboards, charts)
 - React frontend with three modes (Design, View, Manage placeholder)
 - Design Mode: All CRUD pages for layouts, data sources, charts, dashboards
-- View Mode: Dashboard viewer with real-time refresh, sidebar tiles
-- MCP Server for AI component generation
+- View Mode: Dashboard viewer with real-time refresh, sidebar tiles, reduce-to-fit mode
 - Carbon Design System theming throughout (g100 dark theme)
 - Auto-redirect to first dashboard on app load
 - **Chart Editor**: Full chart builder with live preview, data mapping, filters, aggregation
 - **Socket Data Sources**: WebSocket connections with parser config (data_path extraction, JSON/regex parsing)
 - **Axis Labels**: Configurable X/Y axis labels for charts (e.g., "Temperature (°F)")
 - **Timestamp Formatting**: Utility functions for consistent date/time display in charts
+- **Chart Versioning**: Version tracking with increment on save, status (draft/final)
+- **AI Builder (Phases 1-7)**: Full-page AI chat with SSE streaming, MCP tools, session management
+- **AI Session API**: Start, message, save, cancel endpoints with `/api/ai/session`
+- **Custom AI Icon**: Replaced WatsonxAi with custom sparkle icon component
 
 ### 🚧 In Progress
-- AI chat integration for component generation
-- Streaming architecture: Backend WebSocket proxy with /api/datasources/:id/stream endpoint
-- Fix three-dot overflow menu in list views (not currently functional)
+- AI Builder Phase 8: Polish & Testing
+- Error handling improvements
+- Performance optimization
 
 ### 📋 Planned
+- **Tabbed Panel Layout**: Allow panels to contain multiple charts with tabs to switch between
 - **Data Source Testing in Editor**: Add connection test capability to data source editor UI (backend API already exists at `/api/datasources/test`)
+- **Dashboard Design Preset Sizes**: Implement solution for layout dimensions/aspect ratios for fullscreen viewing
 - Manage Mode implementation
 - User authentication
 - EdgeLake integration
 - ModeContext for shared state (replace localStorage-based mode switching)
 - ErrorBoundary component for crash recovery
 - Entity-specific hooks (useDashboard, useCharts, etc.)
-- **Versioning for Dashboards and Charts**:
-  - Add `version` field to dashboards and charts (composite key: id + version)
-  - UI should expose version number and auto-increment on save
-  - Allow user to reset/revert to previous versions
-  - List pages should have toggle to show all versions or just latest (default: latest)
-  - Open questions:
-    - How to handle name changes between versions?
-    - Should chart names be unique per ID (allowing different names across versions)?
-    - Version history UI design
-- **Dashboard Design Preset Sizes**
-  - Decide how to implement a solution that restricts the overall layout to certain dimensions or aspect ratios to account for the full screen view fitage. Or figure out how to make the designed dashboard fit the monitor without scrolling.
 ---
 
 ## Key Files to Understand
@@ -516,7 +488,7 @@ const Component = () => {
 3. `client/src/components/DynamicComponentLoader.jsx` - Runtime component evaluation
 4. `server-go/cmd/server/main.go` - Go backend entry point
 5. `server-go/internal/handlers/` - API request handlers
-6. `server/mcp/componentSpec.js` - AI component specification
+6. `server-go/internal/ai/system_prompt.go` - AI component specification
 
 ## Documentation
 
@@ -527,5 +499,6 @@ const Component = () => {
 
 ---
 
-**Last Updated**: 2025-12-04
-**Build**: 137
+**Last Updated**: 2025-12-06
+**Build**: 203
+- Capture Simulator Websocket: websocat ws://100.74.102.38:8081/ws

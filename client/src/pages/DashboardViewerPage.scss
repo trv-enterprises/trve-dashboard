@@ -3,9 +3,10 @@
 .dashboard-viewer-page {
   background-color: #161616;
   height: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden !important; // Only grid container should scroll
 
   &.fullscreen {
     position: fixed;
@@ -28,7 +29,11 @@
     background-color: #262626;
     border-bottom: 1px solid #393939;
     flex-shrink: 0;
+    flex-grow: 0;
     height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    overflow: hidden;
 
     .toolbar-left {
       display: flex;
@@ -89,15 +94,42 @@
           animation: spin 1s linear infinite;
         }
       }
+
+      .menu-item-with-check {
+        display: flex;
+        align-items: center;
+        gap: spacing.$spacing-03;
+        min-width: 120px;
+
+        svg {
+          color: #78a9ff;
+          flex-shrink: 0;
+        }
+      }
     }
   }
 
   .dashboard-grid-container {
-    flex: 1;
+    flex: 1 1 0; // Grow, shrink, and use 0 as basis for proper flex overflow
     min-height: 0; // Required for flex overflow to work
-    padding: spacing.$spacing-04;
-    overflow: auto;
+    height: 0; // Force flex to control height, not content
+    padding: 0;
+    overflow: auto; // THIS is the only scrolling element
     background-color: var(--cds-background);
+
+    &.reduce-to-fit {
+      position: relative;
+      overflow: hidden;
+      padding: spacing.$spacing-02; // Minimal padding in reduce-to-fit mode
+
+      .dashboard-grid {
+        position: absolute;
+        inset: spacing.$spacing-02; // Fill container with padding offset
+        min-width: 0; // Allow grid to shrink below content size
+        width: auto;
+        height: auto;
+      }
+    }
 
     .dashboard-grid {
       display: grid;
@@ -107,7 +139,8 @@
       width: 100%;
 
       .panel-container {
-        background-color: var(--cds-layer-01);
+        background-color: #262626;
+        border: 1px solid #393939;
         border-radius: 4px;
         overflow: hidden;
         display: flex;
@@ -115,8 +148,7 @@
         height: 100%;
 
         &.has-component {
-          // Panels with components get border and subtle shadow
-          border: 1px solid #393939;
+          // All panels with components have consistent styling
           box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
         }
 
@@ -146,8 +178,12 @@
           padding: spacing.$spacing-04;
           overflow: hidden;
           min-height: 0;
-          height: calc(100% - 40px);
+          height: 100%;
           position: relative;
+
+          &.with-header {
+            height: calc(100% - 40px);
+          }
 
           // Wrapper div from DynamicComponentLoader
           > div {
@@ -169,8 +205,10 @@
 
         // Empty panels (no chart assigned)
         &.empty-panel {
-          border: 1px dashed var(--cds-border-subtle-01);
+          border-style: dashed;
+          border-color: var(--cds-border-subtle-01);
           background-color: transparent;
+          box-shadow: none;
         }
 
         .empty-panel-placeholder {

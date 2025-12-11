@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Loading,
@@ -7,7 +7,8 @@ import {
 } from '@carbon/react';
 import {
   Dashboard,
-  Time
+  Time,
+  DataBase
 } from '@carbon/icons-react';
 import apiClient from '../api/client';
 import './DashboardTileViewPage.scss';
@@ -21,29 +22,72 @@ import './DashboardTileViewPage.scss';
  * - Dashboard name
  * - Description (truncated)
  * - Auto-refresh indicator
+ * - Data sources used
  */
 function DashboardTileViewPage() {
   const navigate = useNavigate();
   const [dashboards, setDashboards] = useState([]);
+  const [charts, setCharts] = useState({});
+  const [datasources, setDatasources] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    fetchDashboards();
+    fetchData();
   }, []);
 
-  const fetchDashboards = async () => {
+  const fetchData = async () => {
     try {
-      const response = await apiClient.getDashboards({ page: 1, page_size: 100 });
-      if (response.dashboards) {
-        setDashboards(response.dashboards);
+      // Fetch dashboards, charts, and datasources in parallel
+      const [dashboardsRes, chartsRes, datasourcesRes] = await Promise.all([
+        apiClient.getDashboards({ page: 1, page_size: 100 }),
+        apiClient.getCharts(),
+        apiClient.getDatasources()
+      ]);
+
+      if (dashboardsRes.dashboards) {
+        setDashboards(dashboardsRes.dashboards);
+      }
+
+      // Build chart lookup (chart_id -> chart)
+      if (chartsRes.charts) {
+        const chartMap = {};
+        chartsRes.charts.forEach(chart => {
+          chartMap[chart.id] = chart;
+        });
+        setCharts(chartMap);
+      }
+
+      // Build datasource lookup (datasource_id -> name)
+      if (datasourcesRes.datasources) {
+        const dsMap = {};
+        datasourcesRes.datasources.forEach(ds => {
+          dsMap[ds.id] = ds.name;
+        });
+        setDatasources(dsMap);
       }
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Get unique data source names for a dashboard
+  const getDatasourceNames = (dashboard) => {
+    if (!dashboard.panels || dashboard.panels.length === 0) return [];
+
+    const dsNames = new Set();
+    dashboard.panels.forEach(panel => {
+      if (panel.chart_id) {
+        const chart = charts[panel.chart_id];
+        if (chart?.datasource_id && datasources[chart.datasource_id]) {
+          dsNames.add(datasources[chart.datasource_id]);
+        }
+      }
+    });
+    return Array.from(dsNames);
   };
 
   const handleTileClick = (dashboardId) => {
@@ -132,6 +176,12 @@ function DashboardTileViewPage() {
                       {dashboard.panels.length} panel{dashboard.panels.length !== 1 ? 's' : ''}
                     </Tag>
                   )}
+                  {getDatasourceNames(dashboard).map(dsName => (
+                    <Tag key={dsName} type="blue" size="sm">
+                      <DataBase size={12} />
+                      {dsName}
+                    </Tag>
+                  ))}
                 </div>
               </div>
             </div>

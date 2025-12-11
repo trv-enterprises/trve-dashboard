@@ -18,7 +18,7 @@ import {
   Tag,
   Link
 } from '@carbon/react';
-import { Add, TrashCan, DataBase } from '@carbon/icons-react';
+import { TrashCan, DataBase } from '@carbon/icons-react';
 import apiClient from '../api/client';
 import './DatasourcesPage.scss';
 
@@ -207,7 +207,6 @@ function DatasourcesPage() {
                   persistent
                 />
                 <Button
-                  renderIcon={Add}
                   onClick={handleCreate}
                   size="md"
                   kind="primary"

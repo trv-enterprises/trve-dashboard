@@ -78,16 +78,18 @@
     .tile-thumbnail {
       width: 100%;
       height: 160px;
-      background: var(--cds-layer-02);
+      background: var(--cds-layer-01);
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      border-bottom: 1px solid var(--cds-border-subtle-01);
 
       img {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain;
+        object-position: center center;
       }
 
       .thumbnail-placeholder {

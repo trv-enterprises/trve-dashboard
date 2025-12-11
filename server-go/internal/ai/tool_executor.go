@@ -113,6 +113,9 @@ func (e *ToolExecutor) executeUpdateChartConfig(ctx context.Context, chartID str
 	if err != nil {
 		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
 	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
+	}
 
 	updates := []string{}
 	if params.Description != nil {
@@ -160,6 +163,9 @@ func (e *ToolExecutor) executeUpdateDataMapping(ctx context.Context, chartID str
 	chart, err := e.chartRepo.FindByIDAndVersion(ctx, chartID, chartVersion)
 	if err != nil {
 		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
+	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
 	}
 
 	if params.DatasourceID != nil {
@@ -227,6 +233,9 @@ func (e *ToolExecutor) executeUpdateQueryConfig(ctx context.Context, chartID str
 	if err != nil {
 		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
 	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
+	}
 
 	// Initialize QueryConfig if nil
 	if chart.QueryConfig == nil {
@@ -274,6 +283,9 @@ func (e *ToolExecutor) executeUpdateFilters(ctx context.Context, chartID string,
 	if err != nil {
 		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
 	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
+	}
 
 	// Initialize DataMapping if nil
 	if chart.DataMapping == nil {
@@ -311,6 +323,9 @@ func (e *ToolExecutor) executeUpdateAggregation(ctx context.Context, chartID str
 	chart, err := e.chartRepo.FindByIDAndVersion(ctx, chartID, chartVersion)
 	if err != nil {
 		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
+	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
 	}
 
 	// Initialize DataMapping if nil
@@ -365,6 +380,9 @@ func (e *ToolExecutor) executeSetCustomCode(ctx context.Context, chartID string,
 	if err != nil {
 		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
 	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
+	}
 
 	chart.UseCustomCode = true
 	chart.ComponentCode = params.ComponentCode
@@ -402,6 +420,9 @@ func (e *ToolExecutor) executeUpdateChartOptions(ctx context.Context, chartID st
 	chart, err := e.chartRepo.FindByIDAndVersion(ctx, chartID, chartVersion)
 	if err != nil {
 		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
+	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
 	}
 
 	// Initialize Options if nil
@@ -547,6 +568,9 @@ func (e *ToolExecutor) executePreviewData(ctx context.Context, chartID string, c
 	if err != nil {
 		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
 	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
+	}
 
 	if chart.DatasourceID == "" {
 		return &ToolResult{Success: false, Error: "chart has no data source configured"}, nil
@@ -597,6 +621,9 @@ func (e *ToolExecutor) executeGetChartState(ctx context.Context, chartID string,
 	chart, err := e.chartRepo.FindByIDAndVersion(ctx, chartID, chartVersion)
 	if err != nil {
 		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
+	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
 	}
 
 	return &ToolResult{

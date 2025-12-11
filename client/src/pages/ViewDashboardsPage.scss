@@ -139,6 +139,23 @@
           text-overflow: ellipsis;
           white-space: nowrap;
         }
+
+        .info-button {
+          background: none;
+          border: none;
+          padding: spacing.$spacing-02;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #6f6f6f;
+          transition: color 0.2s ease;
+          flex-shrink: 0;
+
+          &:hover {
+            color: #78a9ff;
+          }
+        }
       }
 
       .tile-description {

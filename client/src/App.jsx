@@ -155,7 +155,7 @@ function AppContent() {
         </SideNav>
       )}
 
-      <Content className={`app-content ${currentMode !== MODES.VIEW && isSideNavExpanded ? '' : 'app-content--nav-collapsed'}`}>
+      <Content className={`app-content ${currentMode === MODES.VIEW ? 'app-content--no-nav' : (isSideNavExpanded ? '' : 'app-content--nav-collapsed')}`}>
         <Routes>
           {/* Default route redirects to View mode - first dashboard or fallback */}
           <Route path="/" element={

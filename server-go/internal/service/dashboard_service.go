@@ -6,17 +6,20 @@ import (
 
 	"github.com/tviviano/dashboard/internal/models"
 	"github.com/tviviano/dashboard/internal/repository"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // DashboardService handles business logic for dashboards
 type DashboardService struct {
 	repo *repository.DashboardRepository
+	db   *mongo.Database
 }
 
 // NewDashboardService creates a new dashboard service
-func NewDashboardService(repo *repository.DashboardRepository) *DashboardService {
+func NewDashboardService(repo *repository.DashboardRepository, db *mongo.Database) *DashboardService {
 	return &DashboardService{
 		repo: repo,
+		db:   db,
 	}
 }
 
@@ -70,6 +73,31 @@ func (s *DashboardService) ListDashboards(ctx context.Context, params models.Das
 
 	return &models.DashboardListResponse{
 		Dashboards: dashboards,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+	}, nil
+}
+
+// ListDashboardsWithDatasources retrieves dashboard summaries with data source names
+func (s *DashboardService) ListDashboardsWithDatasources(ctx context.Context, params models.DashboardQueryParams) (*models.DashboardSummaryListResponse, error) {
+	summaries, total, err := s.repo.ListWithDatasources(ctx, params, s.db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list dashboards with datasources: %w", err)
+	}
+
+	// Default page values
+	page := params.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := params.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+
+	return &models.DashboardSummaryListResponse{
+		Dashboards: summaries,
 		Total:      total,
 		Page:       page,
 		PageSize:   pageSize,

@@ -80,14 +80,16 @@ func (h *DashboardHandler) GetDashboard(c *gin.Context) {
 
 // ListDashboards retrieves a list of dashboards with pagination
 // @Summary List dashboards
-// @Description Get a paginated list of dashboards with optional filtering
+// @Description Get a paginated list of dashboards with optional filtering. Use include_datasources=true to get data source names for each dashboard.
 // @Tags dashboards
 // @Produce json
 // @Param name query string false "Filter by name (partial match)"
 // @Param is_public query boolean false "Filter by public status"
+// @Param include_datasources query boolean false "Include data source names from charts"
 // @Param page query int false "Page number" default(1)
 // @Param page_size query int false "Page size" default(20)
-// @Success 200 {object} models.DashboardListResponse
+// @Success 200 {object} models.DashboardListResponse "Standard response"
+// @Success 200 {object} models.DashboardSummaryListResponse "Response when include_datasources=true"
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /dashboards [get]
@@ -95,6 +97,17 @@ func (h *DashboardHandler) ListDashboards(c *gin.Context) {
 	var params models.DashboardQueryParams
 	if err := c.ShouldBindQuery(&params); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// If include_datasources is true, use the aggregation method
+	if params.IncludeDatasources {
+		response, err := h.service.ListDashboardsWithDatasources(c.Request.Context(), params)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, response)
 		return
 	}
 

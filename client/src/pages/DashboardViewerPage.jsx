@@ -11,10 +11,13 @@ import {
   Maximize,
   Minimize,
   Renew,
+  Time,
   Edit,
-  Time
+  FitToScreen,
+  CenterToFit
 } from '@carbon/icons-react';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
+import ChartDataModal from '../components/ChartDataModal';
 import apiClient from '../api/client';
 import './DashboardViewerPage.scss';
 
@@ -41,13 +44,26 @@ function DashboardViewerPage() {
   const [error, setError] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [reduceToFit, setReduceToFit] = useState(false);
+  const [dataModalOpen, setDataModalOpen] = useState(false);
+  const [selectedChart, setSelectedChart] = useState(null);
+  const [configRefreshInterval, setConfigRefreshInterval] = useState(120); // Default 120s for dashboard/chart config refresh
 
-  // Grid configuration
-  const GRID_ROW_HEIGHT = 32;
+  // Grid configuration - fixed 64x36px cells (16:9 aspect ratio)
+  // Must match DashboardDetailPage.jsx
+  const CELL_WIDTH = 64;
+  const CELL_HEIGHT = 36;
 
-  // Calculate actual rows needed based on panel positions
+  // Calculate actual columns and rows needed based on panel positions
+  const maxGridCol = useMemo(() => {
+    if (!dashboard?.panels || dashboard.panels.length === 0) return 30; // default
+    return dashboard.panels.reduce((max, panel) => {
+      return Math.max(max, panel.x + panel.w);
+    }, 0);
+  }, [dashboard?.panels]);
+
   const maxGridRow = useMemo(() => {
-    if (!dashboard?.panels || dashboard.panels.length === 0) return 0;
+    if (!dashboard?.panels || dashboard.panels.length === 0) return 30; // default
     return dashboard.panels.reduce((max, panel) => {
       return Math.max(max, panel.y + panel.h);
     }, 0);
@@ -85,25 +101,41 @@ function DashboardViewerPage() {
     }
   }, [id]);
 
+  // Fetch system config on mount to get config_refresh_interval
+  useEffect(() => {
+    const fetchSystemConfig = async () => {
+      try {
+        const config = await apiClient.getSystemConfig();
+        if (config?.config_refresh_interval > 0) {
+          setConfigRefreshInterval(config.config_refresh_interval);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch system config, using default refresh interval:', err);
+      }
+    };
+    fetchSystemConfig();
+  }, []);
+
   // Initial load
   useEffect(() => {
     fetchDashboard();
   }, [fetchDashboard]);
 
-  // Auto-refresh based on dashboard settings (refresh_interval is in seconds)
+  // Auto-refresh dashboard/chart config from database (configRefreshInterval from system config)
+  // This is separate from data refresh which is controlled per-chart
   useEffect(() => {
-    if (!dashboard?.settings?.refresh_interval || dashboard.settings.refresh_interval <= 0) {
+    if (configRefreshInterval <= 0) {
       return;
     }
 
     // Convert seconds to milliseconds
-    const intervalMs = dashboard.settings.refresh_interval * 1000;
+    const intervalMs = configRefreshInterval * 1000;
     const interval = setInterval(() => {
       fetchDashboard();
     }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [dashboard?.settings?.refresh_interval, fetchDashboard]);
+  }, [configRefreshInterval, fetchDashboard]);
 
   // Fullscreen handling
   const toggleFullscreen = () => {
@@ -135,6 +167,19 @@ function DashboardViewerPage() {
 
   const formatTime = (date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
+  // Handle double-click on chart panel to show data modal
+  const handlePanelDoubleClick = (chart) => {
+    if (chart && chart.datasource_id) {
+      setSelectedChart(chart);
+      setDataModalOpen(true);
+    }
+  };
+
+  const handleCloseDataModal = () => {
+    setDataModalOpen(false);
+    setSelectedChart(null);
   };
 
   if (loading && !dashboard) {
@@ -180,7 +225,7 @@ function DashboardViewerPage() {
           {dashboard?.settings?.refresh_interval > 0 && (
             <Tag type="green" size="sm">
               <Time size={12} />
-              Auto-refresh: {dashboard.settings.refresh_interval}s
+              Data refresh: {dashboard.settings.refresh_interval}s
             </Tag>
           )}
         </div>
@@ -206,6 +251,13 @@ function DashboardViewerPage() {
           </IconButton>
           <IconButton
             kind="ghost"
+            label={reduceToFit ? 'Actual size' : 'Fit to screen'}
+            onClick={() => setReduceToFit(!reduceToFit)}
+          >
+            {reduceToFit ? <CenterToFit size={20} /> : <FitToScreen size={20} />}
+          </IconButton>
+          <IconButton
+            kind="ghost"
             label="Edit dashboard"
             onClick={() => navigate(`/design/dashboards/${id}`, { state: { from: `/view/dashboards/${id}` } })}
           >
@@ -216,12 +268,16 @@ function DashboardViewerPage() {
 
       {/* Dashboard grid */}
       {dashboard?.panels && dashboard.panels.length > 0 ? (
-        <div className="dashboard-grid-container">
+        <div className={`dashboard-grid-container ${reduceToFit ? 'reduce-to-fit' : ''}`}>
           <div
             className="dashboard-grid"
             style={{
-              gridTemplateColumns: 'repeat(12, 1fr)',
-              gridTemplateRows: `repeat(${maxGridRow}, ${GRID_ROW_HEIGHT}px)`
+              gridTemplateColumns: reduceToFit
+                ? `repeat(${maxGridCol}, 1fr)`
+                : `repeat(${maxGridCol}, ${CELL_WIDTH}px)`,
+              gridTemplateRows: reduceToFit
+                ? `repeat(${maxGridRow}, 1fr)`
+                : `repeat(${maxGridRow}, ${CELL_HEIGHT}px)`
             }}
           >
             {dashboard.panels.map((panel) => {
@@ -234,18 +290,26 @@ function DashboardViewerPage() {
                   className={`panel-container ${hasChart ? 'has-component' : 'empty-panel'}`}
                   style={{
                     gridColumn: `${panel.x + 1} / span ${panel.w}`,
-                    gridRow: `${panel.y + 1} / span ${panel.h}`
+                    gridRow: `${panel.y + 1} / span ${panel.h}`,
+                    cursor: hasChart ? 'pointer' : 'default'
                   }}
+                  onDoubleClick={() => handlePanelDoubleClick(chart)}
                 >
                   {hasChart ? (
                     <>
-                      <div className="chart-header">
-                        <span className="chart-name">{chart.name || 'Untitled Chart'}</span>
-                      </div>
-                      <div className="component-wrapper">
+                      {/* Show header only for datatable type (no built-in title) */}
+                      {chart.chart_type === 'datatable' && (
+                        <div className="chart-header">
+                          <span className="chart-name">{chart.name || 'Untitled Chart'}</span>
+                        </div>
+                      )}
+                      <div className={`component-wrapper ${chart.chart_type === 'datatable' ? 'with-header' : ''}`}>
                         <DynamicComponentLoader
                           code={chart.component_code}
                           props={{}}
+                          dataMapping={chart.data_mapping}
+                          datasourceId={chart.datasource_id}
+                          dataRefreshInterval={dashboard?.settings?.refresh_interval > 0 ? dashboard.settings.refresh_interval * 1000 : null}
                         />
                       </div>
                     </>
@@ -267,6 +331,13 @@ function DashboardViewerPage() {
           </Button>
         </div>
       )}
+
+      {/* Chart Data Modal - shows data table on double-click */}
+      <ChartDataModal
+        open={dataModalOpen}
+        chart={selectedChart}
+        onClose={handleCloseDataModal}
+      />
     </div>
   );
 }

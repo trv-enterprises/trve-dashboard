@@ -1,0 +1,310 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" font-family="IBM Plex Sans, Arial, sans-serif">
+  <defs>
+    <linearGradient id="frontendGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="backendGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f3460;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a2e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="externalGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#533483;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3a1c71;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#0d0d0d"/>
+
+  <!-- Title -->
+  <text x="600" y="40" text-anchor="middle" fill="#f4f4f4" font-size="24" font-weight="600">GiVi-Solution Dashboard - Logical Architecture</text>
+
+  <!-- ==================== FRONTEND BOX ==================== -->
+  <rect x="40" y="70" width="540" height="380" rx="8" fill="url(#frontendGrad)" stroke="#0f62fe" stroke-width="2"/>
+  <text x="310" y="100" text-anchor="middle" fill="#78a9ff" font-size="18" font-weight="600">React Frontend</text>
+  <text x="310" y="118" text-anchor="middle" fill="#6f6f6f" font-size="11">Port 5173 | Vite + Carbon Design System</text>
+
+  <!-- Design Mode -->
+  <rect x="55" y="135" width="160" height="130" rx="4" fill="#262626" stroke="#393939" stroke-width="1"/>
+  <text x="135" y="155" text-anchor="middle" fill="#24a148" font-size="12" font-weight="600">Design Mode</text>
+  <rect x="65" y="165" width="140" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="135" y="179" text-anchor="middle" fill="#c6c6c6" font-size="10">Layouts Editor</text>
+  <rect x="65" y="190" width="140" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="135" y="204" text-anchor="middle" fill="#c6c6c6" font-size="10">Data Sources</text>
+  <rect x="65" y="215" width="140" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="135" y="229" text-anchor="middle" fill="#c6c6c6" font-size="10">Chart Builder</text>
+  <rect x="65" y="240" width="140" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="135" y="254" text-anchor="middle" fill="#c6c6c6" font-size="10">Dashboard Editor</text>
+
+  <!-- View Mode -->
+  <rect x="230" y="135" width="160" height="130" rx="4" fill="#262626" stroke="#393939" stroke-width="1"/>
+  <text x="310" y="155" text-anchor="middle" fill="#0f62fe" font-size="12" font-weight="600">View Mode</text>
+  <rect x="240" y="165" width="140" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="310" y="179" text-anchor="middle" fill="#c6c6c6" font-size="10">Dashboard Viewer</text>
+  <rect x="240" y="190" width="140" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="310" y="204" text-anchor="middle" fill="#c6c6c6" font-size="10">Auto-Refresh</text>
+  <rect x="240" y="215" width="140" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="310" y="229" text-anchor="middle" fill="#c6c6c6" font-size="10">Fullscreen Mode</text>
+  <rect x="240" y="240" width="140" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="310" y="254" text-anchor="middle" fill="#c6c6c6" font-size="10">Reduce-to-Fit</text>
+
+  <!-- Manage Mode -->
+  <rect x="405" y="135" width="160" height="130" rx="4" fill="#262626" stroke="#393939" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="485" y="155" text-anchor="middle" fill="#6f6f6f" font-size="12" font-weight="600">Manage Mode</text>
+  <text x="485" y="175" text-anchor="middle" fill="#525252" font-size="10" font-style="italic">(Future)</text>
+  <rect x="415" y="190" width="140" height="20" rx="2" fill="#1a1a1a" opacity="0.5"/>
+  <text x="485" y="204" text-anchor="middle" fill="#525252" font-size="10">Settings</text>
+  <rect x="415" y="215" width="140" height="20" rx="2" fill="#1a1a1a" opacity="0.5"/>
+  <text x="485" y="229" text-anchor="middle" fill="#525252" font-size="10">User Config</text>
+
+  <!-- Core Components -->
+  <rect x="55" y="280" width="250" height="80" rx="4" fill="#262626" stroke="#393939" stroke-width="1"/>
+  <text x="180" y="300" text-anchor="middle" fill="#da1e28" font-size="12" font-weight="600">Core Components</text>
+  <rect x="65" y="310" width="110" height="18" rx="2" fill="#1a1a1a"/>
+  <text x="120" y="323" text-anchor="middle" fill="#c6c6c6" font-size="9">DynamicLoader</text>
+  <rect x="185" y="310" width="110" height="18" rx="2" fill="#1a1a1a"/>
+  <text x="240" y="323" text-anchor="middle" fill="#c6c6c6" font-size="9">ChartEditorModal</text>
+  <rect x="65" y="333" width="110" height="18" rx="2" fill="#1a1a1a"/>
+  <text x="120" y="346" text-anchor="middle" fill="#c6c6c6" font-size="9">ModeToggle</text>
+  <rect x="185" y="333" width="110" height="18" rx="2" fill="#1a1a1a"/>
+  <text x="240" y="346" text-anchor="middle" fill="#c6c6c6" font-size="9">Navigation</text>
+
+  <!-- API Client -->
+  <rect x="320" y="280" width="245" height="80" rx="4" fill="#262626" stroke="#393939" stroke-width="1"/>
+  <text x="442" y="300" text-anchor="middle" fill="#ff832b" font-size="12" font-weight="600">API Client</text>
+  <rect x="330" y="310" width="105" height="18" rx="2" fill="#1a1a1a"/>
+  <text x="382" y="323" text-anchor="middle" fill="#c6c6c6" font-size="9">REST Fetcher</text>
+  <rect x="445" y="310" width="105" height="18" rx="2" fill="#1a1a1a"/>
+  <text x="497" y="323" text-anchor="middle" fill="#c6c6c6" font-size="9">WebSocket</text>
+  <rect x="330" y="333" width="220" height="18" rx="2" fill="#1a1a1a"/>
+  <text x="440" y="346" text-anchor="middle" fill="#c6c6c6" font-size="9">ECharts + Carbon Theme</text>
+
+  <!-- Frontend Tech Stack -->
+  <rect x="55" y="375" width="510" height="60" rx="4" fill="#1a1a1a" stroke="#393939" stroke-width="1"/>
+  <text x="310" y="395" text-anchor="middle" fill="#8d8d8d" font-size="11" font-weight="500">Tech Stack</text>
+  <text x="100" y="418" text-anchor="middle" fill="#78a9ff" font-size="10">React 18</text>
+  <text x="180" y="418" text-anchor="middle" fill="#78a9ff" font-size="10">Vite 5</text>
+  <text x="270" y="418" text-anchor="middle" fill="#78a9ff" font-size="10">React Router 6</text>
+  <text x="380" y="418" text-anchor="middle" fill="#78a9ff" font-size="10">Carbon 11</text>
+  <text x="480" y="418" text-anchor="middle" fill="#78a9ff" font-size="10">ECharts 5</text>
+
+  <!-- ==================== BACKEND BOX ==================== -->
+  <rect x="620" y="70" width="540" height="520" rx="8" fill="url(#backendGrad)" stroke="#24a148" stroke-width="2"/>
+  <text x="890" y="100" text-anchor="middle" fill="#6fdc8c" font-size="18" font-weight="600">Go Backend</text>
+  <text x="890" y="118" text-anchor="middle" fill="#6f6f6f" font-size="11">Port 3001 | Gin + MongoDB + Redis</text>
+
+  <!-- API Routes -->
+  <rect x="635" y="135" width="510" height="145" rx="4" fill="#262626" stroke="#393939" stroke-width="1"/>
+  <text x="890" y="155" text-anchor="middle" fill="#0f62fe" font-size="12" font-weight="600">REST API Endpoints</text>
+
+  <!-- API Grid -->
+  <rect x="645" y="165" width="120" height="50" rx="2" fill="#1a1a1a"/>
+  <text x="705" y="182" text-anchor="middle" fill="#78a9ff" font-size="10" font-weight="500">/api/layouts</text>
+  <text x="705" y="198" text-anchor="middle" fill="#6f6f6f" font-size="8">CRUD + List</text>
+  <text x="705" y="210" text-anchor="middle" fill="#525252" font-size="7">12-col grid panels</text>
+
+  <rect x="770" y="165" width="120" height="50" rx="2" fill="#1a1a1a"/>
+  <text x="830" y="182" text-anchor="middle" fill="#78a9ff" font-size="10" font-weight="500">/api/datasources</text>
+  <text x="830" y="198" text-anchor="middle" fill="#6f6f6f" font-size="8">CRUD + Query + Test</text>
+  <text x="830" y="210" text-anchor="middle" fill="#525252" font-size="7">SQL/API/CSV/Socket</text>
+
+  <rect x="895" y="165" width="120" height="50" rx="2" fill="#1a1a1a"/>
+  <text x="955" y="182" text-anchor="middle" fill="#78a9ff" font-size="10" font-weight="500">/api/charts</text>
+  <text x="955" y="198" text-anchor="middle" fill="#6f6f6f" font-size="8">CRUD + Versions</text>
+  <text x="955" y="210" text-anchor="middle" fill="#525252" font-size="7">Draft/Publish/History</text>
+
+  <rect x="1020" y="165" width="120" height="50" rx="2" fill="#1a1a1a"/>
+  <text x="1080" y="182" text-anchor="middle" fill="#78a9ff" font-size="10" font-weight="500">/api/dashboards</text>
+  <text x="1080" y="198" text-anchor="middle" fill="#6f6f6f" font-size="8">CRUD + Details</text>
+  <text x="1080" y="210" text-anchor="middle" fill="#525252" font-size="7">Panels + Settings</text>
+
+  <rect x="645" y="220" width="120" height="50" rx="2" fill="#1a1a1a"/>
+  <text x="705" y="237" text-anchor="middle" fill="#be95ff" font-size="10" font-weight="500">/api/ai/sessions</text>
+  <text x="705" y="253" text-anchor="middle" fill="#6f6f6f" font-size="8">Create + Message</text>
+  <text x="705" y="265" text-anchor="middle" fill="#525252" font-size="7">WebSocket streaming</text>
+
+  <rect x="770" y="220" width="120" height="50" rx="2" fill="#1a1a1a"/>
+  <text x="830" y="237" text-anchor="middle" fill="#be95ff" font-size="10" font-weight="500">/mcp/sse</text>
+  <text x="830" y="253" text-anchor="middle" fill="#6f6f6f" font-size="8">MCP Protocol</text>
+  <text x="830" y="265" text-anchor="middle" fill="#525252" font-size="7">Tool execution</text>
+
+  <rect x="895" y="220" width="120" height="50" rx="2" fill="#1a1a1a"/>
+  <text x="955" y="237" text-anchor="middle" fill="#42be65" font-size="10" font-weight="500">/health</text>
+  <text x="955" y="253" text-anchor="middle" fill="#6f6f6f" font-size="8">Status Check</text>
+  <text x="955" y="265" text-anchor="middle" fill="#525252" font-size="7">MongoDB + Redis</text>
+
+  <rect x="1020" y="220" width="120" height="50" rx="2" fill="#1a1a1a"/>
+  <text x="1080" y="237" text-anchor="middle" fill="#42be65" font-size="10" font-weight="500">/swagger</text>
+  <text x="1080" y="253" text-anchor="middle" fill="#6f6f6f" font-size="8">API Docs</text>
+  <text x="1080" y="265" text-anchor="middle" fill="#525252" font-size="7">OpenAPI spec</text>
+
+  <!-- Services Layer -->
+  <rect x="635" y="290" width="250" height="95" rx="4" fill="#262626" stroke="#393939" stroke-width="1"/>
+  <text x="760" y="310" text-anchor="middle" fill="#24a148" font-size="12" font-weight="600">Services</text>
+  <rect x="645" y="320" width="75" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="682" y="334" text-anchor="middle" fill="#c6c6c6" font-size="9">Layout</text>
+  <rect x="725" y="320" width="75" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="762" y="334" text-anchor="middle" fill="#c6c6c6" font-size="9">Datasource</text>
+  <rect x="805" y="320" width="75" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="842" y="334" text-anchor="middle" fill="#c6c6c6" font-size="9">Chart</text>
+  <rect x="645" y="345" width="75" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="682" y="359" text-anchor="middle" fill="#c6c6c6" font-size="9">Dashboard</text>
+  <rect x="725" y="345" width="75" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="762" y="359" text-anchor="middle" fill="#c6c6c6" font-size="9">AISession</text>
+  <rect x="805" y="345" width="75" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="842" y="359" text-anchor="middle" fill="#c6c6c6" font-size="9">Component</text>
+
+  <!-- AI Module -->
+  <rect x="895" y="290" width="250" height="95" rx="4" fill="#262626" stroke="#be95ff" stroke-width="1"/>
+  <text x="1020" y="310" text-anchor="middle" fill="#be95ff" font-size="12" font-weight="600">AI Module</text>
+  <rect x="905" y="320" width="115" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="962" y="334" text-anchor="middle" fill="#c6c6c6" font-size="9">Agent (SDK)</text>
+  <rect x="1025" y="320" width="115" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="1082" y="334" text-anchor="middle" fill="#c6c6c6" font-size="9">ToolExecutor</text>
+  <rect x="905" y="345" width="115" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="962" y="359" text-anchor="middle" fill="#c6c6c6" font-size="9">ChartHub (WS)</text>
+  <rect x="1025" y="345" width="115" height="20" rx="2" fill="#1a1a1a"/>
+  <text x="1082" y="359" text-anchor="middle" fill="#c6c6c6" font-size="9">MCP Handler</text>
+
+  <!-- Repositories -->
+  <rect x="635" y="395" width="250" height="70" rx="4" fill="#262626" stroke="#393939" stroke-width="1"/>
+  <text x="760" y="415" text-anchor="middle" fill="#ff832b" font-size="12" font-weight="600">Repositories</text>
+  <rect x="645" y="425" width="230" height="30" rx="2" fill="#1a1a1a"/>
+  <text x="760" y="445" text-anchor="middle" fill="#c6c6c6" font-size="10">MongoDB Operations (BSON)</text>
+
+  <!-- Data Source Adapters -->
+  <rect x="895" y="395" width="250" height="70" rx="4" fill="#262626" stroke="#393939" stroke-width="1"/>
+  <text x="1020" y="415" text-anchor="middle" fill="#ff832b" font-size="12" font-weight="600">Data Source Adapters</text>
+  <rect x="905" y="428" width="55" height="18" rx="2" fill="#1a1a1a"/>
+  <text x="932" y="441" text-anchor="middle" fill="#c6c6c6" font-size="9">SQL</text>
+  <rect x="965" y="428" width="55" height="18" rx="2" fill="#1a1a1a"/>
+  <text x="992" y="441" text-anchor="middle" fill="#c6c6c6" font-size="9">API</text>
+  <rect x="1025" y="428" width="55" height="18" rx="2" fill="#1a1a1a"/>
+  <text x="1052" y="441" text-anchor="middle" fill="#c6c6c6" font-size="9">CSV</text>
+  <rect x="1085" y="428" width="55" height="18" rx="2" fill="#1a1a1a"/>
+  <text x="1112" y="441" text-anchor="middle" fill="#c6c6c6" font-size="9">Socket</text>
+
+  <!-- Backend Tech Stack -->
+  <rect x="635" y="475" width="510" height="50" rx="4" fill="#1a1a1a" stroke="#393939" stroke-width="1"/>
+  <text x="890" y="495" text-anchor="middle" fill="#8d8d8d" font-size="11" font-weight="500">Tech Stack</text>
+  <text x="700" y="515" text-anchor="middle" fill="#6fdc8c" font-size="10">Go 1.23</text>
+  <text x="780" y="515" text-anchor="middle" fill="#6fdc8c" font-size="10">Gin</text>
+  <text x="860" y="515" text-anchor="middle" fill="#6fdc8c" font-size="10">Gorilla WS</text>
+  <text x="960" y="515" text-anchor="middle" fill="#6fdc8c" font-size="10">Swaggo</text>
+  <text x="1060" y="515" text-anchor="middle" fill="#6fdc8c" font-size="10">Anthropic SDK</text>
+
+  <!-- ==================== EXTERNAL SYSTEMS ==================== -->
+
+  <!-- MongoDB -->
+  <rect x="40" y="620" width="180" height="100" rx="6" fill="url(#externalGrad)" stroke="#be95ff" stroke-width="2"/>
+  <text x="130" y="650" text-anchor="middle" fill="#e8daff" font-size="14" font-weight="600">MongoDB 7</text>
+  <text x="130" y="670" text-anchor="middle" fill="#a56eff" font-size="10">Primary Database</text>
+  <rect x="55" y="680" width="150" height="25" rx="2" fill="#1a1a1a"/>
+  <text x="130" y="697" text-anchor="middle" fill="#c6c6c6" font-size="9">layouts, charts, dashboards</text>
+
+  <!-- Redis -->
+  <rect x="240" y="620" width="180" height="100" rx="6" fill="url(#externalGrad)" stroke="#be95ff" stroke-width="2"/>
+  <text x="330" y="650" text-anchor="middle" fill="#e8daff" font-size="14" font-weight="600">Redis 7</text>
+  <text x="330" y="670" text-anchor="middle" fill="#a56eff" font-size="10">Cache + Sessions</text>
+  <rect x="255" y="680" width="150" height="25" rx="2" fill="#1a1a1a"/>
+  <text x="330" y="697" text-anchor="middle" fill="#c6c6c6" font-size="9">AI session state</text>
+
+  <!-- Anthropic API -->
+  <rect x="440" y="620" width="180" height="100" rx="6" fill="url(#externalGrad)" stroke="#be95ff" stroke-width="2"/>
+  <text x="530" y="650" text-anchor="middle" fill="#e8daff" font-size="14" font-weight="600">Anthropic API</text>
+  <text x="530" y="670" text-anchor="middle" fill="#a56eff" font-size="10">Claude AI</text>
+  <rect x="455" y="680" width="150" height="25" rx="2" fill="#1a1a1a"/>
+  <text x="530" y="697" text-anchor="middle" fill="#c6c6c6" font-size="9">Chart generation</text>
+
+  <!-- External Data Sources -->
+  <rect x="640" y="620" width="280" height="100" rx="6" fill="url(#externalGrad)" stroke="#be95ff" stroke-width="2"/>
+  <text x="780" y="650" text-anchor="middle" fill="#e8daff" font-size="14" font-weight="600">External Data Sources</text>
+  <rect x="655" y="665" width="60" height="22" rx="2" fill="#1a1a1a"/>
+  <text x="685" y="680" text-anchor="middle" fill="#c6c6c6" font-size="9">PostgreSQL</text>
+  <rect x="720" y="665" width="60" height="22" rx="2" fill="#1a1a1a"/>
+  <text x="750" y="680" text-anchor="middle" fill="#c6c6c6" font-size="9">MySQL</text>
+  <rect x="785" y="665" width="60" height="22" rx="2" fill="#1a1a1a"/>
+  <text x="815" y="680" text-anchor="middle" fill="#c6c6c6" font-size="9">REST APIs</text>
+  <rect x="850" y="665" width="60" height="22" rx="2" fill="#1a1a1a"/>
+  <text x="880" y="680" text-anchor="middle" fill="#c6c6c6" font-size="9">WebSocket</text>
+  <rect x="655" y="692" width="120" height="22" rx="2" fill="#1a1a1a"/>
+  <text x="715" y="707" text-anchor="middle" fill="#c6c6c6" font-size="9">EdgeLake (Future)</text>
+  <rect x="780" y="692" width="60" height="22" rx="2" fill="#1a1a1a"/>
+  <text x="810" y="707" text-anchor="middle" fill="#c6c6c6" font-size="9">CSV Files</text>
+
+  <!-- Browser -->
+  <rect x="940" y="620" width="180" height="100" rx="6" fill="url(#externalGrad)" stroke="#be95ff" stroke-width="2"/>
+  <text x="1030" y="650" text-anchor="middle" fill="#e8daff" font-size="14" font-weight="600">Web Browser</text>
+  <text x="1030" y="670" text-anchor="middle" fill="#a56eff" font-size="10">End User</text>
+  <rect x="955" y="680" width="150" height="25" rx="2" fill="#1a1a1a"/>
+  <text x="1030" y="697" text-anchor="middle" fill="#c6c6c6" font-size="9">View dashboards</text>
+
+  <!-- ==================== CONNECTION LINES ==================== -->
+
+  <!-- Frontend to Backend -->
+  <line x1="580" y1="260" x2="620" y2="260" stroke="#0f62fe" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <text x="600" y="252" text-anchor="middle" fill="#0f62fe" font-size="9">REST/WS</text>
+
+  <!-- Backend to MongoDB -->
+  <line x1="760" y1="540" x2="130" y2="620" stroke="#be95ff" stroke-width="1.5" stroke-dasharray="4,2"/>
+
+  <!-- Backend to Redis -->
+  <line x1="850" y1="540" x2="330" y2="620" stroke="#be95ff" stroke-width="1.5" stroke-dasharray="4,2"/>
+
+  <!-- Backend to Anthropic -->
+  <line x1="920" y1="540" x2="530" y2="620" stroke="#be95ff" stroke-width="1.5" stroke-dasharray="4,2"/>
+
+  <!-- Backend to Data Sources -->
+  <line x1="1020" y1="540" x2="780" y2="620" stroke="#be95ff" stroke-width="1.5" stroke-dasharray="4,2"/>
+
+  <!-- Browser to Frontend -->
+  <line x1="1030" y1="620" x2="450" y2="450" stroke="#78a9ff" stroke-width="1.5" stroke-dasharray="4,2"/>
+
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#0f62fe"/>
+    </marker>
+  </defs>
+
+  <!-- Legend -->
+  <rect x="40" y="750" width="1120" height="120" rx="6" fill="#1a1a1a" stroke="#393939" stroke-width="1"/>
+  <text x="600" y="775" text-anchor="middle" fill="#f4f4f4" font-size="14" font-weight="600">Legend &amp; Key APIs</text>
+
+  <!-- Legend items -->
+  <rect x="60" y="795" width="16" height="16" rx="2" fill="#0f62fe"/>
+  <text x="85" y="807" fill="#c6c6c6" font-size="11">Frontend Component</text>
+
+  <rect x="60" y="820" width="16" height="16" rx="2" fill="#24a148"/>
+  <text x="85" y="832" fill="#c6c6c6" font-size="11">Backend Service</text>
+
+  <rect x="60" y="845" width="16" height="16" rx="2" fill="#be95ff"/>
+  <text x="85" y="857" fill="#c6c6c6" font-size="11">External System</text>
+
+  <!-- Key APIs -->
+  <text x="280" y="807" fill="#78a9ff" font-size="10">GET /api/dashboards/:id</text>
+  <text x="280" y="825" fill="#6f6f6f" font-size="9">Fetch dashboard with panels</text>
+
+  <text x="280" y="850" fill="#78a9ff" font-size="10">GET /api/charts/:id</text>
+  <text x="280" y="868" fill="#6f6f6f" font-size="9">Get chart with component_code</text>
+
+  <text x="520" y="807" fill="#78a9ff" font-size="10">POST /api/ai/sessions</text>
+  <text x="520" y="825" fill="#6f6f6f" font-size="9">Start AI chat for chart building</text>
+
+  <text x="520" y="850" fill="#78a9ff" font-size="10">WS /api/ai/sessions/:id/ws</text>
+  <text x="520" y="868" fill="#6f6f6f" font-size="9">Stream AI responses + tool calls</text>
+
+  <text x="760" y="807" fill="#78a9ff" font-size="10">POST /api/datasources/:id/query</text>
+  <text x="760" y="825" fill="#6f6f6f" font-size="9">Execute query against source</text>
+
+  <text x="760" y="850" fill="#78a9ff" font-size="10">GET /api/charts/:id/versions</text>
+  <text x="760" y="868" fill="#6f6f6f" font-size="9">List chart version history</text>
+
+  <text x="1000" y="807" fill="#78a9ff" font-size="10">GET /mcp/sse</text>
+  <text x="1000" y="825" fill="#6f6f6f" font-size="9">MCP SSE stream</text>
+
+  <text x="1000" y="850" fill="#78a9ff" font-size="10">GET /swagger/index.html</text>
+  <text x="1000" y="868" fill="#6f6f6f" font-size="9">Interactive API docs</text>
+
+</svg>

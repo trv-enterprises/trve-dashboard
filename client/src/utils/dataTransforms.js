@@ -194,7 +194,9 @@ export function transformData(data, transforms = {}) {
     return { columns: [], rows: [], metadata: {}, aggregatedValue: null };
   }
 
-  const { filters, aggregation, sortBy, sortOrder, limit } = transforms;
+  // Handle null transforms (default param only works for undefined, not null)
+  const safeTransforms = transforms || {};
+  const { filters, aggregation, sortBy, sortOrder, limit } = safeTransforms;
 
   let rows = [...data.rows];
   const columns = data.columns;
@@ -430,6 +432,15 @@ export function formatTimestamp(value, format = 'short', options = {}) {
         minute: '2-digit'
       });
 
+    case 'chart_time_seconds':
+      // Time with seconds for chart axes: "10:30:05 AM"
+      return date.toLocaleTimeString(locale, {
+        ...formatOptions,
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+
     case 'chart_date':
       // Date only for chart axes: "Jan 15"
       return date.toLocaleDateString(locale, {
@@ -446,6 +457,17 @@ export function formatTimestamp(value, format = 'short', options = {}) {
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit'
+      });
+
+    case 'chart_datetime_seconds':
+      // Full date/time with seconds for chart axes: "Jan 15, 10:30:05 AM"
+      return date.toLocaleString(locale, {
+        ...formatOptions,
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit'
       });
 
     case 'chart_auto':
@@ -589,6 +611,37 @@ export function formatDataForDisplay(data, options = {}) {
     rows: data.rows, // Original rows
     formattedRows, // Formatted for display
     metadata: data.metadata
+  };
+}
+
+/**
+ * Build transforms configuration from chart data_mapping
+ * This converts the database data_mapping format to the transforms format
+ * used by transformData()
+ *
+ * @param {Object} dataMapping - Chart data_mapping object
+ * @returns {Object|null} - Transforms config or null if no transforms needed
+ */
+export function buildTransformsFromMapping(dataMapping) {
+  if (!dataMapping) return null;
+
+  const { filters, aggregation, sort_by, sort_order, limit } = dataMapping;
+  const hasTransforms = (filters?.length > 0) || aggregation?.type || sort_by || (limit > 0);
+
+  if (!hasTransforms) return null;
+
+  return {
+    filters: (filters || []).map(f => ({
+      field: f.field,
+      op: f.op,
+      value: (f.op === 'in' || f.op === 'notIn') && typeof f.value === 'string'
+        ? f.value.split(',').map(v => v.trim())
+        : f.value
+    })),
+    aggregation: aggregation?.type ? aggregation : null,
+    sortBy: sort_by || null,
+    sortOrder: sort_order || 'desc',
+    limit: limit || 0
   };
 }
 

@@ -16,7 +16,7 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 					"chart_type": map[string]interface{}{
 						"type":        "string",
 						"description": "Type of chart",
-						"enum":        []string{"bar", "line", "area", "pie", "scatter", "gauge", "heatmap", "radar", "funnel", "custom"},
+						"enum":        []string{"bar", "line", "area", "pie", "scatter", "gauge", "heatmap", "radar", "funnel", "dataview", "custom"},
 					},
 				},
 			},

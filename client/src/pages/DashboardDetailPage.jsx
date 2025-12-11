@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import html2canvas from 'html2canvas';
+import * as echarts from 'echarts';
 import {
   Button,
   Loading,
@@ -12,7 +13,10 @@ import {
   NumberInput,
   IconButton,
   OverflowMenu,
-  OverflowMenuItem
+  OverflowMenuItem,
+  MenuButton,
+  MenuItem,
+  Tooltip
 } from '@carbon/react';
 import {
   Save,
@@ -23,8 +27,9 @@ import {
   View,
   ChartBar,
   Catalog,
-  WatsonxAi
+  Information
 } from '@carbon/icons-react';
+import AiIcon from '../components/icons/AiIcon';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import ChartEditorModal from '../components/ChartEditorModal';
 import apiClient from '../api/client';
@@ -100,16 +105,120 @@ function DashboardDetailPage() {
   const gridRef = useRef(null);
   const thumbnailCaptureRef = useRef(null);
 
-  // Grid configuration
-  const GRID_COLS = 12;
-  const GRID_ROW_HEIGHT = 32;
-  const GRID_ROWS = 50;
+  // Layout dimension state
+  const [dimensions, setDimensions] = useState([]);
+  const [currentDimension, setCurrentDimension] = useState('');
+  const [dimensionLoading, setDimensionLoading] = useState(true);
+
+  // Grid configuration - fixed 64x36px cells (16:9 aspect ratio)
+  // Larger dimensions = more cells, not bigger cells
+  const CELL_WIDTH = 64;
+  const CELL_HEIGHT = 36;
+
+  // Calculate grid dimensions based on selected dimension preset
+  const currentDim = dimensions.find(d => d.name === currentDimension);
+  const gridWidth = currentDim?.max_width || 1920;
+  const gridHeight = currentDim?.max_height || 1080;
+  const GRID_COLS = Math.floor(gridWidth / CELL_WIDTH);
+  const GRID_ROWS = Math.floor(gridHeight / CELL_HEIGHT);
+  const OVERFLOW_ROWS = 10; // Extra rows below visible area for drawing new panels
 
   useEffect(() => {
     if (!isCreateMode) {
       fetchDashboard();
     }
   }, [id]);
+
+  // Load layout dimensions on mount
+  useEffect(() => {
+    const loadDimensions = async () => {
+      try {
+        setDimensionLoading(true);
+        const config = await apiClient.getSystemConfig();
+
+        // Convert layout_dimensions object to array for dropdown
+        const dimensionList = Object.entries(config.layout_dimensions || {}).map(([name, dim]) => ({
+          name,
+          max_width: dim.max_width,
+          max_height: dim.max_height
+        }));
+
+        // Sort by width ascending
+        dimensionList.sort((a, b) => a.max_width - b.max_width);
+
+        setDimensions(dimensionList);
+
+        // Set current dimension from system config
+        const current = config.settings?.current_layout_dimension || config.default_dimension;
+        setCurrentDimension(current);
+      } catch (err) {
+        console.error('Failed to load layout dimensions:', err);
+      } finally {
+        setDimensionLoading(false);
+      }
+    };
+
+    loadDimensions();
+  }, []);
+
+  // Handle dimension change - auto-scale panels if new dimension is smaller
+  const handleDimensionChange = async (newDimension) => {
+    const newDim = dimensions.find(d => d.name === newDimension);
+    if (!newDim) return;
+
+    // Calculate grid columns/rows for old and new dimensions
+    const oldCols = GRID_COLS;
+    const oldRows = GRID_ROWS;
+    const newCols = Math.floor(newDim.max_width / CELL_WIDTH);
+    const newRows = Math.floor(newDim.max_height / CELL_HEIGHT);
+
+    // Check if any panels need scaling (exceed new bounds)
+    if (panels.length > 0) {
+      // Find max extent of current panels
+      let maxPanelRight = 0;
+      let maxPanelBottom = 0;
+      panels.forEach(panel => {
+        maxPanelRight = Math.max(maxPanelRight, panel.x + panel.w);
+        maxPanelBottom = Math.max(maxPanelBottom, panel.y + panel.h);
+      });
+
+      // Check if panels exceed new grid bounds
+      const needsScaling = maxPanelRight > newCols || maxPanelBottom > newRows;
+
+      if (needsScaling) {
+        // Calculate scale factors based on panel extent vs new grid size
+        const scaleX = maxPanelRight > newCols ? newCols / maxPanelRight : 1;
+        const scaleY = maxPanelBottom > newRows ? newRows / maxPanelBottom : 1;
+
+        console.log('Auto-scaling panels:', {
+          oldCols, oldRows, newCols, newRows,
+          maxPanelRight, maxPanelBottom,
+          scaleX, scaleY
+        });
+
+        // Scale all panels proportionally
+        const scaledPanels = panels.map(panel => ({
+          ...panel,
+          x: Math.floor(panel.x * scaleX),
+          y: Math.floor(panel.y * scaleY),
+          w: Math.max(1, Math.floor(panel.w * scaleX)), // Min width of 1
+          h: Math.max(1, Math.floor(panel.h * scaleY))  // Min height of 1
+        }));
+
+        setPanels(scaledPanels);
+        setHasChanges(true);
+      }
+    }
+
+    try {
+      await apiClient.setCurrentDimension(newDimension);
+      setCurrentDimension(newDimension);
+    } catch (err) {
+      console.error('Failed to set dimension:', err);
+      setError('Failed to save dimension preference');
+      setTimeout(() => setError(null), 5000);
+    }
+  };
 
   // Check for duplicate dashboard name on blur
   const checkDuplicateDashboardName = async (nameToCheck) => {
@@ -138,8 +247,6 @@ function DashboardDetailPage() {
     try {
       setLoading(true);
       const data = await apiClient.getDashboard(id);
-      console.log('Dashboard response:', data);
-
       setDashboard(data);
       setName(data.name);
       setDescription(data.description || '');
@@ -147,6 +254,11 @@ function DashboardDetailPage() {
       setRefreshInterval(data.settings?.refresh_interval || 0);
       setIsPublic(data.settings?.is_public || false);
       setAllowExport(data.settings?.allow_export !== false);
+
+      // Restore the layout dimension the dashboard was created with
+      if (data.settings?.layout_dimension) {
+        setCurrentDimension(data.settings.layout_dimension);
+      }
 
       // Load panels (now contain chart_id references)
       if (data.panels && data.panels.length > 0) {
@@ -233,11 +345,13 @@ function DashboardDetailPage() {
   const openAIEditor = (panelId) => {
     const panel = panels.find(p => p.id === panelId);
     const chartId = panel?.chart_id;
+    // Pass the current dashboard URL as referrer so AI editor returns here
+    const returnUrl = isCreateMode ? '/design/dashboards' : `/design/dashboards/${id}`;
     if (chartId) {
-      navigate(`/design/charts/ai/${chartId}`);
+      navigate(`/design/charts/ai/${chartId}`, { state: { from: returnUrl, panelId } });
     } else {
       // Navigate to create new chart with AI
-      navigate('/design/charts/ai/new');
+      navigate('/design/charts/ai/new', { state: { from: returnUrl, panelId } });
     }
   };
 
@@ -292,9 +406,8 @@ function DashboardDetailPage() {
   const getGridPosition = (e) => {
     if (!gridRef.current) return null;
     const rect = gridRef.current.getBoundingClientRect();
-    const cellWidth = rect.width / GRID_COLS;
-    const x = Math.floor((e.clientX - rect.left) / cellWidth);
-    const y = Math.floor((e.clientY - rect.top) / GRID_ROW_HEIGHT);
+    const x = Math.floor((e.clientX - rect.left) / CELL_WIDTH);
+    const y = Math.floor((e.clientY - rect.top) / CELL_HEIGHT);
     return { x: Math.max(0, Math.min(x, GRID_COLS - 1)), y: Math.max(0, y) };
   };
 
@@ -395,36 +508,301 @@ function DashboardDetailPage() {
     setResizingPanel({ id: panel.id });
   };
 
-  // Capture thumbnail of the dashboard grid (in preview style, not design mode)
+  // Capture thumbnail of the dashboard grid (switches to preview mode temporarily)
   const captureThumbnail = async () => {
-    if (!thumbnailCaptureRef.current) return null;
+    if (!thumbnailCaptureRef.current || !gridRef.current) return null;
+    if (panels.length === 0) return null;
+
+    // Store current mode to restore after capture
+    const previousMode = editorMode;
+
+    console.log('=== THUMBNAIL CAPTURE DEBUG START ===');
+    console.log('1. Dimension preset:', currentDimension);
+    console.log('2. Current dimension object:', currentDim);
+    console.log('3. Grid constants:', { CELL_WIDTH, CELL_HEIGHT, GRID_COLS, GRID_ROWS });
 
     try {
-      // Add thumbnail-capture class to hide design mode elements
+      // Switch to preview mode so charts are rendered
+      setEditorMode(EDITOR_MODES.PREVIEW);
+
+      // Apply thumbnail-capture class to container for styling
       thumbnailCaptureRef.current.classList.add('thumbnail-capture');
 
-      // Wait for CSS to apply
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Calculate grid dimensions from constants (what the grid SHOULD be)
+      const gridWidth = GRID_COLS * CELL_WIDTH;
+      const gridHeight = GRID_ROWS * CELL_HEIGHT;
 
-      const canvas = await html2canvas(thumbnailCaptureRef.current, {
-        scale: 0.5,
-        backgroundColor: '#161616',
-        logging: false,
-        useCORS: true,
-        allowTaint: true
+      console.log('4. Calculated grid dimensions:', { gridWidth, gridHeight });
+
+      // Get actual DOM dimensions BEFORE style changes
+      const containerRectBefore = thumbnailCaptureRef.current.getBoundingClientRect();
+      const gridRectBefore = gridRef.current.getBoundingClientRect();
+      console.log('5. Container rect BEFORE style change:', containerRectBefore);
+      console.log('6. Grid rect BEFORE style change:', gridRectBefore);
+      console.log('7. Grid element scrollWidth/scrollHeight BEFORE:', {
+        scrollWidth: gridRef.current.scrollWidth,
+        scrollHeight: gridRef.current.scrollHeight,
+        offsetWidth: gridRef.current.offsetWidth,
+        offsetHeight: gridRef.current.offsetHeight,
+        clientWidth: gridRef.current.clientWidth,
+        clientHeight: gridRef.current.clientHeight
       });
 
-      // Remove the class
+      // Calculate content extent FIRST (before setting container size)
+      let maxPanelRightForContainer = 0;
+      let maxPanelBottomForContainer = 0;
+      panels.forEach(panel => {
+        maxPanelRightForContainer = Math.max(maxPanelRightForContainer, (panel.x + panel.w) * CELL_WIDTH);
+        maxPanelBottomForContainer = Math.max(maxPanelBottomForContainer, (panel.y + panel.h) * CELL_HEIGHT);
+      });
+      const containerWidth = Math.max(gridWidth, maxPanelRightForContainer);
+      const containerHeight = Math.max(gridHeight, maxPanelBottomForContainer);
+
+      // Temporarily set container to capture size (larger of grid or content)
+      const originalContainerStyle = thumbnailCaptureRef.current.style.cssText;
+      thumbnailCaptureRef.current.style.width = `${containerWidth}px`;
+      thumbnailCaptureRef.current.style.height = `${containerHeight}px`;
+      thumbnailCaptureRef.current.style.overflow = 'visible';
+      thumbnailCaptureRef.current.style.maxHeight = 'none';
+
+      console.log('4b. Container size set to:', { containerWidth, containerHeight });
+
+      // Wait for React to re-render in preview mode
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // NOW apply style overrides after React has rendered
+      // Force the grid template to use fixed pixel sizes
+      const originalGridStyle = gridRef.current.style.cssText;
+      gridRef.current.style.width = `${gridWidth}px`;
+      gridRef.current.style.height = `${gridHeight}px`;
+      gridRef.current.style.maxWidth = `${gridWidth}px`;
+      gridRef.current.style.overflow = 'hidden';
+      gridRef.current.style.gridTemplateColumns = `repeat(${GRID_COLS}, ${CELL_WIDTH}px)`;
+      gridRef.current.style.gridTemplateRows = `repeat(${GRID_ROWS}, ${CELL_HEIGHT}px)`;
+
+      // Force each panel to its exact pixel dimensions
+      const panelItems = gridRef.current.querySelectorAll('.panel-item');
+      const originalPanelStyles = [];
+      panelItems.forEach((panelEl, i) => {
+        originalPanelStyles.push(panelEl.style.cssText);
+        const panel = panels[i];
+        if (panel) {
+          const panelWidth = panel.w * CELL_WIDTH;
+          const panelHeight = panel.h * CELL_HEIGHT;
+          panelEl.style.width = `${panelWidth}px`;
+          panelEl.style.height = `${panelHeight}px`;
+          panelEl.style.maxWidth = `${panelWidth}px`;
+          panelEl.style.maxHeight = `${panelHeight}px`;
+          panelEl.style.overflow = 'hidden';
+          console.log(`    Panel ${i}: forcing size to ${panelWidth}x${panelHeight}px`);
+        }
+      });
+
+      // Wait for styles to apply
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Force ECharts instances to resize to their panel's exact dimensions
+      // Use the imported echarts library directly
+      const chartElements = gridRef.current.querySelectorAll('[_echarts_instance_]');
+      console.log('4c. Found ECharts instances:', chartElements.length);
+      console.log('4c. echarts library available:', !!echarts);
+
+      chartElements.forEach((el, i) => {
+        const instance = echarts.getInstanceByDom(el);
+        console.log(`    ECharts instance ${i}: found=${!!instance}`);
+        if (instance) {
+          // Find the parent panel to get its dimensions
+          const panelEl = el.closest('.panel-item');
+          console.log(`    Panel element found: ${!!panelEl}`);
+          if (panelEl) {
+            const w = parseInt(panelEl.dataset.panelW, 10);
+            const h = parseInt(panelEl.dataset.panelH, 10);
+            const panelWidth = w * CELL_WIDTH;
+            const panelHeight = h * CELL_HEIGHT - 32; // Subtract header height
+            console.log(`    Resizing ECharts instance ${i} to ${panelWidth}x${panelHeight}px`);
+            instance.resize({ width: panelWidth, height: panelHeight });
+          } else {
+            console.log(`    Resizing ECharts instance ${i} (no panel found)`);
+            instance.resize();
+          }
+        }
+      });
+
+      // Also force-resize all canvas elements to fit their containers
+      const canvasElements = gridRef.current.querySelectorAll('canvas');
+      console.log('4d. Found canvas elements:', canvasElements.length);
+      canvasElements.forEach((canvas, i) => {
+        const panelEl = canvas.closest('.panel-item');
+        if (panelEl) {
+          const w = parseInt(panelEl.dataset.panelW, 10);
+          const h = parseInt(panelEl.dataset.panelH, 10);
+          if (w && h) {
+            const panelWidth = w * CELL_WIDTH;
+            const panelHeight = h * CELL_HEIGHT - 32;
+            console.log(`    Canvas ${i}: setting max dimensions to ${panelWidth}x${panelHeight}px`);
+            canvas.style.maxWidth = `${panelWidth}px`;
+            canvas.style.maxHeight = `${panelHeight}px`;
+          }
+        }
+      });
+
+      // Wait for ECharts resize to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Check scrollWidth after resize - if still larger than grid, that's our capture width
+      const scrollWidthAfterResize = gridRef.current.scrollWidth;
+      console.log('4e. scrollWidth after ECharts resize:', scrollWidthAfterResize);
+      if (scrollWidthAfterResize > gridWidth) {
+        console.log('4e. WARNING: Content still extends beyond grid. Overflow:', scrollWidthAfterResize - gridWidth, 'px');
+      }
+
+      // Get actual DOM dimensions AFTER style changes
+      const containerRectAfter = thumbnailCaptureRef.current.getBoundingClientRect();
+      const gridRectAfter = gridRef.current.getBoundingClientRect();
+      console.log('8. Container rect AFTER style change:', containerRectAfter);
+      console.log('9. Grid rect AFTER style change:', gridRectAfter);
+      console.log('10. Grid element scrollWidth/scrollHeight AFTER:', {
+        scrollWidth: gridRef.current.scrollWidth,
+        scrollHeight: gridRef.current.scrollHeight,
+        offsetWidth: gridRef.current.offsetWidth,
+        offsetHeight: gridRef.current.offsetHeight,
+        clientWidth: gridRef.current.clientWidth,
+        clientHeight: gridRef.current.clientHeight
+      });
+
+      // Calculate the bounding box of actual content (panels only, not empty grid space)
+      // Find the maximum extent of panels
+      let maxPanelRight = 0;
+      let maxPanelBottom = 0;
+      console.log('11. Panel data:');
+      panels.forEach((panel, i) => {
+        const panelRight = (panel.x + panel.w) * CELL_WIDTH;
+        const panelBottom = (panel.y + panel.h) * CELL_HEIGHT;
+        maxPanelRight = Math.max(maxPanelRight, panelRight);
+        maxPanelBottom = Math.max(maxPanelBottom, panelBottom);
+        console.log(`    Panel ${i}: x=${panel.x}, y=${panel.y}, w=${panel.w}, h=${panel.h} => right=${panelRight}px, bottom=${panelBottom}px`);
+      });
+
+      // Capture dimensions: use grid size, unless panels extend beyond grid
+      // Don't add margin - capture exactly what's needed
+      const captureWidth = Math.max(gridWidth, maxPanelRight);
+      const captureHeight = Math.max(gridHeight, maxPanelBottom);
+
+      console.log('11b. Capture dimensions:', {
+        gridWidth, gridHeight, maxPanelRight, maxPanelBottom, captureWidth, captureHeight
+      });
+
+      console.log('12. Content bounds:', { maxPanelRight, maxPanelBottom });
+      console.log('13. Capture dimensions:', { captureWidth, captureHeight });
+
+      const html2canvasOptions = {
+        scale: 0.25, // Scale down for thumbnail size
+        backgroundColor: '#161616',
+        logging: true, // Enable html2canvas logging
+        useCORS: true,
+        allowTaint: true,
+        scrollX: 0,
+        scrollY: 0,
+        windowScrollX: 0,
+        windowScrollY: 0,
+        windowWidth: captureWidth + 200,
+        windowHeight: captureHeight + 200,
+        width: captureWidth,
+        height: captureHeight,
+        // Modify cloned DOM before rendering to ensure proper clipping
+        onclone: (clonedDoc) => {
+          const clonedGrid = clonedDoc.querySelector('.panel-grid');
+          if (clonedGrid) {
+            clonedGrid.style.width = `${captureWidth}px`;
+            clonedGrid.style.maxWidth = `${captureWidth}px`;
+            clonedGrid.style.overflow = 'hidden';
+            clonedGrid.style.clipPath = 'inset(0 0 0 0)';
+
+            // Force all panels to their exact dimensions and clip
+            const panels = clonedGrid.querySelectorAll('.panel-item');
+            panels.forEach(panel => {
+              const w = parseInt(panel.dataset.panelW, 10);
+              const h = parseInt(panel.dataset.panelH, 10);
+              if (w && h) {
+                const panelWidth = w * CELL_WIDTH;
+                const panelHeight = h * CELL_HEIGHT;
+                panel.style.width = `${panelWidth}px`;
+                panel.style.height = `${panelHeight}px`;
+                panel.style.maxWidth = `${panelWidth}px`;
+                panel.style.maxHeight = `${panelHeight}px`;
+                panel.style.overflow = 'hidden';
+                panel.style.clipPath = 'inset(0 0 0 0)';
+              }
+            });
+
+            // Force all canvases to fit their panel dimensions via CSS only
+            // DO NOT set canvas.width/height attributes - that clears the canvas content!
+            const canvases = clonedGrid.querySelectorAll('canvas');
+            canvases.forEach(canvas => {
+              const panelEl = canvas.closest('.panel-item');
+              if (panelEl) {
+                const w = parseInt(panelEl.dataset.panelW, 10);
+                const h = parseInt(panelEl.dataset.panelH, 10);
+                if (w && h) {
+                  const panelWidth = w * CELL_WIDTH;
+                  const panelHeight = h * CELL_HEIGHT - 32;
+                  // Only set CSS style dimensions, NOT canvas attributes
+                  canvas.style.width = `${panelWidth}px`;
+                  canvas.style.height = `${panelHeight}px`;
+                  canvas.style.maxWidth = `${panelWidth}px`;
+                  canvas.style.maxHeight = `${panelHeight}px`;
+                  canvas.style.objectFit = 'contain';
+                }
+              }
+            });
+          }
+          console.log('14b. onclone: Modified cloned DOM with explicit panel/canvas sizes');
+        }
+      };
+      console.log('14. html2canvas options:', html2canvasOptions);
+
+      // Capture the grid directly - crop to content area
+      const canvas = await html2canvas(gridRef.current, html2canvasOptions);
+
+      console.log('15. Resulting canvas dimensions:', { width: canvas.width, height: canvas.height });
+      console.log('16. Expected canvas dimensions (with scale):', {
+        width: captureWidth * 0.25,
+        height: captureHeight * 0.25
+      });
+
+      // Restore container, grid, and panel styles
+      thumbnailCaptureRef.current.style.cssText = originalContainerStyle;
+      gridRef.current.style.cssText = originalGridStyle;
+
+      // Restore panel styles
+      const panelItemsToRestore = gridRef.current.querySelectorAll('.panel-item');
+      panelItemsToRestore.forEach((panelEl, i) => {
+        if (originalPanelStyles[i] !== undefined) {
+          panelEl.style.cssText = originalPanelStyles[i];
+        }
+      });
+
       thumbnailCaptureRef.current.classList.remove('thumbnail-capture');
 
+      // Restore previous mode
+      setEditorMode(previousMode);
+
       const dataUrl = canvas.toDataURL('image/png', 0.8);
+      console.log('17. Data URL length:', dataUrl.length);
+      console.log('=== THUMBNAIL CAPTURE DEBUG END ===');
       return dataUrl;
     } catch (err) {
       console.error('Failed to capture thumbnail:', err);
-      // Ensure we remove the class even if there's an error
+      // Ensure we clean up even if there's an error
       if (thumbnailCaptureRef.current) {
+        thumbnailCaptureRef.current.style.cssText = '';
         thumbnailCaptureRef.current.classList.remove('thumbnail-capture');
       }
+      if (gridRef.current) {
+        gridRef.current.style.cssText = '';
+      }
+      // Restore previous mode
+      setEditorMode(previousMode);
       return null;
     }
   };
@@ -446,7 +824,8 @@ function DashboardDetailPage() {
           theme,
           refresh_interval: refreshInterval,
           is_public: isPublic,
-          allow_export: allowExport
+          allow_export: allowExport,
+          layout_dimension: currentDimension // Save the dimension preset with the dashboard
         }
       };
 
@@ -528,7 +907,7 @@ function DashboardDetailPage() {
         {/* Form content */}
         <div className="form-content">
         {/* Dashboard Name - full width */}
-        <div className="form-row">
+        <div className="form-row compact">
           <TextInput
             id="dashboard-name"
             labelText="Dashboard Name"
@@ -546,7 +925,7 @@ function DashboardDetailPage() {
         </div>
 
         {/* Description - full width */}
-        <div className="form-row">
+        <div className="form-row compact">
           <TextInput
             id="dashboard-description"
             labelText="Description (optional)"
@@ -614,6 +993,35 @@ function DashboardDetailPage() {
             Preview
           </Button>
         </div>
+        {editorMode === EDITOR_MODES.DESIGN && dimensions.length > 0 && (
+          <div className="dimension-selector">
+            <Select
+              id="dimension-select"
+              labelText=""
+              hideLabel
+              size="sm"
+              value={currentDimension}
+              onChange={(e) => handleDimensionChange(e.target.value)}
+              disabled={dimensionLoading}
+            >
+              {dimensions.map((dim) => (
+                <SelectItem
+                  key={dim.name}
+                  value={dim.name}
+                  text={`${dim.name} (${dim.max_width}×${dim.max_height})`}
+                />
+              ))}
+            </Select>
+            <Tooltip
+              align="bottom"
+              label="Choose HD for simpler layouts that expand to fit, or 4K for precise positioning that reduces gracefully."
+            >
+              <button type="button" className="info-button">
+                <Information size={16} />
+              </button>
+            </Tooltip>
+          </div>
+        )}
         <div className="editor-mode-help">
           {editorMode === EDITOR_MODES.DESIGN && (
             <span>Drag header to move • Drag corner to resize • Click center to edit chart • Draw on empty space to add panel</span>
@@ -628,8 +1036,9 @@ function DashboardDetailPage() {
       <div className="components-section">
         {/* Grid info */}
         <div className="grid-info">
+          <span>Layout: {GRID_COLS * CELL_WIDTH}×{GRID_ROWS * CELL_HEIGHT}px</span>
           <span>Grid: {GRID_COLS} columns × {GRID_ROWS} rows</span>
-          <span>Cell height: {GRID_ROW_HEIGHT}px</span>
+          <span>Cell: {CELL_WIDTH}×{CELL_HEIGHT}px</span>
           <span>Panels: {panels.length}</span>
         </div>
 
@@ -639,8 +1048,13 @@ function DashboardDetailPage() {
             ref={gridRef}
             className={`panel-grid mode-${editorMode}`}
             style={{
-              gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-              gridTemplateRows: `repeat(${GRID_ROWS}, ${GRID_ROW_HEIGHT}px)`
+              width: `${GRID_COLS * CELL_WIDTH}px`,
+              minHeight: `${(GRID_ROWS + OVERFLOW_ROWS) * CELL_HEIGHT}px`,
+              gridTemplateColumns: `repeat(${GRID_COLS}, ${CELL_WIDTH}px)`,
+              gridTemplateRows: `repeat(${GRID_ROWS + OVERFLOW_ROWS}, ${CELL_HEIGHT}px)`,
+              '--cell-width': `${CELL_WIDTH}px`,
+              '--grid-visible-width': `${GRID_COLS * CELL_WIDTH}px`,
+              '--grid-visible-height': `${GRID_ROWS * CELL_HEIGHT}px`
             }}
             onMouseDown={handleGridMouseDown}
             onMouseMove={handleGridMouseMove}
@@ -657,6 +1071,9 @@ function DashboardDetailPage() {
               return (
                 <div
                   key={panel.id}
+                  data-panel-id={panel.id}
+                  data-panel-w={panel.w}
+                  data-panel-h={panel.h}
                   className={`panel-item ${isPreviewMode && hasChart ? 'live-preview' : ''} ${isDesignMode ? 'design-mode' : ''}`}
                   style={{
                     gridColumn: `${panel.x + 1} / span ${panel.w}`,
@@ -699,48 +1116,79 @@ function DashboardDetailPage() {
                         <DynamicComponentLoader
                           code={chart.component_code}
                           props={{}}
+                          dataMapping={chart.data_mapping}
+                          datasourceId={chart.datasource_id}
                         />
                       </div>
                     ) : isDesignMode ? (
                       <div className="design-body">
                         {hasChart ? (
                           <div className="chart-info">
-                            <ChartBar size={24} />
-                            <span className="chart-name">{chart.name}</span>
-                            <OverflowMenu
+                            <div className="chart-title">
+                              <ChartBar size={20} />
+                              <span className="chart-name">{chart.name}</span>
+                            </div>
+                            <MenuButton
+                              label="Edit"
                               size="sm"
-                              flipped
-                              iconDescription="Edit chart"
-                              className="chart-edit-menu"
+                              kind="secondary"
                             >
-                              <OverflowMenuItem
-                                itemText="Edit"
+                              <MenuItem
+                                label="Edit Chart"
                                 onClick={() => openChartEditor(panel.id)}
                               />
-                              <OverflowMenuItem
-                                itemText="Edit with AI"
+                              <MenuItem
+                                label="Edit Chart with AI"
+                                renderIcon={AiIcon}
                                 onClick={() => openAIEditor(panel.id)}
                               />
-                            </OverflowMenu>
+                              <MenuItem
+                                label="New Chart"
+                                renderIcon={Add}
+                                onClick={() => {
+                                  // Clear the chart reference first, then open editor for new chart
+                                  updatePanel(panel.id, { chart_id: null });
+                                  openChartEditor(panel.id);
+                                }}
+                              />
+                              <MenuItem
+                                label="New Chart with AI"
+                                renderIcon={AiIcon}
+                                onClick={() => {
+                                  // Clear the chart reference first, then open AI editor for new chart
+                                  updatePanel(panel.id, { chart_id: null });
+                                  openAIEditor(panel.id);
+                                }}
+                              />
+                              <MenuItem
+                                label="Select Existing"
+                                renderIcon={Catalog}
+                                onClick={() => openChartSelector(panel.id)}
+                              />
+                            </MenuButton>
                           </div>
                         ) : (
                           <div className="empty-panel-actions">
-                            <Button
-                              kind="tertiary"
+                            <MenuButton
+                              label="New Chart"
                               size="sm"
-                              renderIcon={Add}
-                              onClick={() => openChartEditor(panel.id)}
+                              kind="secondary"
                             >
-                              New Chart
-                            </Button>
-                            <Button
-                              kind="ghost"
-                              size="sm"
-                              renderIcon={Catalog}
-                              onClick={() => openChartSelector(panel.id)}
-                            >
-                              Select Existing
-                            </Button>
+                              <MenuItem
+                                label="New Chart"
+                                onClick={() => openChartEditor(panel.id)}
+                              />
+                              <MenuItem
+                                label="New Chart with AI"
+                                renderIcon={AiIcon}
+                                onClick={() => openAIEditor(panel.id)}
+                              />
+                              <MenuItem
+                                label="Select Existing"
+                                renderIcon={Catalog}
+                                onClick={() => openChartSelector(panel.id)}
+                              />
+                            </MenuButton>
                           </div>
                         )}
                       </div>

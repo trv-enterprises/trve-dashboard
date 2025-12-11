@@ -42,6 +42,40 @@ func getBufferSize(config *models.SocketConfig) int {
 	return 100 // default buffer size
 }
 
+// normalizeTimestamp converts timestamps to seconds (Unix epoch)
+// Detects milliseconds (13+ digits) and converts to seconds
+// Handles int, int64, float64, and string types
+func normalizeTimestamp(val interface{}) interface{} {
+	var ts int64
+
+	switch v := val.(type) {
+	case int:
+		ts = int64(v)
+	case int64:
+		ts = v
+	case float64:
+		ts = int64(v)
+	case string:
+		// Try to parse as number
+		var f float64
+		if _, err := fmt.Sscanf(v, "%f", &f); err == nil {
+			ts = int64(f)
+		} else {
+			return val // Return as-is if not a number
+		}
+	default:
+		return val // Return as-is for unknown types
+	}
+
+	// If timestamp is in milliseconds (13+ digits), convert to seconds
+	// Unix timestamps in seconds are 10 digits until year 2286
+	if ts > 9999999999 {
+		ts = ts / 1000
+	}
+
+	return ts
+}
+
 // connect establishes connection based on protocol
 func (s *SocketDataSource) connect() error {
 	switch s.config.Protocol {
@@ -234,11 +268,14 @@ func (s *SocketDataSource) streamWebSocket(ctx context.Context, recordChan chan<
 				return
 			}
 
-			record := s.parseMessage(message)
-			select {
-			case recordChan <- record:
-			case <-ctx.Done():
-				return
+			// Parse message - may return multiple records if data_path contains an array
+			records := s.parseMessageToRecords(message)
+			for _, record := range records {
+				select {
+				case recordChan <- record:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}
@@ -284,6 +321,75 @@ func (s *SocketDataSource) streamTCP(ctx context.Context, recordChan chan<- mode
 	}
 }
 
+// parseMessageToRecords converts raw bytes to one or more Records
+// If the data_path points to an array, each item becomes a separate record
+func (s *SocketDataSource) parseMessageToRecords(message []byte) []models.Record {
+	var rawData map[string]interface{}
+
+	// Parse JSON
+	if err := json.Unmarshal(message, &rawData); err != nil {
+		// If JSON parsing fails, return single record with raw data
+		record := models.Record{
+			"data":      string(message),
+			"error":     err.Error(),
+			"timestamp": time.Now().Unix(),
+		}
+		return []models.Record{record}
+	}
+
+	parser := s.config.Parser
+	if parser == nil || parser.DataPath == "" {
+		// No parser config or data path, return as single record
+		// Preserve existing timestamp if present (normalized), otherwise add current time
+		if ts, hasTimestamp := rawData["timestamp"]; hasTimestamp {
+			rawData["timestamp"] = normalizeTimestamp(ts)
+		} else {
+			rawData["timestamp"] = time.Now().Unix()
+		}
+		return []models.Record{rawData}
+	}
+
+	// Extract data from data_path
+	extracted := extractByPath(rawData, parser.DataPath)
+	if extracted == nil {
+		// data_path extraction failed, use raw data
+		// Preserve existing timestamp if present (normalized), otherwise add current time
+		if ts, hasTimestamp := rawData["timestamp"]; hasTimestamp {
+			rawData["timestamp"] = normalizeTimestamp(ts)
+		} else {
+			rawData["timestamp"] = time.Now().Unix()
+		}
+		return []models.Record{rawData}
+	}
+
+	// Check if extracted data is an array
+	if dataArray, ok := extracted.([]interface{}); ok {
+		// Explode array into multiple records
+		records := make([]models.Record, 0, len(dataArray))
+		for _, item := range dataArray {
+			if itemMap, ok := item.(map[string]interface{}); ok {
+				record := models.Record{}
+				for k, v := range itemMap {
+					record[k] = v
+				}
+				// Apply parser config to extract timestamp_field and apply mappings
+				record = s.applyParserConfigToRecord(record)
+				// Ensure timestamp exists after parser config applied
+				if _, hasTimestamp := record["timestamp"]; !hasTimestamp {
+					record["timestamp"] = time.Now().Unix()
+				}
+				records = append(records, record)
+			}
+		}
+		if len(records) > 0 {
+			return records
+		}
+	}
+
+	// If not an array, use original parseMessage logic
+	return []models.Record{s.parseMessage(message)}
+}
+
 // parseMessage converts raw bytes to a Record based on MessageFormat and parser config
 func (s *SocketDataSource) parseMessage(message []byte) models.Record {
 	record := make(models.Record)
@@ -313,7 +419,10 @@ func (s *SocketDataSource) parseMessage(message []byte) models.Record {
 		}
 	}
 
-	record["timestamp"] = time.Now().Unix()
+	// Only set timestamp if not already present from the data
+	if _, hasTimestamp := record["timestamp"]; !hasTimestamp {
+		record["timestamp"] = time.Now().Unix()
+	}
 	return record
 }
 
@@ -345,9 +454,12 @@ func (s *SocketDataSource) applyParserConfig(record models.Record) models.Record
 		}
 	}
 
-	// Step 3: Add the extracted timestamp to the record
+	// Step 3: Add the extracted timestamp to the record (normalized to seconds)
 	if extractedTimestamp != nil {
-		record["timestamp"] = extractedTimestamp
+		record["timestamp"] = normalizeTimestamp(extractedTimestamp)
+	} else if ts, exists := record["timestamp"]; exists {
+		// Normalize existing timestamp if present
+		record["timestamp"] = normalizeTimestamp(ts)
 	}
 
 	// Apply field mappings (rename fields)
@@ -368,9 +480,71 @@ func (s *SocketDataSource) applyParserConfig(record models.Record) models.Record
 				filtered[field] = val
 			}
 		}
-		// Always preserve timestamp if it was extracted
-		if extractedTimestamp != nil {
-			filtered["timestamp"] = extractedTimestamp
+		// Always preserve timestamp (already normalized in record)
+		if ts, exists := record["timestamp"]; exists {
+			filtered["timestamp"] = ts
+		}
+		record = filtered
+	}
+
+	// Apply exclude fields filter (blacklist)
+	if len(parser.ExcludeFields) > 0 {
+		for _, field := range parser.ExcludeFields {
+			delete(record, field)
+		}
+	}
+
+	return record
+}
+
+// applyParserConfigToRecord applies parser config to an individual record (already extracted from array)
+// This skips data_path extraction since that's already done
+func (s *SocketDataSource) applyParserConfigToRecord(record models.Record) models.Record {
+	parser := s.config.Parser
+	if parser == nil {
+		return record
+	}
+
+	// Extract timestamp from timestamp_field if specified
+	// For array items, the timestamp_field is a direct field name (not a path)
+	if parser.TimestampField != "" {
+		// Try direct field first
+		if val, exists := record[parser.TimestampField]; exists {
+			record["timestamp"] = normalizeTimestamp(val)
+		} else {
+			// Try as a path (for nested timestamps within the item)
+			if extracted := extractByPath(record, parser.TimestampField); extracted != nil {
+				record["timestamp"] = normalizeTimestamp(extracted)
+			}
+		}
+	}
+
+	// Normalize existing timestamp if present (even without timestamp_field config)
+	if ts, exists := record["timestamp"]; exists {
+		record["timestamp"] = normalizeTimestamp(ts)
+	}
+
+	// Apply field mappings (rename fields)
+	if len(parser.FieldMappings) > 0 {
+		for oldName, newName := range parser.FieldMappings {
+			if val, exists := record[oldName]; exists {
+				record[newName] = val
+				delete(record, oldName)
+			}
+		}
+	}
+
+	// Apply include fields filter (whitelist)
+	if len(parser.IncludeFields) > 0 {
+		filtered := make(models.Record)
+		for _, field := range parser.IncludeFields {
+			if val, exists := record[field]; exists {
+				filtered[field] = val
+			}
+		}
+		// Always preserve timestamp
+		if ts, exists := record["timestamp"]; exists {
+			filtered["timestamp"] = ts
 		}
 		record = filtered
 	}

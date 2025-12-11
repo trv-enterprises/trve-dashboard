@@ -160,6 +160,11 @@ function generateDataDrivenCode(chart) {
     return generateScatterCode(datasource_id, queryRaw, queryType, xAxis, yAxis[0], transforms, xAxisLabel, yAxisLabel);
   }
 
+  // Handle dataview (table) charts
+  if (chart_type === 'dataview') {
+    return generateDataViewCode(datasource_id, queryRaw, queryType, data_mapping, transforms);
+  }
+
   // Standard axis-based charts (bar, line, area)
   const chartTypeForSeries = chart_type === 'area' ? 'line' : (chart_type || 'bar');
   const areaStyle = chart_type === 'area' ? 'areaStyle: {},' : '';
@@ -210,7 +215,35 @@ function generateDataDrivenCode(chart) {
   ${seriesCode}
 
   const option = {
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+      trigger: 'axis',
+      formatter: function(params) {
+        if (!params || !params.length) return '';
+        // Header: format the axis value (timestamp in milliseconds)
+        // axisValue is raw milliseconds, divide by 1000 for formatTimestamp
+        const axisVal = params[0].axisValue;
+        let header = params[0].axisValueLabel || params[0].name || '';
+        // If axisValue is a large number (timestamp in ms), format it
+        if (typeof axisVal === 'number' && axisVal > 1000000000000) {
+          header = formatTimestamp(axisVal / 1000, 'chart_datetime');
+        }
+        let result = header;
+        params.forEach(function(p) {
+          // Extract value - handle multiple formats:
+          // 1. Single numeric value
+          // 2. [timestamp, value] array
+          // 3. "timestamp,value" string (from some data sources)
+          let val = p.value;
+          if (Array.isArray(val)) {
+            val = val[1]; // Get second element from [timestamp, value]
+          } else if (typeof val === 'string' && val.includes(',')) {
+            val = val.split(',').pop(); // Get last part after comma
+          }
+          result += '<br/>' + p.marker + ' ' + p.seriesName + ': ' + (val != null ? val : '-');
+        });
+        return result;
+      }
+    },
     ${yAxis.length > 1 ? `legend: { data: [${yAxisStr}], bottom: 0 },` : ''}
     xAxis: { type: 'category', data: categories${chart_type === 'area' ? ', boundaryGap: false' : ''}${xAxisLabel ? `, name: '${xAxisLabel}'` : ''} },
     yAxis: { type: 'value'${yAxisLabel ? `, name: '${yAxisLabel}'` : ''} },
@@ -307,6 +340,49 @@ function generateStaticCode(chartType) {
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--cds-text-secondary)' }}>
       <p>Custom chart - configure options or data source</p>
     </div>
+  );
+};`,
+    dataview: `const Component = () => {
+  const headers = [
+    { key: 'name', header: 'Name' },
+    { key: 'value', header: 'Value' },
+    { key: 'status', header: 'Status' }
+  ];
+
+  const rows = [
+    { id: '1', name: 'Server 1', value: '98.5%', status: 'Active' },
+    { id: '2', name: 'Server 2', value: '95.2%', status: 'Active' },
+    { id: '3', name: 'Database', value: '99.1%', status: 'Active' },
+    { id: '4', name: 'Cache', value: '87.3%', status: 'Warning' }
+  ];
+
+  return (
+    <DataTable rows={rows} headers={headers} isSortable>
+      {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
+        <TableContainer style={{ height: '100%', overflow: 'auto' }}>
+          <Table {...getTableProps()} size="lg">
+            <TableHead>
+              <TableRow>
+                {headers.map((header) => (
+                  <TableHeader {...getHeaderProps({ header })} key={header.key}>
+                    {header.header}
+                  </TableHeader>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow {...getRowProps({ row })} key={row.id}>
+                  {row.cells.map((cell) => (
+                    <TableCell key={cell.id}>{cell.value}</TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </DataTable>
   );
 };`
   };
@@ -439,6 +515,102 @@ function generateScatterCode(datasourceId, queryRaw, queryType, xAxis, yAxis, tr
   };
 
   return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`;
+}
+
+function generateDataViewCode(datasourceId, queryRaw, queryType, dataMapping, transforms) {
+  const hasTransforms = !!transforms;
+  const visibleColumns = dataMapping?.visible_columns || [];
+  const hasVisibleColumns = visibleColumns.length > 0;
+
+  return `const Component = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const { data, loading, error } = useData({
+    datasourceId: '${datasourceId}',
+    query: {
+      raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
+      type: '${queryType}',
+      params: {}
+    },
+    refreshInterval: 30000
+  });
+
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--cds-text-secondary)' }}>Loading...</div>;
+  if (error) return <div style={{ color: 'var(--cds-text-error)', padding: '1rem' }}>Error: {error.message}</div>;
+  if (!data?.rows?.length) return <div style={{ color: 'var(--cds-text-secondary)', padding: '1rem' }}>No data available</div>;
+
+  ${hasTransforms ? `// Apply client-side transforms
+  const transforms = ${JSON.stringify(transforms)};
+  const transformed = transformData(data, transforms);
+  const sourceRows = transformed.rows;
+  const sourceColumns = transformed.columns;` : `const sourceRows = data.rows;
+  const sourceColumns = data.columns;`}
+
+  // Determine which columns to display
+  ${hasVisibleColumns ? `const displayColumns = ${JSON.stringify(visibleColumns)}.filter(c => sourceColumns.includes(c));` : `const displayColumns = sourceColumns;`}
+
+  // Convert columnar data to row objects for DataTable
+  const headers = displayColumns.map(col => ({ key: col, header: col }));
+  const rows = sourceRows.map((row, idx) => {
+    const rowObj = { id: String(idx) };
+    displayColumns.forEach((col) => {
+      const colIdx = sourceColumns.indexOf(col);
+      rowObj[col] = formatCellValue(row[colIdx], col);
+    });
+    return rowObj;
+  });
+
+  // Filter rows by search term
+  const filteredRows = searchTerm
+    ? rows.filter(row =>
+        Object.values(row).some(val =>
+          String(val).toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      )
+    : rows;
+
+  return (
+    <DataTable rows={filteredRows} headers={headers} isSortable>
+      {({ rows, headers, getTableProps, getHeaderProps, getRowProps, onInputChange }) => (
+        <TableContainer style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <TableToolbar>
+            <TableToolbarContent>
+              <TableToolbarSearch
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  onInputChange(e);
+                }}
+                placeholder="Search..."
+                persistent
+              />
+            </TableToolbarContent>
+          </TableToolbar>
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <Table {...getTableProps()} size="lg">
+              <TableHead>
+                <TableRow>
+                  {headers.map((header) => (
+                    <TableHeader {...getHeaderProps({ header })} key={header.key}>
+                      {header.header}
+                    </TableHeader>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow {...getRowProps({ row })} key={row.id}>
+                    {row.cells.map((cell) => (
+                      <TableCell key={cell.id}>{cell.value}</TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </TableContainer>
+      )}
+    </DataTable>
+  );
 };`;
 }
 

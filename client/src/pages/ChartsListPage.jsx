@@ -17,10 +17,11 @@ import {
   Loading,
   Tag,
   Link,
-  OverflowMenu,
-  OverflowMenuItem
+  MenuButton,
+  MenuItem
 } from '@carbon/react';
-import { Add, TrashCan, ChartLineSmooth, WatsonxAi } from '@carbon/icons-react';
+import { TrashCan, ChartLineSmooth } from '@carbon/icons-react';
+import AiIcon from '../components/icons/AiIcon';
 import apiClient from '../api/client';
 import ChartDeleteDialog from '../components/ChartDeleteDialog';
 import './ChartsListPage.scss';
@@ -37,6 +38,7 @@ import './ChartsListPage.scss';
 function ChartsListPage() {
   const navigate = useNavigate();
   const [charts, setCharts] = useState([]);
+  const [datasources, setDatasources] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,28 +47,45 @@ function ChartsListPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [chartToDelete, setChartToDelete] = useState(null);
 
-  // Fetch charts from API
+  // Fetch charts and data sources from API
   useEffect(() => {
-    fetchCharts();
+    fetchData();
   }, []);
 
-  const fetchCharts = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.getCharts();
+      // Fetch charts and data sources in parallel
+      const [chartsData, datasourcesData] = await Promise.all([
+        apiClient.getCharts(),
+        apiClient.getDatasources()
+      ]);
 
-      if (data.charts) {
-        setCharts(data.charts);
-      } else if (data.error) {
-        setError(data.error);
+      if (chartsData.charts) {
+        setCharts(chartsData.charts);
+      } else if (chartsData.error) {
+        setError(chartsData.error);
       } else {
         setCharts([]);
+      }
+
+      // Create a lookup map for data sources
+      if (datasourcesData.datasources) {
+        const dsMap = {};
+        datasourcesData.datasources.forEach(ds => {
+          dsMap[ds.id] = ds.name;
+        });
+        setDatasources(dsMap);
       }
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchCharts = async () => {
+    fetchData();
   };
 
   const handleCreate = () => {
@@ -139,17 +158,27 @@ function ChartsListPage() {
     // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(chart =>
-        chart.name?.toLowerCase().includes(term) ||
-        chart.description?.toLowerCase().includes(term) ||
-        chart.chart_type?.toLowerCase().includes(term)
-      );
+      result = result.filter(chart => {
+        const dsName = datasources[chart.datasource_id] || '';
+        return chart.name?.toLowerCase().includes(term) ||
+          chart.description?.toLowerCase().includes(term) ||
+          chart.chart_type?.toLowerCase().includes(term) ||
+          dsName.toLowerCase().includes(term);
+      });
     }
 
     // Sort
     result.sort((a, b) => {
-      let aVal = a[sortKey] || '';
-      let bVal = b[sortKey] || '';
+      let aVal, bVal;
+
+      // Handle datasource sorting (use name lookup)
+      if (sortKey === 'datasource') {
+        aVal = datasources[a.datasource_id] || '';
+        bVal = datasources[b.datasource_id] || '';
+      } else {
+        aVal = a[sortKey] || '';
+        bVal = b[sortKey] || '';
+      }
 
       // Handle date sorting
       if (sortKey === 'updated') {
@@ -166,11 +195,12 @@ function ChartsListPage() {
     });
 
     return result;
-  }, [charts, searchTerm, sortKey, sortDirection]);
+  }, [charts, datasources, searchTerm, sortKey, sortDirection]);
 
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
     { key: 'chart_type', header: 'Type', isSortable: true },
+    { key: 'datasource', header: 'Data Source', isSortable: true },
     { key: 'status', header: 'Status', isSortable: true },
     { key: 'description', header: 'Description', isSortable: false },
     { key: 'updated', header: 'Last modified', isSortable: true },
@@ -181,6 +211,7 @@ function ChartsListPage() {
     id: chart.id,
     name: chart.name,
     chart_type: chart.chart_type,
+    datasource: datasources[chart.datasource_id] || 'None',
     status: chart.status || 'draft',
     description: chart.description || '',
     updated: formatDate(chart.updated)
@@ -230,22 +261,21 @@ function ChartsListPage() {
                   placeholder="Search"
                   persistent
                 />
-                <OverflowMenu
-                  renderIcon={Add}
+                <MenuButton
+                  label="Create"
                   size="md"
-                  flipped
-                  menuOptionsClass="create-menu-options"
-                  iconDescription="Create chart"
+                  kind="primary"
                 >
-                  <OverflowMenuItem
-                    itemText="Create"
+                  <MenuItem
+                    label="Create"
                     onClick={handleCreate}
                   />
-                  <OverflowMenuItem
-                    itemText="Create with AI"
+                  <MenuItem
+                    label="Create with AI"
+                    renderIcon={AiIcon}
                     onClick={handleCreateWithAI}
                   />
-                </OverflowMenu>
+                </MenuButton>
               </TableToolbarContent>
             </TableToolbar>
             <Table {...getTableProps()}>
@@ -320,7 +350,7 @@ function ChartsListPage() {
                                     onClick={(e) => handleAIEdit(e, chart)}
                                     size="sm"
                                   >
-                                    <WatsonxAi size={16} />
+                                    <AiIcon size={16} />
                                   </IconButton>
                                   <IconButton
                                     kind="ghost"

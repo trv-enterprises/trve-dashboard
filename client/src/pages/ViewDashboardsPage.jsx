@@ -4,9 +4,10 @@ import {
   Tile,
   Loading,
   Tag,
-  Search
+  Search,
+  Tooltip
 } from '@carbon/react';
-import { Dashboard, View, Time, ChartMultitype } from '@carbon/icons-react';
+import { Dashboard, View, ChartMultitype, DataBase, Information } from '@carbon/icons-react';
 import './ViewDashboardsPage.scss';
 
 /**
@@ -29,7 +30,7 @@ function ViewDashboardsPage() {
   const fetchDashboards = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/dashboards?page=1&page_size=100');
+      const response = await fetch('http://localhost:3001/api/dashboards?page=1&page_size=100&include_datasources=true');
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -54,14 +55,8 @@ function ViewDashboardsPage() {
     navigate(`/view/dashboards/${dashboard.id}`);
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const getComponentCount = (dashboard) => {
-    return dashboard.components?.filter(c => c.component_id).length || 0;
+  const getDatasourceNames = (dashboard) => {
+    return dashboard.datasource_names || [];
   };
 
   const filteredDashboards = dashboards.filter(dashboard =>
@@ -128,29 +123,27 @@ function ViewDashboardsPage() {
               <div className="tile-header">
                 <ChartMultitype size={24} className="tile-icon" />
                 <h3>{dashboard.name}</h3>
+                {dashboard.description && (
+                  <Tooltip label={dashboard.description} align="bottom">
+                    <button type="button" className="info-button" onClick={(e) => e.stopPropagation()}>
+                      <Information size={16} />
+                    </button>
+                  </Tooltip>
+                )}
               </div>
 
-              <p className="tile-description">
-                {dashboard.description || 'No description'}
-              </p>
-
-              <div className="tile-stats">
-                <div className="stat">
-                  <View size={16} />
-                  <span>{getComponentCount(dashboard)} components</span>
+              {getDatasourceNames(dashboard).length > 0 && (
+                <div className="tile-stats">
+                  <div className="stat">
+                    <DataBase size={16} />
+                    <span>{getDatasourceNames(dashboard).join(', ')}</span>
+                  </div>
                 </div>
-                <div className="stat">
-                  <Time size={16} />
-                  <span>{formatDate(dashboard.updated)}</span>
-                </div>
-              </div>
+              )}
 
               <div className="tile-tags">
                 {dashboard.settings?.theme && (
                   <Tag type="blue" size="sm">{dashboard.settings.theme} theme</Tag>
-                )}
-                {dashboard.settings?.refresh_interval > 0 && (
-                  <Tag type="green" size="sm">Auto-refresh</Tag>
                 )}
                 {dashboard.settings?.is_public && (
                   <Tag type="purple" size="sm">Public</Tag>

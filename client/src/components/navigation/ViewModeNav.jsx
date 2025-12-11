@@ -20,7 +20,7 @@ function ViewModeNav({ location, navigate }) {
 
   const fetchDashboards = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/dashboards?page=1&page_size=100');
+      const response = await fetch('http://localhost:3001/api/dashboards?page=1&page_size=100&include_datasources=true');
       if (response.ok) {
         const data = await response.json();
         if (data.dashboards) {

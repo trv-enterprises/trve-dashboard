@@ -17,7 +17,7 @@ import {
   Loading,
   Link
 } from '@carbon/react';
-import { Add, TrashCan, Dashboard } from '@carbon/icons-react';
+import { TrashCan, Dashboard } from '@carbon/icons-react';
 import apiClient from '../api/client';
 import './DashboardsListPage.scss';
 
@@ -47,7 +47,7 @@ function DashboardsListPage() {
   const fetchDashboards = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.getDashboards();
+      const data = await apiClient.getDashboards({ include_datasources: true });
 
       if (data.dashboards) {
         setDashboards(data.dashboards);
@@ -149,15 +149,23 @@ function DashboardsListPage() {
     { key: 'name', header: 'Name', isSortable: true },
     { key: 'description', header: 'Description', isSortable: false },
     { key: 'panels', header: 'Panels', isSortable: true },
+    { key: 'datasources', header: 'Data Sources', isSortable: false },
     { key: 'updated', header: 'Last modified', isSortable: true },
     { key: 'actions', header: '', isSortable: false }
   ];
+
+  const getDatasourceNames = (dashboard) => {
+    const names = dashboard.datasource_names || [];
+    if (names.length === 0) return '-';
+    return names.join(', ');
+  };
 
   const rows = filteredAndSortedDashboards.map((dashboard) => ({
     id: dashboard.id,
     name: dashboard.name,
     description: dashboard.description || '',
     panels: getPanelCount(dashboard),
+    datasources: getDatasourceNames(dashboard),
     updated: formatDate(dashboard.updated)
   }));
 
@@ -206,7 +214,6 @@ function DashboardsListPage() {
                   persistent
                 />
                 <Button
-                  renderIcon={Add}
                   onClick={handleCreate}
                   size="md"
                   kind="primary"

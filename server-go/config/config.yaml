@@ -66,6 +66,9 @@ validation:
     - "@carbon/react"
     - "@carbon/icons-react"
 
+dashboard:
+  config_refresh_interval: 120  # seconds - how often to refresh dashboard/chart config from database
+
 layout:
   spacing: 32  # pixels - $spacing-08
   max_width: 1920
@@ -76,6 +79,15 @@ layout:
   min_panel_height: 160
   max_panel_width: 1280
   max_panel_height: 1280
+
+layout_dimensions: # first item will be the default for new dashboards
+  1728x1117-MAC: {max_width: 1728, max_height: 1117}
+  1920x1080-HD: {max_width: 1920, max_height: 1080} # Full HD
+  2056x1329: {max_width: 2056, max_height: 1329}
+  2560×1440-2k: {max_width: 2560, max_height: 1440} # (QHD/2K)
+  2992x1934: {max_width: 3008, max_height: 1934}
+  3456x2160: {max_width: 3456, max_height: 2160}
+  3840×2160-4k: {max_width: 3840, max_height: 2160}
 
 logging:
   level: debug  # debug, info, warn, error
@@ -115,3 +127,10 @@ swagger:
     - http
   contact_name: Dashboard Team
   contact_email: support@example.com
+
+# Static file serving for production (SPA)
+# In development, use Vite dev server (npm run dev) for hot module replacement
+# In production, build the client (npm run build) and enable this
+static_files:
+  enabled: false  # Set to true in production, or via DASHBOARD_STATIC_FILES_ENABLED=true
+  path: ../client/dist  # Path to built React app (relative to server-go directory)

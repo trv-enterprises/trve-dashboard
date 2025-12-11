@@ -212,6 +212,26 @@ class APIClient {
     return this.request(`/api/datasources/${id}/schema`);
   }
 
+  async createDatasource(datasource) {
+    return this.request('/api/datasources', {
+      method: 'POST',
+      body: JSON.stringify(datasource),
+    });
+  }
+
+  async updateDatasource(id, updates) {
+    return this.request(`/api/datasources/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteDatasource(id) {
+    return this.request(`/api/datasources/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // AI Session endpoints
   async createAISession(chartId = null) {
     const payload = chartId ? { chart_id: chartId } : {};
@@ -251,6 +271,40 @@ class APIClient {
     const wsProtocol = this.baseURL.startsWith('https') ? 'wss' : 'ws';
     const host = this.baseURL.replace(/^https?:\/\//, '');
     return `${wsProtocol}://${host}/api/ai/sessions/${sessionId}/ws`;
+  }
+
+  // Config endpoints
+  async getSystemConfig() {
+    return this.request('/api/config/system');
+  }
+
+  async updateSystemConfig(settings) {
+    return this.request('/api/config/system', {
+      method: 'PUT',
+      body: JSON.stringify({ settings }),
+    });
+  }
+
+  async setCurrentDimension(dimension) {
+    return this.request('/api/config/system/dimension', {
+      method: 'PUT',
+      body: JSON.stringify({ dimension }),
+    });
+  }
+
+  async getLayoutDimensions() {
+    return this.request('/api/config/dimensions');
+  }
+
+  async getUserConfig(userId) {
+    return this.request(`/api/config/user/${userId}`);
+  }
+
+  async updateUserConfig(userId, settings) {
+    return this.request(`/api/config/user/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ settings }),
+    });
   }
 }
 

@@ -94,6 +94,7 @@ type DashboardSettings struct {
 	DefaultView     string `json:"default_view,omitempty" bson:"default_view,omitempty"`
 	IsPublic        bool   `json:"is_public" bson:"is_public"`
 	AllowExport     bool   `json:"allow_export" bson:"allow_export"`
+	LayoutDimension string `json:"layout_dimension,omitempty" bson:"layout_dimension,omitempty"`
 }
 
 // CreateDashboardRequest represents a request to create a dashboard
@@ -129,11 +130,35 @@ type DashboardListResponse struct {
 // DashboardQueryParams defines query parameters for listing dashboards
 // @Description Query parameters for filtering and pagination
 type DashboardQueryParams struct {
-	Name     string `form:"name"`
-	IsPublic *bool  `form:"is_public"`
-	ChartID  string `form:"chart_id"` // Filter dashboards using a specific chart
-	Page     int    `form:"page"`
-	PageSize int    `form:"page_size"`
+	Name               string `form:"name"`
+	IsPublic           *bool  `form:"is_public"`
+	ChartID            string `form:"chart_id"`            // Filter dashboards using a specific chart
+	IncludeDatasources bool   `form:"include_datasources"` // Include data source names from charts
+	Page               int    `form:"page"`
+	PageSize           int    `form:"page_size"`
+}
+
+// DashboardSummary is a lightweight dashboard representation for tile listings
+// @Description Dashboard info with optional data source names for display in tiles
+type DashboardSummary struct {
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	Description     string            `json:"description"`
+	Thumbnail       string            `json:"thumbnail,omitempty"`
+	Settings        DashboardSettings `json:"settings"`
+	PanelCount      int               `json:"panel_count"`
+	DatasourceNames []string          `json:"datasource_names,omitempty"` // Unique data source names used by charts
+	Created         time.Time         `json:"created"`
+	Updated         time.Time         `json:"updated"`
+}
+
+// DashboardSummaryListResponse represents a paginated list of dashboard summaries
+// @Description Response containing dashboard summaries with optional data source info
+type DashboardSummaryListResponse struct {
+	Dashboards []DashboardSummary `json:"dashboards"`
+	Total      int64              `json:"total"`
+	Page       int                `json:"page"`
+	PageSize   int                `json:"page_size"`
 }
 
 // DashboardWithCharts represents a dashboard with expanded chart data

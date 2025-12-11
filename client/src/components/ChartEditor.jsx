@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useImperativeHandle, forwardRef } from 'react';
+import { useState, useEffect, useMemo, useImperativeHandle, forwardRef, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import {
   TextInput,
   TextArea,
@@ -30,6 +31,7 @@ const CHART_TYPES = [
   { id: 'pie', label: 'Pie Chart' },
   { id: 'scatter', label: 'Scatter Plot' },
   { id: 'gauge', label: 'Gauge' },
+  { id: 'dataview', label: 'Data Table' },
   { id: 'custom', label: 'Custom Component' }
 ];
 
@@ -135,6 +137,9 @@ const ChartEditor = forwardRef(function ChartEditor({
   const [activeTab, setActiveTab] = useState(0);
   const [hasChanges, setHasChanges] = useState(false);
   const [initialState, setInitialState] = useState(null);
+
+  // Ref for thumbnail capture
+  const previewRef = useRef(null);
 
   // Check for duplicate chart name on blur
   const checkDuplicateChartName = async (nameToCheck) => {
@@ -438,6 +443,48 @@ const ChartEditor = forwardRef(function ChartEditor({
     };
   }, [previewData, filters, aggregation, sortBy, sortOrder, limitRows]);
 
+  // Capture thumbnail from preview tab
+  const captureThumbnail = async () => {
+    // Switch to preview tab temporarily if not already there
+    const previousTab = activeTab;
+    if (activeTab !== 1) {
+      setActiveTab(1);
+      // Wait for React to render the preview
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    if (!previewRef.current) {
+      // Restore tab if changed
+      if (previousTab !== 1) setActiveTab(previousTab);
+      return null;
+    }
+
+    try {
+      // Wait a bit more for any charts to render
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      const canvas = await html2canvas(previewRef.current, {
+        scale: 0.5, // Scale down for thumbnail
+        backgroundColor: '#161616',
+        logging: false,
+        useCORS: true,
+        allowTaint: true
+      });
+
+      const dataUrl = canvas.toDataURL('image/png', 0.8);
+
+      // Restore tab if changed
+      if (previousTab !== 1) setActiveTab(previousTab);
+
+      return dataUrl;
+    } catch (err) {
+      console.error('Failed to capture chart thumbnail:', err);
+      // Restore tab if changed
+      if (previousTab !== 1) setActiveTab(previousTab);
+      return null;
+    }
+  };
+
   const handleSave = () => {
     if (!name.trim()) {
       alert('Please enter a chart name');
@@ -500,9 +547,10 @@ const ChartEditor = forwardRef(function ChartEditor({
     setAggregation(prev => ({ ...prev, [field]: value }));
   };
 
-  // Expose save method via ref for modal usage
+  // Expose methods via ref for modal usage
   useImperativeHandle(ref, () => ({
     save: handleSave,
+    captureThumbnail,
     getName: () => name,
     isValid: () => !!name.trim()
   }));
@@ -1136,7 +1184,7 @@ const ChartEditor = forwardRef(function ChartEditor({
         {/* Preview Tab */}
         {activeTab === 1 && (
           <div className="tab-content preview-tab">
-            <div className="chart-preview-container">
+            <div className="chart-preview-container" ref={previewRef}>
               {generatedCode ? (
                 <>
                   <div className="preview-chart-header">

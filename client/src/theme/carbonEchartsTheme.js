@@ -83,12 +83,22 @@ export const carbonLightTheme = {
     textStyle: {
       fontWeight: 600,
       color: carbonColors.gray100,
-      fontSize: 20,
+      fontSize: 16,
     },
     subtextStyle: {
       color: carbonColors.gray70,
       fontSize: 14,
     },
+    top: 8,
+    left: 'center',
+  },
+
+  grid: {
+    top: 60, // Space for title + legend
+    left: '3%',
+    right: '4%',
+    bottom: '3%',
+    containLabel: true,
   },
 
   line: {
@@ -350,6 +360,8 @@ export const carbonLightTheme = {
   },
 
   legend: {
+    top: 28, // Below the title
+    left: 'center',
     textStyle: {
       color: carbonColors.gray70,
     },
@@ -464,12 +476,22 @@ export const carbonDarkTheme = {
     textStyle: {
       fontWeight: 600,
       color: carbonColors.gray10,
-      fontSize: 20,
+      fontSize: 16,
     },
     subtextStyle: {
       color: carbonColors.gray30,
       fontSize: 14,
     },
+    top: 8,
+    left: 'center',
+  },
+
+  grid: {
+    top: 60, // Space for title + legend
+    left: '3%',
+    right: '4%',
+    bottom: '3%',
+    containLabel: true,
   },
 
   line: {
@@ -731,6 +753,8 @@ export const carbonDarkTheme = {
   },
 
   legend: {
+    top: 28, // Below the title
+    left: 'center',
     textStyle: {
       color: carbonColors.gray30,
     },

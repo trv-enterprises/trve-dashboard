@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Button,
   TextArea,
@@ -13,12 +13,12 @@ import {
 import {
   ArrowLeft,
   Send,
-  WatsonxAi,
   User,
   Save,
   Close,
   Information
 } from '@carbon/icons-react';
+import AiIcon from '../components/icons/AiIcon';
 import AIChartPreview from '../components/AIChartPreview';
 import { useAISession } from '../hooks/useAISession';
 import apiClient from '../api/client';
@@ -42,7 +42,11 @@ import './AIBuilderPage.scss';
 function AIBuilderPage() {
   const { chartId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const isNewChart = chartId === 'new';
+
+  // Determine return path - either from state (if coming from dashboard) or default to charts list
+  const returnPath = location.state?.from || '/design/charts';
 
   const [input, setInput] = useState('');
   const [chartName, setChartName] = useState('');
@@ -106,7 +110,7 @@ function AIBuilderPage() {
     setSaving(true);
     try {
       await saveSession(chartName.trim());
-      navigate('/design/charts');
+      navigate(returnPath);
     } catch (err) {
       // Error is handled by the hook
     } finally {
@@ -117,14 +121,14 @@ function AIBuilderPage() {
 
   const handleDiscard = async () => {
     await cancelSession();
-    navigate('/design/charts');
+    navigate(returnPath);
   };
 
   const handleBack = () => {
     if (messages.length > 0 || chart) {
       setShowDiscardDialog(true);
     } else {
-      navigate('/design/charts');
+      navigate(returnPath);
     }
   };
 
@@ -148,7 +152,7 @@ function AIBuilderPage() {
         className={`message ${isUser ? 'user' : ''} ${isAssistant ? 'assistant' : ''} ${isSystem ? 'system' : ''}`}
       >
         <div className="message-avatar">
-          {isUser ? <User size={20} /> : <WatsonxAi size={20} />}
+          {isUser ? <User size={20} /> : <AiIcon size={20} />}
         </div>
         <div className="message-content">
           <div className="message-header">
@@ -184,7 +188,7 @@ function AIBuilderPage() {
             Back
           </Button>
           <h1>
-            <WatsonxAi size={24} />
+            <AiIcon size={24} />
             {isNewChart ? 'Create Chart with AI' : 'Edit Chart with AI'}
           </h1>
           {connected && <Tag type="green" size="sm">Connected</Tag>}
@@ -225,7 +229,7 @@ function AIBuilderPage() {
                 {/* Welcome message if no messages */}
                 {messages.length === 0 && (
                   <div className="welcome-message">
-                    <WatsonxAi size={48} />
+                    <AiIcon size={48} />
                     <h3>Welcome to AI Chart Builder</h3>
                     <p>
                       Describe the chart you want to create, and I'll help you build it.
@@ -270,7 +274,7 @@ function AIBuilderPage() {
                 {thinking && (
                   <div className="message assistant thinking">
                     <div className="message-avatar">
-                      <WatsonxAi size={20} />
+                      <AiIcon size={20} />
                     </div>
                     <div className="message-content">
                       <div className="thinking-indicator">
