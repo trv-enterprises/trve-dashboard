@@ -15,9 +15,14 @@ import {
   Button,
   IconButton,
   Loading,
-  Link
+  Link,
+  Tile,
+  ContentSwitcher,
+  Switch,
+  Tag,
+  Tooltip
 } from '@carbon/react';
-import { TrashCan, Dashboard } from '@carbon/icons-react';
+import { TrashCan, Dashboard, List, Grid, Edit, DataBase, Information, ChartMultitype } from '@carbon/icons-react';
 import apiClient from '../api/client';
 import './DashboardsListPage.scss';
 
@@ -33,28 +38,54 @@ import './DashboardsListPage.scss';
 function DashboardsListPage() {
   const navigate = useNavigate();
   const [dashboards, setDashboards] = useState([]);
+  const [charts, setCharts] = useState({});
+  const [datasources, setDatasources] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortKey, setSortKey] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'tile'
 
-  // Fetch dashboards from API
+  // Fetch dashboards, charts, and datasources from API
   useEffect(() => {
-    fetchDashboards();
+    fetchData();
   }, []);
 
-  const fetchDashboards = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.getDashboards({ include_datasources: true });
+      // Fetch dashboards, charts, and datasources in parallel (like DashboardTileViewPage)
+      const [dashboardsRes, chartsRes, datasourcesRes] = await Promise.all([
+        apiClient.getDashboards({ page: 1, page_size: 100 }),
+        apiClient.getCharts(),
+        apiClient.getDatasources()
+      ]);
 
-      if (data.dashboards) {
-        setDashboards(data.dashboards);
-      } else if (data.error) {
-        setError(data.error);
+      if (dashboardsRes.dashboards) {
+        setDashboards(dashboardsRes.dashboards);
+      } else if (dashboardsRes.error) {
+        setError(dashboardsRes.error);
       } else {
         setDashboards([]);
+      }
+
+      // Build chart lookup (chart_id -> chart)
+      if (chartsRes.charts) {
+        const chartMap = {};
+        chartsRes.charts.forEach(chart => {
+          chartMap[chart.id] = chart;
+        });
+        setCharts(chartMap);
+      }
+
+      // Build datasource lookup (datasource_id -> name)
+      if (datasourcesRes.datasources) {
+        const dsMap = {};
+        datasourcesRes.datasources.forEach(ds => {
+          dsMap[ds.id] = ds.name;
+        });
+        setDatasources(dsMap);
       }
     } catch (err) {
       setError(err.message);
@@ -62,6 +93,8 @@ function DashboardsListPage() {
       setLoading(false);
     }
   };
+
+  const fetchDashboards = () => fetchData();
 
   const handleCreate = () => {
     navigate('/design/dashboards/new');
@@ -90,10 +123,8 @@ function DashboardsListPage() {
   };
 
   const getPanelCount = (dashboard) => {
-    if (!dashboard.panels || dashboard.panels.length === 0) {
-      return '0 panels';
-    }
-    const count = dashboard.panels.length;
+    // Use panels array length directly (full dashboard object)
+    const count = dashboard.panels?.length || 0;
     return `${count} panel${count === 1 ? '' : 's'}`;
   };
 
@@ -107,17 +138,41 @@ function DashboardsListPage() {
     }
   };
 
+  // Helper to get datasource names for search filtering (returns string for matching)
+  const getDatasourceNamesForSearch = (dashboard) => {
+    if (!dashboard.panels || dashboard.panels.length === 0) return '';
+
+    const dsNames = new Set();
+    dashboard.panels.forEach(panel => {
+      if (panel.chart_id) {
+        const chart = charts[panel.chart_id];
+        if (chart?.datasource_id && datasources[chart.datasource_id]) {
+          dsNames.add(datasources[chart.datasource_id]);
+        }
+      }
+    });
+
+    return Array.from(dsNames).join(' ');
+  };
+
   // Filter and sort dashboards
   const filteredAndSortedDashboards = useMemo(() => {
     let result = [...dashboards];
 
-    // Filter by search term
+    // Filter by search term (matches name, description, or datasource names)
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(dashboard =>
-        dashboard.name?.toLowerCase().includes(term) ||
-        dashboard.description?.toLowerCase().includes(term)
-      );
+      result = result.filter(dashboard => {
+        // Check name and description
+        if (dashboard.name?.toLowerCase().includes(term)) return true;
+        if (dashboard.description?.toLowerCase().includes(term)) return true;
+
+        // Check datasource names (computed from charts)
+        const dsNames = getDatasourceNamesForSearch(dashboard);
+        if (dsNames.toLowerCase().includes(term)) return true;
+
+        return false;
+      });
     }
 
     // Sort
@@ -130,6 +185,7 @@ function DashboardsListPage() {
         aVal = new Date(aVal).getTime() || 0;
         bVal = new Date(bVal).getTime() || 0;
       } else if (sortKey === 'panels') {
+        // Use panels array length directly (full dashboard object)
         aVal = a.panels?.length || 0;
         bVal = b.panels?.length || 0;
       } else {
@@ -143,7 +199,7 @@ function DashboardsListPage() {
     });
 
     return result;
-  }, [dashboards, searchTerm, sortKey, sortDirection]);
+  }, [dashboards, searchTerm, sortKey, sortDirection, charts, datasources]);
 
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
@@ -154,10 +210,23 @@ function DashboardsListPage() {
     { key: 'actions', header: '', isSortable: false }
   ];
 
+  // Get unique data source names for a dashboard (computed client-side)
   const getDatasourceNames = (dashboard) => {
-    const names = dashboard.datasource_names || [];
-    if (names.length === 0) return '-';
-    return names.join(', ');
+    if (!dashboard.panels || dashboard.panels.length === 0) return '-';
+
+    const dsNames = new Set();
+    dashboard.panels.forEach(panel => {
+      if (panel.chart_id) {
+        const chart = charts[panel.chart_id];
+        if (chart?.datasource_id && datasources[chart.datasource_id]) {
+          dsNames.add(datasources[chart.datasource_id]);
+        }
+      }
+    });
+
+    const namesArray = Array.from(dsNames);
+    if (namesArray.length === 0) return '-';
+    return namesArray.join(', ');
   };
 
   const rows = filteredAndSortedDashboards.map((dashboard) => ({
@@ -199,97 +268,201 @@ function DashboardsListPage() {
         </p>
       </div>
 
-      {/* Data Table with Toolbar */}
-      <DataTable rows={rows} headers={headers} isSortable>
-        {({ rows, headers, getTableProps, getHeaderProps, getRowProps, onInputChange }) => (
-          <TableContainer>
-            <TableToolbar>
-              <TableToolbarContent>
-                <TableToolbarSearch
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    onInputChange(e);
-                  }}
-                  placeholder="Search"
-                  persistent
-                />
-                <Button
-                  onClick={handleCreate}
-                  size="md"
-                  kind="primary"
+      {/* Toolbar */}
+      <div className="page-toolbar">
+        <div className="toolbar-left">
+          <TableToolbarSearch
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search"
+            persistent
+          />
+          <ContentSwitcher
+            onChange={(e) => setViewMode(e.name)}
+            selectedIndex={viewMode === 'list' ? 0 : 1}
+            size="md"
+          >
+            <Switch name="list">
+              <List size={16} />
+            </Switch>
+            <Switch name="tile">
+              <Grid size={16} />
+            </Switch>
+          </ContentSwitcher>
+        </div>
+        <div className="toolbar-actions">
+          <Button
+            onClick={handleCreate}
+            size="md"
+            kind="primary"
+          >
+            Create
+          </Button>
+        </div>
+      </div>
+
+      {/* Tile View */}
+      {viewMode === 'tile' && (
+        <div className="dashboards-content">
+          {filteredAndSortedDashboards.length === 0 ? (
+            <div className="empty-state">
+              <Dashboard size={64} />
+              <h3>No dashboards available</h3>
+              <p>
+                Looks like you haven't added any dashboards. Click{' '}
+                <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
+                {' '}to get started.
+              </p>
+            </div>
+          ) : (
+            <div className="dashboards-grid">
+              {filteredAndSortedDashboards.map((dashboard) => (
+                <Tile
+                  key={dashboard.id}
+                  className="dashboard-tile"
+                  onClick={() => handleRowClick(dashboard)}
                 >
-                  Create
-                </Button>
-              </TableToolbarContent>
-            </TableToolbar>
-            <Table {...getTableProps()}>
-              <TableHead>
-                <TableRow>
-                  {headers.map((header) => (
-                    <TableHeader
-                      {...getHeaderProps({ header })}
-                      key={header.key}
-                      isSortable={header.isSortable}
-                      isSortHeader={sortKey === header.key}
-                      sortDirection={sortKey === header.key ? sortDirection.toUpperCase() : 'NONE'}
-                      onClick={() => header.isSortable && handleSort(header.key)}
-                    >
-                      {header.header}
-                    </TableHeader>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={headers.length}>
-                      <div className="empty-state">
-                        <Dashboard size={64} />
-                        <h3>No dashboards available</h3>
-                        <p>
-                          Looks like you haven't added any dashboards. Click{' '}
-                          <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
-                          {' '}to get started.
-                        </p>
+                  {/* Thumbnail */}
+                  <div className="tile-thumbnail">
+                    {dashboard.thumbnail ? (
+                      <img src={dashboard.thumbnail} alt={dashboard.name} />
+                    ) : (
+                      <div className="tile-thumbnail-placeholder">
+                        <ChartMultitype size={48} />
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((row) => {
-                    const dashboard = getDashboardById(row.id);
-                    return (
-                      <TableRow
-                        {...getRowProps({ row })}
-                        key={row.id}
-                        onClick={() => handleRowClick(dashboard)}
-                        className="clickable-row"
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="tile-content">
+                    <div className="tile-header">
+                      <h3>{dashboard.name}</h3>
+                      {dashboard.description && (
+                        <Tooltip label={dashboard.description} align="bottom">
+                          <button type="button" className="info-button" onClick={(e) => e.stopPropagation()}>
+                            <Information size={16} />
+                          </button>
+                        </Tooltip>
+                      )}
+                    </div>
+
+                    <div className="tile-meta">
+                      <Tag type="blue" size="sm">
+                        {getPanelCount(dashboard)}
+                      </Tag>
+                    </div>
+
+                    {getDatasourceNames(dashboard) !== '-' && (
+                      <div className="tile-datasource">
+                        <DataBase size={14} />
+                        <span>{getDatasourceNames(dashboard)}</span>
+                      </div>
+                    )}
+
+                    <div className="tile-date">
+                      Updated: {formatDate(dashboard.updated)}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="tile-actions">
+                    <IconButton
+                      kind="ghost"
+                      label="Edit"
+                      onClick={(e) => { e.stopPropagation(); handleRowClick(dashboard); }}
+                      size="sm"
+                    >
+                      <Edit size={16} />
+                    </IconButton>
+                    <IconButton
+                      kind="ghost"
+                      label="Delete"
+                      onClick={(e) => handleDelete(e, dashboard)}
+                      size="sm"
+                    >
+                      <TrashCan size={16} />
+                    </IconButton>
+                  </div>
+                </Tile>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* List View (DataTable) */}
+      {viewMode === 'list' && (
+        <DataTable rows={rows} headers={headers} isSortable>
+          {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
+            <TableContainer>
+              <Table {...getTableProps()}>
+                <TableHead>
+                  <TableRow>
+                    {headers.map((header) => (
+                      <TableHeader
+                        {...getHeaderProps({ header })}
+                        key={header.key}
+                        isSortable={header.isSortable}
+                        isSortHeader={sortKey === header.key}
+                        sortDirection={sortKey === header.key ? sortDirection.toUpperCase() : 'NONE'}
+                        onClick={() => header.isSortable && handleSort(header.key)}
                       >
-                        {row.cells.map((cell) => {
-                          if (cell.info.header === 'actions') {
-                            return (
-                              <TableCell key={cell.id} className="actions-cell">
-                                <IconButton
-                                  kind="ghost"
-                                  label="Delete"
-                                  onClick={(e) => handleDelete(e, dashboard)}
-                                  size="sm"
-                                >
-                                  <TrashCan size={16} />
-                                </IconButton>
-                              </TableCell>
-                            );
-                          }
-                          return <TableCell key={cell.id}>{cell.value}</TableCell>;
-                        })}
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </DataTable>
+                        {header.header}
+                      </TableHeader>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={headers.length}>
+                        <div className="empty-state">
+                          <Dashboard size={64} />
+                          <h3>No dashboards available</h3>
+                          <p>
+                            Looks like you haven't added any dashboards. Click{' '}
+                            <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
+                            {' '}to get started.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    rows.map((row) => {
+                      const dashboard = getDashboardById(row.id);
+                      return (
+                        <TableRow
+                          {...getRowProps({ row })}
+                          key={row.id}
+                          onClick={() => handleRowClick(dashboard)}
+                          className="clickable-row"
+                        >
+                          {row.cells.map((cell) => {
+                            if (cell.info.header === 'actions') {
+                              return (
+                                <TableCell key={cell.id} className="actions-cell">
+                                  <IconButton
+                                    kind="ghost"
+                                    label="Delete"
+                                    onClick={(e) => handleDelete(e, dashboard)}
+                                    size="sm"
+                                  >
+                                    <TrashCan size={16} />
+                                  </IconButton>
+                                </TableCell>
+                              );
+                            }
+                            return <TableCell key={cell.id}>{cell.value}</TableCell>;
+                          })}
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </DataTable>
+      )}
     </div>
   );
 }

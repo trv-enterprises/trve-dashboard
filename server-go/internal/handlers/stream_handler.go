@@ -179,6 +179,152 @@ func (h *StreamHandler) ListActiveStreams(c *gin.Context) {
 	})
 }
 
+// StreamAggregatedRequest represents the request body for aggregated streaming
+type StreamAggregatedRequest struct {
+	Interval     int      `json:"interval" binding:"required"`      // Bucket interval in seconds
+	Function     string   `json:"function" binding:"required"`      // avg, min, max, sum, count
+	ValueCols    []string `json:"value_cols" binding:"required"`    // Columns to aggregate
+	TimestampCol string   `json:"timestamp_col" binding:"required"` // Timestamp column
+	SeriesCol    string   `json:"series_col"`                       // Column to partition by (e.g., "location") - optional
+}
+
+// StreamAggregatedDatasource streams time-bucketed aggregated data via SSE
+// @Summary Stream aggregated data from a socket datasource
+// @Description Opens an SSE connection to stream time-bucketed aggregated data
+// @Tags datasources
+// @Accept json
+// @Produce text/event-stream
+// @Param id path string true "Datasource ID"
+// @Param config body StreamAggregatedRequest true "Aggregation configuration"
+// @Success 200 {string} string "SSE stream"
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /datasources/{id}/stream/aggregated [post]
+func (h *StreamHandler) StreamAggregatedDatasource(c *gin.Context) {
+	datasourceID := c.Param("id")
+	if datasourceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "datasource ID is required"})
+		return
+	}
+
+	// Parse aggregation config from request body
+	var req StreamAggregatedRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body: " + err.Error()})
+		return
+	}
+
+	// Validate function
+	validFunctions := map[string]bool{"avg": true, "min": true, "max": true, "sum": true, "count": true}
+	if !validFunctions[req.Function] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid function, must be: avg, min, max, sum, or count"})
+		return
+	}
+
+	// Check if this is a socket datasource
+	isSocket, err := h.manager.IsSocketDatasource(c.Request.Context(), datasourceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if !isSocket {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "datasource is not a socket type"})
+		return
+	}
+
+	// Ensure the raw stream is active (subscribes to start it if needed)
+	rawCh := h.manager.SubscribeAndGetChannel(c.Request.Context(), datasourceID)
+	if rawCh == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start stream"})
+		return
+	}
+	// We don't need the raw channel, just need the stream active
+	h.manager.Unsubscribe(datasourceID, rawCh)
+
+	// Create bucket config
+	bucketConfig := streaming.BucketConfig{
+		DatasourceID: datasourceID,
+		Interval:     req.Interval,
+		Function:     req.Function,
+		ValueCols:    req.ValueCols,
+		TimestampCol: req.TimestampCol,
+		SeriesCol:    req.SeriesCol,
+	}
+
+	// Subscribe to aggregated stream
+	registry := streaming.GetRegistry()
+	aggCh, configKey := registry.Subscribe(bucketConfig)
+
+	log.Printf("[StreamHandler] SSE aggregated connection opened for datasource %s (config: %s)", datasourceID, configKey[:8])
+
+	// Set SSE headers
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+
+	// Send initial config acknowledgment
+	configData, _ := json.Marshal(gin.H{
+		"datasource_id": datasourceID,
+		"config_key":    configKey[:8],
+		"interval":      req.Interval,
+		"function":      req.Function,
+		"value_cols":    req.ValueCols,
+		"timestamp_col": req.TimestampCol,
+		"series_col":    req.SeriesCol,
+	})
+	fmt.Fprintf(c.Writer, "event: config\ndata: %s\n\n", configData)
+	c.Writer.Flush()
+
+	// Create ticker for heartbeat
+	heartbeatTicker := time.NewTicker(30 * time.Second)
+	defer heartbeatTicker.Stop()
+
+	// Stream aggregated records to client
+	clientGone := c.Request.Context().Done()
+	for {
+		select {
+		case <-clientGone:
+			log.Printf("[StreamHandler] Client disconnected from aggregated stream %s", configKey[:8])
+			registry.Unsubscribe(configKey, aggCh)
+			return
+
+		case record, ok := <-aggCh:
+			if !ok {
+				log.Printf("[StreamHandler] Aggregated stream channel closed %s", configKey[:8])
+				return
+			}
+
+			data, err := json.Marshal(record)
+			if err != nil {
+				log.Printf("[StreamHandler] Error marshaling aggregated record: %v", err)
+				continue
+			}
+
+			fmt.Fprintf(c.Writer, "event: bucket\ndata: %s\n\n", data)
+			c.Writer.Flush()
+
+		case <-heartbeatTicker.C:
+			fmt.Fprintf(c.Writer, "event: heartbeat\ndata: {\"timestamp\":%d}\n\n", time.Now().Unix())
+			c.Writer.Flush()
+		}
+	}
+}
+
+// GetAggregatorStats returns statistics about active aggregators
+// @Summary Get aggregator statistics
+// @Description Get statistics about active bucket aggregators
+// @Tags datasources
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /datasources/aggregators [get]
+func (h *StreamHandler) GetAggregatorStats(c *gin.Context) {
+	registry := streaming.GetRegistry()
+	stats := registry.Stats()
+	c.JSON(http.StatusOK, stats)
+}
+
 func errorToString(err error) string {
 	if err == nil {
 		return ""

@@ -31,6 +31,22 @@ type DataFilter struct {
 	Value interface{} `json:"value" bson:"value"` // Value to compare against (can be array for 'in' operator)
 }
 
+// SlidingWindow defines a time-based window for filtering data
+// @Description Time window configuration for limiting data to recent entries
+type SlidingWindow struct {
+	Duration     int    `json:"duration" bson:"duration"`           // Window duration in seconds (e.g., 300 = last 5 minutes)
+	TimestampCol string `json:"timestamp_col" bson:"timestamp_col"` // Column containing timestamps
+}
+
+// TimeBucket defines time-bucketed aggregation for streaming data
+// @Description Time bucket configuration for aggregating streaming data into intervals
+type TimeBucket struct {
+	Interval     int      `json:"interval" bson:"interval"`           // Bucket interval in seconds (e.g., 60 = 1 minute, 3600 = 1 hour)
+	Function     string   `json:"function" bson:"function"`           // Aggregation function: avg, min, max, sum, count
+	ValueCols    []string `json:"value_cols" bson:"value_cols"`       // Columns to aggregate (numeric values)
+	TimestampCol string   `json:"timestamp_col" bson:"timestamp_col"` // Column containing timestamps for bucket alignment
+}
+
 // DataAggregation defines how to aggregate/reduce data
 // @Description Aggregation configuration for data transformation
 type DataAggregation struct {
@@ -43,18 +59,21 @@ type DataAggregation struct {
 // ChartDataMapping defines how to map query results to chart elements
 // @Description Mapping configuration from data columns to chart axes/series
 type ChartDataMapping struct {
-	XAxis       string           `json:"x_axis" bson:"x_axis"`               // Column for X axis (categories)
-	XAxisLabel  string           `json:"x_axis_label" bson:"x_axis_label"`   // Label for X axis (e.g., "Time", "Date")
-	XAxisFormat string           `json:"x_axis_format" bson:"x_axis_format"` // Format for X axis values: chart, chart_time, chart_date, chart_datetime, short, long, etc.
-	YAxis       []string         `json:"y_axis" bson:"y_axis"`               // Columns for Y axis (values/series)
-	YAxisLabel  string           `json:"y_axis_label" bson:"y_axis_label"`   // Label for Y axis (e.g., "Temperature (°F)", "Count")
-	GroupBy     string           `json:"group_by" bson:"group_by"`           // Column to group/split series by
-	LabelCol    string           `json:"label_col" bson:"label_col"`         // Column for labels
-	Filters     []DataFilter     `json:"filters" bson:"filters"`             // Client-side filters applied after data fetch
-	Aggregation *DataAggregation `json:"aggregation" bson:"aggregation"`     // Aggregation to apply (first, last, avg, etc.)
-	SortBy      string           `json:"sort_by" bson:"sort_by"`             // Column to sort by
-	SortOrder   string           `json:"sort_order" bson:"sort_order"`       // asc or desc
-	Limit       int              `json:"limit" bson:"limit"`                 // Max rows to return
+	XAxis         string           `json:"x_axis" bson:"x_axis"`                     // Column for X axis (categories)
+	XAxisLabel    string           `json:"x_axis_label" bson:"x_axis_label"`         // Label for X axis (e.g., "Time", "Date")
+	XAxisFormat   string           `json:"x_axis_format" bson:"x_axis_format"`       // Format for X axis values: chart, chart_time, chart_date, chart_datetime, short, long, etc.
+	YAxis         []string         `json:"y_axis" bson:"y_axis"`                     // Columns for Y axis (values/series)
+	YAxisLabel    string           `json:"y_axis_label" bson:"y_axis_label"`         // Label for Y axis (e.g., "Temperature (°F)", "Count")
+	Series        string           `json:"series" bson:"series"`                     // Column that identifies each series (e.g., "location") - used for time bucket partitioning
+	GroupBy       string           `json:"group_by" bson:"group_by"`                 // Column to group/split series by (client-side grouping)
+	LabelCol      string           `json:"label_col" bson:"label_col"`               // Column for labels
+	Filters       []DataFilter     `json:"filters" bson:"filters"`                   // Client-side filters applied after data fetch
+	Aggregation   *DataAggregation `json:"aggregation" bson:"aggregation"`           // Aggregation to apply (first, last, avg, etc.)
+	SlidingWindow *SlidingWindow   `json:"sliding_window" bson:"sliding_window"`     // Time-based sliding window (e.g., last 5 minutes)
+	TimeBucket    *TimeBucket      `json:"time_bucket" bson:"time_bucket"`           // Time-bucketed aggregation for streaming data
+	SortBy        string           `json:"sort_by" bson:"sort_by"`                   // Column to sort by
+	SortOrder     string           `json:"sort_order" bson:"sort_order"`             // asc or desc
+	Limit         int              `json:"limit" bson:"limit"`                       // Max rows to return
 }
 
 // EmbeddedChart represents a chart embedded directly in a dashboard

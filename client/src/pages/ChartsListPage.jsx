@@ -18,9 +18,13 @@ import {
   Tag,
   Link,
   MenuButton,
-  MenuItem
+  MenuItem,
+  Tile,
+  ContentSwitcher,
+  Switch,
+  Tooltip
 } from '@carbon/react';
-import { TrashCan, ChartLineSmooth } from '@carbon/icons-react';
+import { TrashCan, ChartLineSmooth, List, Grid, Edit, DataBase, Information } from '@carbon/icons-react';
 import AiIcon from '../components/icons/AiIcon';
 import apiClient from '../api/client';
 import ChartDeleteDialog from '../components/ChartDeleteDialog';
@@ -46,6 +50,7 @@ function ChartsListPage() {
   const [sortDirection, setSortDirection] = useState('asc');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [chartToDelete, setChartToDelete] = useState(null);
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'tile'
 
   // Fetch charts and data sources from API
   useEffect(() => {
@@ -247,134 +252,249 @@ function ChartsListPage() {
         </p>
       </div>
 
-      {/* Data Table with Toolbar */}
-      <DataTable rows={rows} headers={headers} isSortable>
-        {({ rows, headers, getTableProps, getHeaderProps, getRowProps, onInputChange }) => (
-          <TableContainer>
-            <TableToolbar>
-              <TableToolbarContent>
-                <TableToolbarSearch
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    onInputChange(e);
-                  }}
-                  placeholder="Search"
-                  persistent
-                />
-                <MenuButton
-                  label="Create"
-                  size="md"
-                  kind="primary"
+      {/* Toolbar */}
+      <div className="page-toolbar">
+        <div className="toolbar-left">
+          <TableToolbarSearch
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search"
+            persistent
+          />
+          <ContentSwitcher
+            onChange={(e) => setViewMode(e.name)}
+            selectedIndex={viewMode === 'list' ? 0 : 1}
+            size="md"
+          >
+            <Switch name="list">
+              <List size={16} />
+            </Switch>
+            <Switch name="tile">
+              <Grid size={16} />
+            </Switch>
+          </ContentSwitcher>
+        </div>
+        <div className="toolbar-actions">
+          <MenuButton
+            label="Create"
+            size="md"
+            kind="primary"
+          >
+            <MenuItem
+              label="Create"
+              onClick={handleCreate}
+            />
+            <MenuItem
+              label="Create with AI"
+              renderIcon={AiIcon}
+              onClick={handleCreateWithAI}
+            />
+          </MenuButton>
+        </div>
+      </div>
+
+      {/* Tile View */}
+      {viewMode === 'tile' && (
+        <div className="charts-content">
+          {filteredAndSortedCharts.length === 0 ? (
+            <div className="empty-state">
+              <ChartLineSmooth size={64} />
+              <h3>No charts available</h3>
+              <p>
+                Looks like you haven't added any charts. Click{' '}
+                <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
+                {' '}to get started.
+              </p>
+            </div>
+          ) : (
+            <div className="charts-grid">
+              {filteredAndSortedCharts.map((chart) => (
+                <Tile
+                  key={chart.id}
+                  className="chart-tile"
+                  onClick={() => handleRowClick(chart)}
                 >
-                  <MenuItem
-                    label="Create"
-                    onClick={handleCreate}
-                  />
-                  <MenuItem
-                    label="Create with AI"
-                    renderIcon={AiIcon}
-                    onClick={handleCreateWithAI}
-                  />
-                </MenuButton>
-              </TableToolbarContent>
-            </TableToolbar>
-            <Table {...getTableProps()}>
-              <TableHead>
-                <TableRow>
-                  {headers.map((header) => (
-                    <TableHeader
-                      {...getHeaderProps({ header })}
-                      key={header.key}
-                      isSortable={header.isSortable}
-                      isSortHeader={sortKey === header.key}
-                      sortDirection={sortKey === header.key ? sortDirection.toUpperCase() : 'NONE'}
-                      onClick={() => header.isSortable && handleSort(header.key)}
-                    >
-                      {header.header}
-                    </TableHeader>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={headers.length}>
-                      <div className="empty-state">
-                        <ChartLineSmooth size={64} />
-                        <h3>No charts available</h3>
-                        <p>
-                          Looks like you haven't added any charts. Click{' '}
-                          <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
-                          {' '}to get started.
-                        </p>
+                  {/* Thumbnail */}
+                  <div className="tile-thumbnail">
+                    {chart.thumbnail ? (
+                      <img src={chart.thumbnail} alt={chart.name} />
+                    ) : (
+                      <div className="tile-thumbnail-placeholder">
+                        <ChartLineSmooth size={48} />
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((row) => {
-                    const chart = getChartById(row.id);
-                    return (
-                      <TableRow
-                        {...getRowProps({ row })}
-                        key={row.id}
-                        onClick={() => handleRowClick(chart)}
-                        className="clickable-row"
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="tile-content">
+                    <div className="tile-header">
+                      <h3>{chart.name}</h3>
+                      {chart.description && (
+                        <Tooltip label={chart.description} align="bottom">
+                          <button type="button" className="info-button" onClick={(e) => e.stopPropagation()}>
+                            <Information size={16} />
+                          </button>
+                        </Tooltip>
+                      )}
+                    </div>
+
+                    <div className="tile-meta">
+                      <Tag type={getChartTypeColor(chart.chart_type)} size="sm">
+                        {chart.chart_type?.toUpperCase() || 'N/A'}
+                      </Tag>
+                      <Tag type={chart.status === 'final' ? 'green' : 'gray'} size="sm">
+                        {chart.status?.toUpperCase() || 'DRAFT'}
+                      </Tag>
+                    </div>
+
+                    {datasources[chart.datasource_id] && (
+                      <div className="tile-datasource">
+                        <DataBase size={14} />
+                        <span>{datasources[chart.datasource_id]}</span>
+                      </div>
+                    )}
+
+                    <div className="tile-date">
+                      Updated: {formatDate(chart.updated)}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="tile-actions">
+                    <IconButton
+                      kind="ghost"
+                      label="Edit"
+                      onClick={(e) => { e.stopPropagation(); handleRowClick(chart); }}
+                      size="sm"
+                    >
+                      <Edit size={16} />
+                    </IconButton>
+                    <IconButton
+                      kind="ghost"
+                      label="Edit with AI"
+                      onClick={(e) => handleAIEdit(e, chart)}
+                      size="sm"
+                    >
+                      <AiIcon size={16} />
+                    </IconButton>
+                    <IconButton
+                      kind="ghost"
+                      label="Delete"
+                      onClick={(e) => handleDelete(e, chart)}
+                      size="sm"
+                    >
+                      <TrashCan size={16} />
+                    </IconButton>
+                  </div>
+                </Tile>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* List View (DataTable) */}
+      {viewMode === 'list' && (
+        <DataTable rows={rows} headers={headers} isSortable>
+          {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
+            <TableContainer>
+              <Table {...getTableProps()}>
+                <TableHead>
+                  <TableRow>
+                    {headers.map((header) => (
+                      <TableHeader
+                        {...getHeaderProps({ header })}
+                        key={header.key}
+                        isSortable={header.isSortable}
+                        isSortHeader={sortKey === header.key}
+                        sortDirection={sortKey === header.key ? sortDirection.toUpperCase() : 'NONE'}
+                        onClick={() => header.isSortable && handleSort(header.key)}
                       >
-                        {row.cells.map((cell) => {
-                          if (cell.info.header === 'chart_type') {
-                            return (
-                              <TableCell key={cell.id}>
-                                <Tag type={getChartTypeColor(cell.value)} size="md">
-                                  {cell.value?.toUpperCase() || 'N/A'}
-                                </Tag>
-                              </TableCell>
-                            );
-                          }
-                          if (cell.info.header === 'status') {
-                            const statusColor = cell.value === 'final' ? 'green' : 'gray';
-                            return (
-                              <TableCell key={cell.id}>
-                                <Tag type={statusColor} size="md">
-                                  {cell.value?.toUpperCase() || 'DRAFT'}
-                                </Tag>
-                              </TableCell>
-                            );
-                          }
-                          if (cell.info.header === 'actions') {
-                            return (
-                              <TableCell key={cell.id} className="actions-cell">
-                                <div className="actions-wrapper">
-                                  <IconButton
-                                    kind="ghost"
-                                    label="Edit with AI"
-                                    onClick={(e) => handleAIEdit(e, chart)}
-                                    size="sm"
-                                  >
-                                    <AiIcon size={16} />
-                                  </IconButton>
-                                  <IconButton
-                                    kind="ghost"
-                                    label="Delete"
-                                    onClick={(e) => handleDelete(e, chart)}
-                                    size="sm"
-                                  >
-                                    <TrashCan size={16} />
-                                  </IconButton>
-                                </div>
-                              </TableCell>
-                            );
-                          }
-                          return <TableCell key={cell.id}>{cell.value}</TableCell>;
-                        })}
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </DataTable>
+                        {header.header}
+                      </TableHeader>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={headers.length}>
+                        <div className="empty-state">
+                          <ChartLineSmooth size={64} />
+                          <h3>No charts available</h3>
+                          <p>
+                            Looks like you haven't added any charts. Click{' '}
+                            <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
+                            {' '}to get started.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    rows.map((row) => {
+                      const chart = getChartById(row.id);
+                      return (
+                        <TableRow
+                          {...getRowProps({ row })}
+                          key={row.id}
+                          onClick={() => handleRowClick(chart)}
+                          className="clickable-row"
+                        >
+                          {row.cells.map((cell) => {
+                            if (cell.info.header === 'chart_type') {
+                              return (
+                                <TableCell key={cell.id}>
+                                  <Tag type={getChartTypeColor(cell.value)} size="md">
+                                    {cell.value?.toUpperCase() || 'N/A'}
+                                  </Tag>
+                                </TableCell>
+                              );
+                            }
+                            if (cell.info.header === 'status') {
+                              const statusColor = cell.value === 'final' ? 'green' : 'gray';
+                              return (
+                                <TableCell key={cell.id}>
+                                  <Tag type={statusColor} size="md">
+                                    {cell.value?.toUpperCase() || 'DRAFT'}
+                                  </Tag>
+                                </TableCell>
+                              );
+                            }
+                            if (cell.info.header === 'actions') {
+                              return (
+                                <TableCell key={cell.id} className="actions-cell">
+                                  <div className="actions-wrapper">
+                                    <IconButton
+                                      kind="ghost"
+                                      label="Edit with AI"
+                                      onClick={(e) => handleAIEdit(e, chart)}
+                                      size="sm"
+                                    >
+                                      <AiIcon size={16} />
+                                    </IconButton>
+                                    <IconButton
+                                      kind="ghost"
+                                      label="Delete"
+                                      onClick={(e) => handleDelete(e, chart)}
+                                      size="sm"
+                                    >
+                                      <TrashCan size={16} />
+                                    </IconButton>
+                                  </div>
+                                </TableCell>
+                              );
+                            }
+                            return <TableCell key={cell.id}>{cell.value}</TableCell>;
+                          })}
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </DataTable>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <ChartDeleteDialog

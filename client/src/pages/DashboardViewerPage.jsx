@@ -4,7 +4,9 @@ import {
   Button,
   Loading,
   IconButton,
-  Tag
+  Tag,
+  OverflowMenu,
+  OverflowMenuItem
 } from '@carbon/react';
 import {
   ArrowLeft,
@@ -16,6 +18,7 @@ import {
   FitToScreen,
   CenterToFit
 } from '@carbon/icons-react';
+import html2canvas from 'html2canvas';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import ChartDataModal from '../components/ChartDataModal';
 import apiClient from '../api/client';
@@ -182,6 +185,37 @@ function DashboardViewerPage() {
     setSelectedChart(null);
   };
 
+  // Save thumbnail by capturing the dashboard grid
+  const saveThumbnail = async () => {
+    const gridContainer = document.querySelector('.dashboard-grid-container');
+    if (!gridContainer) {
+      console.error('Dashboard grid container not found');
+      return;
+    }
+
+    try {
+      const canvas = await html2canvas(gridContainer, {
+        backgroundColor: '#161616',
+        scale: 0.5, // Reduce size for thumbnail
+        logging: false,
+        useCORS: true
+      });
+
+      const thumbnailDataUrl = canvas.toDataURL('image/png');
+
+      // Update dashboard with new thumbnail
+      await apiClient.updateDashboard(id, {
+        ...dashboard,
+        thumbnail: thumbnailDataUrl
+      });
+
+      // Refresh dashboard to show updated data
+      fetchDashboard();
+    } catch (err) {
+      console.error('Failed to save thumbnail:', err);
+    }
+  };
+
   if (loading && !dashboard) {
     return (
       <div className="dashboard-viewer-page">
@@ -215,9 +249,6 @@ function DashboardViewerPage() {
           </IconButton>
           <div className="dashboard-info">
             <h1>{dashboard?.name}</h1>
-            {dashboard?.description && (
-              <p>{dashboard.description}</p>
-            )}
           </div>
         </div>
 
@@ -256,13 +287,21 @@ function DashboardViewerPage() {
           >
             {reduceToFit ? <CenterToFit size={20} /> : <FitToScreen size={20} />}
           </IconButton>
-          <IconButton
-            kind="ghost"
-            label="Edit dashboard"
-            onClick={() => navigate(`/design/dashboards/${id}`, { state: { from: `/view/dashboards/${id}` } })}
+          <OverflowMenu
+            renderIcon={() => <Edit size={20} />}
+            flipped
+            direction="bottom"
+            iconDescription="Dashboard actions"
           >
-            <Edit size={20} />
-          </IconButton>
+            <OverflowMenuItem
+              itemText="Edit"
+              onClick={() => navigate(`/design/dashboards/${id}`, { state: { from: `/view/dashboards/${id}` } })}
+            />
+            <OverflowMenuItem
+              itemText="Save Thumbnail"
+              onClick={saveThumbnail}
+            />
+          </OverflowMenu>
         </div>
       </div>
 

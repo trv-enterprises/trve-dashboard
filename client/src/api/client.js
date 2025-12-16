@@ -1,4 +1,19 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Use current hostname for API calls (allows Tailscale/network access)
+// Falls back to localhost for SSR or when window is not available
+const getApiBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  if (typeof window !== 'undefined') {
+    return `http://${window.location.hostname}:3001`;
+  }
+  return 'http://localhost:3001';
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Export for use in other files
+export const API_BASE = API_BASE_URL;
 
 /**
  * API Client for Dashboard Server

@@ -99,6 +99,9 @@ cors:
   allowed_origins:
     - http://localhost:5173
     - http://localhost:3000
+    - http://100.127.19.27:5173  # Tailscale - this machine
+    - http://100.64.0.0:5173     # Tailscale range placeholder
+    - "*"                         # Allow all origins for Tailscale network
   allowed_methods:
     - GET
     - POST

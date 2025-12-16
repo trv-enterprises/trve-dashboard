@@ -77,6 +77,10 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, chartID string, chartVer
 		return e.executeUpdateFilters(ctx, chartID, chartVersion, input)
 	case ToolUpdateAggregation:
 		return e.executeUpdateAggregation(ctx, chartID, chartVersion, input)
+	case ToolUpdateSlidingWindow:
+		return e.executeUpdateSlidingWindow(ctx, chartID, chartVersion, input)
+	case ToolUpdateTimeBucket:
+		return e.executeUpdateTimeBucket(ctx, chartID, chartVersion, input)
 	case ToolSetCustomCode:
 		return e.executeSetCustomCode(ctx, chartID, chartVersion, input)
 	case ToolUpdateChartOptions:
@@ -359,6 +363,113 @@ func (e *ToolExecutor) executeUpdateAggregation(ctx context.Context, chartID str
 	return &ToolResult{
 		Success:      true,
 		Message:      "Updated aggregation configuration",
+		ChartUpdated: true,
+	}, nil
+}
+
+// executeUpdateSlidingWindow updates sliding window configuration for time-based data filtering
+func (e *ToolExecutor) executeUpdateSlidingWindow(ctx context.Context, chartID string, chartVersion int, input json.RawMessage) (*ToolResult, error) {
+	var params struct {
+		Duration     *int    `json:"duration,omitempty"`
+		TimestampCol *string `json:"timestamp_col,omitempty"`
+	}
+	if err := json.Unmarshal(input, &params); err != nil {
+		return &ToolResult{Success: false, Error: "invalid input: " + err.Error()}, nil
+	}
+
+	chart, err := e.chartRepo.FindByIDAndVersion(ctx, chartID, chartVersion)
+	if err != nil {
+		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
+	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
+	}
+
+	// Initialize DataMapping if nil
+	if chart.DataMapping == nil {
+		chart.DataMapping = &models.ChartDataMapping{}
+	}
+	if chart.DataMapping.SlidingWindow == nil {
+		chart.DataMapping.SlidingWindow = &models.SlidingWindow{}
+	}
+
+	if params.Duration != nil {
+		chart.DataMapping.SlidingWindow.Duration = *params.Duration
+	}
+	if params.TimestampCol != nil {
+		chart.DataMapping.SlidingWindow.TimestampCol = *params.TimestampCol
+	}
+
+	if err := e.chartRepo.Update(ctx, chartID, chartVersion, chart); err != nil {
+		return &ToolResult{Success: false, Error: "failed to update chart: " + err.Error()}, nil
+	}
+
+	// Broadcast chart update to all subscribers
+	e.broadcastChartUpdate(chart)
+
+	return &ToolResult{
+		Success:      true,
+		Message:      fmt.Sprintf("Updated sliding window: %d seconds on column '%s'", chart.DataMapping.SlidingWindow.Duration, chart.DataMapping.SlidingWindow.TimestampCol),
+		ChartUpdated: true,
+	}, nil
+}
+
+// executeUpdateTimeBucket updates time-bucketed aggregation configuration for streaming data
+func (e *ToolExecutor) executeUpdateTimeBucket(ctx context.Context, chartID string, chartVersion int, input json.RawMessage) (*ToolResult, error) {
+	var params struct {
+		Interval     *int      `json:"interval,omitempty"`
+		Function     *string   `json:"function,omitempty"`
+		ValueCols    *[]string `json:"value_cols,omitempty"`
+		TimestampCol *string   `json:"timestamp_col,omitempty"`
+	}
+	if err := json.Unmarshal(input, &params); err != nil {
+		return &ToolResult{Success: false, Error: "invalid input: " + err.Error()}, nil
+	}
+
+	chart, err := e.chartRepo.FindByIDAndVersion(ctx, chartID, chartVersion)
+	if err != nil {
+		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
+	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
+	}
+
+	// Initialize DataMapping if nil
+	if chart.DataMapping == nil {
+		chart.DataMapping = &models.ChartDataMapping{}
+	}
+	if chart.DataMapping.TimeBucket == nil {
+		chart.DataMapping.TimeBucket = &models.TimeBucket{}
+	}
+
+	if params.Interval != nil {
+		chart.DataMapping.TimeBucket.Interval = *params.Interval
+	}
+	if params.Function != nil {
+		// Validate function
+		validFunctions := map[string]bool{"avg": true, "min": true, "max": true, "sum": true, "count": true}
+		if !validFunctions[*params.Function] {
+			return &ToolResult{Success: false, Error: "invalid function, must be: avg, min, max, sum, or count"}, nil
+		}
+		chart.DataMapping.TimeBucket.Function = *params.Function
+	}
+	if params.ValueCols != nil {
+		chart.DataMapping.TimeBucket.ValueCols = *params.ValueCols
+	}
+	if params.TimestampCol != nil {
+		chart.DataMapping.TimeBucket.TimestampCol = *params.TimestampCol
+	}
+
+	if err := e.chartRepo.Update(ctx, chartID, chartVersion, chart); err != nil {
+		return &ToolResult{Success: false, Error: "failed to update chart: " + err.Error()}, nil
+	}
+
+	// Broadcast chart update to all subscribers
+	e.broadcastChartUpdate(chart)
+
+	return &ToolResult{
+		Success:      true,
+		Message:      fmt.Sprintf("Updated time bucket: %d second intervals using '%s' function on columns %v", chart.DataMapping.TimeBucket.Interval, chart.DataMapping.TimeBucket.Function, chart.DataMapping.TimeBucket.ValueCols),
 		ChartUpdated: true,
 	}, nil
 }

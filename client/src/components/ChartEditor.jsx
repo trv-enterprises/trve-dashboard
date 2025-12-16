@@ -6,6 +6,7 @@ import {
   Toggle,
   Select,
   SelectItem,
+  MultiSelect,
   Column,
   Grid,
   ContentSwitcher,
@@ -18,6 +19,7 @@ import {
 } from '@carbon/react';
 import { Play, Add, TrashCan, ChartBar, Code, TableSplit } from '@carbon/icons-react';
 import DynamicComponentLoader from './DynamicComponentLoader';
+import { API_BASE } from '../api/client';
 import SQLQueryBuilder from './SQLQueryBuilder';
 import { transformData, formatCellValue } from '../utils/dataTransforms';
 import apiClient from '../api/client';
@@ -112,6 +114,7 @@ const ChartEditor = forwardRef(function ChartEditor({
   const [yAxisColumns, setYAxisColumns] = useState([]);
   const [yAxisLabel, setYAxisLabel] = useState(''); // Custom label for Y axis (e.g., "Temperature (°F)")
   const [groupByColumn, setGroupByColumn] = useState('');
+  const [seriesColumn, setSeriesColumn] = useState(''); // Column that identifies each series (e.g., location) - used for time bucket partitioning
 
   // Filters and aggregation
   const [filters, setFilters] = useState([]);
@@ -119,6 +122,18 @@ const ChartEditor = forwardRef(function ChartEditor({
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
   const [limitRows, setLimitRows] = useState(0);
+
+  // Sliding window for time-series data
+  const [slidingWindowEnabled, setSlidingWindowEnabled] = useState(false);
+  const [slidingWindowDuration, setSlidingWindowDuration] = useState(300); // Default 5 minutes
+  const [slidingWindowTimestampCol, setSlidingWindowTimestampCol] = useState('');
+
+  // Time bucket aggregation for streaming data (socket datasources only)
+  const [timeBucketEnabled, setTimeBucketEnabled] = useState(false);
+  const [timeBucketInterval, setTimeBucketInterval] = useState(60); // Default 1 minute
+  const [timeBucketFunction, setTimeBucketFunction] = useState('avg');
+  const [timeBucketValueCols, setTimeBucketValueCols] = useState([]);
+  const [timeBucketTimestampCol, setTimeBucketTimestampCol] = useState('');
 
   // Preview data
   const [previewData, setPreviewData] = useState(null);
@@ -185,11 +200,30 @@ const ChartEditor = forwardRef(function ChartEditor({
       setYAxisColumns(chart.data_mapping?.y_axis || []);
       setYAxisLabel(chart.data_mapping?.y_axis_label || '');
       setGroupByColumn(chart.data_mapping?.group_by || '');
+      setSeriesColumn(chart.data_mapping?.series || '');
       setFilters(chart.data_mapping?.filters || []);
       setAggregation(chart.data_mapping?.aggregation || { type: '', sortBy: '', field: '', count: 10 });
       setSortBy(chart.data_mapping?.sort_by || '');
       setSortOrder(chart.data_mapping?.sort_order || 'desc');
       setLimitRows(chart.data_mapping?.limit || 0);
+      // Sliding window initialization
+      const sw = chart.data_mapping?.sliding_window;
+      setSlidingWindowEnabled(sw?.duration > 0 && !!sw?.timestamp_col);
+      setSlidingWindowDuration(sw?.duration || 300);
+      setSlidingWindowTimestampCol(sw?.timestamp_col || '');
+      // Time bucket initialization (for socket datasources)
+      // Load condition must match save condition: all three fields required
+      const tb = chart.data_mapping?.time_bucket;
+      const hasValidTimeBucket = tb?.interval > 0 && !!tb?.timestamp_col && (tb?.value_cols?.length || 0) > 0;
+      setTimeBucketEnabled(hasValidTimeBucket);
+      setTimeBucketInterval(tb?.interval || 60);
+      setTimeBucketFunction(tb?.function || 'avg');
+      setTimeBucketValueCols(tb?.value_cols || []);
+      setTimeBucketTimestampCol(tb?.timestamp_col || '');
+      // Debug logging for time bucket load
+      if (tb) {
+        console.log('[ChartEditor] Loading time_bucket:', { tb, hasValidTimeBucket });
+      }
       setComponentCode(chart.component_code || '');
       setShowCustomCode(chart.use_custom_code ?? (chart.chart_type === 'custom'));
       setInitialState(JSON.stringify({
@@ -297,11 +331,20 @@ const ChartEditor = forwardRef(function ChartEditor({
     setYAxisColumns([]);
     setYAxisLabel('');
     setGroupByColumn('');
+    setSeriesColumn('');
     setFilters([]);
     setAggregation({ type: '', sortBy: '', field: '', count: 10 });
     setSortBy('');
     setSortOrder('desc');
     setLimitRows(0);
+    setSlidingWindowEnabled(false);
+    setSlidingWindowDuration(300);
+    setSlidingWindowTimestampCol('');
+    setTimeBucketEnabled(false);
+    setTimeBucketInterval(60);
+    setTimeBucketFunction('avg');
+    setTimeBucketValueCols([]);
+    setTimeBucketTimestampCol('');
     setComponentCode('');
     setShowCustomCode(false);
     setPreviewData(null);
@@ -311,7 +354,7 @@ const ChartEditor = forwardRef(function ChartEditor({
 
   const fetchDatasources = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/datasources?page=1&page_size=100');
+      const response = await fetch(`${API_BASE}/api/datasources?page=1&page_size=100`);
       const data = await response.json();
       if (data.datasources) {
         setDatasources(data.datasources);
@@ -338,7 +381,7 @@ const ChartEditor = forwardRef(function ChartEditor({
     setPreviewError(null);
 
     try {
-      const response = await fetch(`http://localhost:3001/api/datasources/${selectedDatasourceId}/query`, {
+      const response = await fetch(`${API_BASE}/api/datasources/${selectedDatasourceId}/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -508,8 +551,35 @@ const ChartEditor = forwardRef(function ChartEditor({
         y_axis: yAxisColumns,
         y_axis_label: yAxisLabel || '',
         group_by: groupByColumn || '',
+        series: seriesColumn || '', // Column for series partitioning in time buckets
         filters: filters.length > 0 ? filters : [],
         aggregation: aggregation.type ? aggregation : null,
+        sliding_window: slidingWindowEnabled && slidingWindowTimestampCol ? {
+          duration: slidingWindowDuration,
+          timestamp_col: slidingWindowTimestampCol
+        } : null,
+        time_bucket: (() => {
+          const willSave = timeBucketEnabled && timeBucketTimestampCol && timeBucketValueCols.length > 0;
+          // Debug logging for time bucket save
+          if (timeBucketEnabled) {
+            console.log('[ChartEditor] Time bucket save check:', {
+              timeBucketEnabled,
+              timeBucketTimestampCol,
+              timeBucketValueCols,
+              timeBucketInterval,
+              timeBucketFunction,
+              willSave,
+              reason: !timeBucketTimestampCol ? 'Missing timestamp column' :
+                      timeBucketValueCols.length === 0 ? 'No value columns selected' : 'OK'
+            });
+          }
+          return willSave ? {
+            interval: timeBucketInterval,
+            function: timeBucketFunction,
+            value_cols: timeBucketValueCols,
+            timestamp_col: timeBucketTimestampCol
+          } : null;
+        })(),
         sort_by: sortBy || '',
         sort_order: sortOrder || 'desc',
         limit: limitRows || 0
@@ -751,72 +821,78 @@ const ChartEditor = forwardRef(function ChartEditor({
                 <div className="mapping-section">
                   <h4>Data Mapping</h4>
                   {availableColumns.length > 0 ? (
-                    <Grid narrow>
-                      <Column lg={4} md={4} sm={4}>
-                        <Select
-                          id="x-axis-column"
-                          labelText="X-Axis (Categories)"
-                          value={xAxisColumn}
-                          onChange={(e) => setXAxisColumn(e.target.value)}
-                        >
-                          <SelectItem value="" text="Select column..." />
-                          {availableColumns.map(col => (
-                            <SelectItem key={col} value={col} text={col} />
-                          ))}
-                        </Select>
-                      </Column>
-                      <Column lg={4} md={4} sm={4}>
-                        <div className="y-axis-selector">
-                          <label className="cds--label">Y-Axis (Values)</label>
-                          <div className="column-tags">
-                            {availableColumns.filter(c => c !== xAxisColumn).map(col => (
-                              <Tag
-                                key={col}
-                                type={yAxisColumns.includes(col) ? 'blue' : 'gray'}
-                                onClick={() => handleYAxisToggle(col)}
-                                className="column-tag"
-                              >
-                                {col}
-                              </Tag>
+                    <>
+                      <Grid narrow>
+                        <Column lg={4} md={4} sm={4}>
+                          <Select
+                            id="x-axis-column"
+                            labelText="X-Axis (Categories)"
+                            value={xAxisColumn}
+                            onChange={(e) => setXAxisColumn(e.target.value)}
+                          >
+                            <SelectItem value="" text="Select column..." />
+                            {availableColumns.map(col => (
+                              <SelectItem key={col} value={col} text={col} />
                             ))}
-                          </div>
-                        </div>
-                      </Column>
-                      <Column lg={4} md={4} sm={4}>
-                        <Select
-                          id="group-by-column"
-                          labelText="Group By (Optional)"
-                          value={groupByColumn}
-                          onChange={(e) => setGroupByColumn(e.target.value)}
-                        >
-                          <SelectItem value="" text="None" />
-                          {availableColumns.filter(c => c !== xAxisColumn && !yAxisColumns.includes(c)).map(col => (
-                            <SelectItem key={col} value={col} text={col} />
-                          ))}
-                        </Select>
-                      </Column>
-                      <Column lg={4} md={4} sm={4}>
-                        <TextInput
-                          id="x-axis-label"
-                          labelText="X-Axis Label (Optional)"
-                          value={xAxisLabel}
-                          onChange={(e) => setXAxisLabel(e.target.value)}
-                          placeholder="e.g., Time"
-                        />
-                      </Column>
-                      <Column lg={4} md={4} sm={4}>
-                        <TextInput
-                          id="y-axis-label"
-                          labelText="Y-Axis Label (Optional)"
-                          value={yAxisLabel}
-                          onChange={(e) => setYAxisLabel(e.target.value)}
-                          placeholder="e.g., Temperature (°F)"
-                        />
-                      </Column>
-                    </Grid>
+                          </Select>
+                        </Column>
+                        <Column lg={4} md={4} sm={4}>
+                          <MultiSelect
+                            id="y-axis-columns"
+                            titleText="Y-Axis (Values)"
+                            label={yAxisColumns.length > 0 ? yAxisColumns.join(', ') : 'Select Y value(s)...'}
+                            items={availableColumns.filter(c => c !== xAxisColumn).map(col => ({
+                              id: col,
+                              label: col
+                            }))}
+                            selectedItems={yAxisColumns.map(col => ({ id: col, label: col }))}
+                            onChange={({ selectedItems }) => {
+                              setYAxisColumns(selectedItems.map(item => item.id));
+                            }}
+                            itemToString={(item) => item ? item.label : ''}
+                          />
+                        </Column>
+                        {selectedDatasource?.type === 'socket' && (
+                          <Column lg={4} md={4} sm={4}>
+                            <Select
+                              id="series-column"
+                              labelText="Series (Bucket Partition)"
+                              value={seriesColumn}
+                              onChange={(e) => setSeriesColumn(e.target.value)}
+                              helperText="Separate aggregation per value"
+                            >
+                              <SelectItem value="" text="None" />
+                              {availableColumns.filter(c => c !== xAxisColumn && !yAxisColumns.includes(c)).map(col => (
+                                <SelectItem key={col} value={col} text={col} />
+                              ))}
+                            </Select>
+                          </Column>
+                        )}
+                      </Grid>
+                      <Grid narrow className="axis-labels-row">
+                        <Column lg={4} md={4} sm={4}>
+                          <TextInput
+                            id="x-axis-label"
+                            labelText="X-Axis Label (Optional)"
+                            value={xAxisLabel}
+                            onChange={(e) => setXAxisLabel(e.target.value)}
+                            placeholder="e.g., Time"
+                          />
+                        </Column>
+                        <Column lg={4} md={4} sm={4}>
+                          <TextInput
+                            id="y-axis-label"
+                            labelText="Y-Axis Label (Optional)"
+                            value={yAxisLabel}
+                            onChange={(e) => setYAxisLabel(e.target.value)}
+                            placeholder="e.g., Temperature (°F)"
+                          />
+                        </Column>
+                      </Grid>
+                    </>
                   ) : (
                     <div className="saved-values-display">
-                      {(xAxisColumn || yAxisColumns.length > 0 || groupByColumn) ? (
+                      {(xAxisColumn || yAxisColumns.length > 0 || seriesColumn) ? (
                         <Grid narrow>
                           <Column lg={4} md={4} sm={4}>
                             <div className="saved-value-field">
@@ -842,16 +918,18 @@ const ChartEditor = forwardRef(function ChartEditor({
                               )}
                             </div>
                           </Column>
-                          <Column lg={4} md={4} sm={4}>
-                            <div className="saved-value-field">
-                              <label className="cds--label">Group By</label>
-                              {groupByColumn ? (
-                                <Tag type="teal">{groupByColumn}</Tag>
-                              ) : (
-                                <span className="no-value">None</span>
-                              )}
-                            </div>
-                          </Column>
+                          {selectedDatasource?.type === 'socket' && (
+                            <Column lg={4} md={4} sm={4}>
+                              <div className="saved-value-field">
+                                <label className="cds--label">Series (Bucket Partition)</label>
+                                {seriesColumn ? (
+                                  <Tag type="purple">{seriesColumn}</Tag>
+                                ) : (
+                                  <span className="no-value">None</span>
+                                )}
+                              </div>
+                            </Column>
+                          )}
                         </Grid>
                       ) : (
                         <p className="run-query-hint">Run query to load available columns for mapping</p>
@@ -1132,6 +1210,220 @@ const ChartEditor = forwardRef(function ChartEditor({
                     </div>
                   )}
                 </div>
+
+                {/* Sliding Window Section - for time-series data */}
+                <div className="sliding-window-section">
+                  <div className="section-header">
+                    <h4>Sliding Window (Time-Series)</h4>
+                    <Toggle
+                      id="sliding-window-toggle"
+                      labelText=""
+                      labelA="Off"
+                      labelB="On"
+                      toggled={slidingWindowEnabled}
+                      onToggle={() => setSlidingWindowEnabled(!slidingWindowEnabled)}
+                      size="sm"
+                    />
+                  </div>
+                  {slidingWindowEnabled && (
+                    availableColumns.length > 0 ? (
+                      <Grid narrow>
+                        <Column lg={6} md={4} sm={4}>
+                          <Select
+                            id="sliding-window-timestamp"
+                            labelText="Timestamp Column"
+                            value={slidingWindowTimestampCol}
+                            onChange={(e) => setSlidingWindowTimestampCol(e.target.value)}
+                          >
+                            <SelectItem value="" text="Select timestamp column..." />
+                            {availableColumns.map(col => (
+                              <SelectItem key={col} value={col} text={col} />
+                            ))}
+                          </Select>
+                        </Column>
+                        <Column lg={6} md={4} sm={4}>
+                          <NumberInput
+                            id="sliding-window-duration"
+                            label="Window Duration (seconds)"
+                            value={slidingWindowDuration}
+                            onChange={(e, { value }) => setSlidingWindowDuration(value)}
+                            min={10}
+                            max={86400}
+                            step={10}
+                            helperText="e.g., 300 = 5 min, 3600 = 1 hour"
+                          />
+                        </Column>
+                      </Grid>
+                    ) : slidingWindowTimestampCol ? (
+                      <div className="saved-values-display">
+                        <Grid narrow>
+                          <Column lg={6} md={4} sm={4}>
+                            <div className="saved-value-field">
+                              <label className="cds--label">Timestamp Column</label>
+                              <Tag type="blue">{slidingWindowTimestampCol}</Tag>
+                            </div>
+                          </Column>
+                          <Column lg={6} md={4} sm={4}>
+                            <div className="saved-value-field">
+                              <label className="cds--label">Window Duration</label>
+                              <Tag type="teal">{slidingWindowDuration}s ({Math.round(slidingWindowDuration / 60)} min)</Tag>
+                            </div>
+                          </Column>
+                        </Grid>
+                        <p className="run-query-hint" style={{ marginTop: '0.5rem' }}>Run query to modify sliding window settings</p>
+                      </div>
+                    ) : (
+                      <p className="run-query-hint">Run query to select timestamp column for sliding window</p>
+                    )
+                  )}
+                  {!slidingWindowEnabled && (
+                    <p className="no-filters-message">
+                      Enable to show only recent data (e.g., last 5 minutes). Useful for streaming/real-time charts.
+                    </p>
+                  )}
+                </div>
+
+                {/* Time Bucket Section - for socket streaming datasources only */}
+                {selectedDatasource?.type === 'socket' && (
+                  <div className="time-bucket-section">
+                    <div className="section-header">
+                      <h4>Time Bucket Aggregation (Streaming)</h4>
+                      <Toggle
+                        id="time-bucket-toggle"
+                        labelText=""
+                        labelA="Off"
+                        labelB="On"
+                        toggled={timeBucketEnabled}
+                        onToggle={() => setTimeBucketEnabled(!timeBucketEnabled)}
+                        size="sm"
+                      />
+                    </div>
+                    {/* Warning when time bucket is enabled but incomplete */}
+                    {timeBucketEnabled && (!timeBucketTimestampCol || timeBucketValueCols.length === 0) && (
+                      <InlineNotification
+                        kind="warning"
+                        title="Incomplete configuration"
+                        subtitle={
+                          !timeBucketTimestampCol
+                            ? 'Select a timestamp column to enable time bucket aggregation.'
+                            : 'Select at least one value column to aggregate.'
+                        }
+                        lowContrast
+                        hideCloseButton
+                        style={{ marginBottom: '1rem' }}
+                      />
+                    )}
+                    {timeBucketEnabled && (
+                      availableColumns.length > 0 ? (
+                        <Grid narrow>
+                          <Column lg={3} md={4} sm={4}>
+                            <NumberInput
+                              id="time-bucket-interval"
+                              label="Bucket Interval (seconds)"
+                              value={timeBucketInterval}
+                              onChange={(e, { value }) => setTimeBucketInterval(value)}
+                              min={1}
+                              max={86400}
+                              step={1}
+                              helperText="e.g., 60 = 1 min buckets"
+                            />
+                          </Column>
+                          <Column lg={3} md={4} sm={4}>
+                            <Select
+                              id="time-bucket-function"
+                              labelText="Aggregation Function"
+                              value={timeBucketFunction}
+                              onChange={(e) => setTimeBucketFunction(e.target.value)}
+                            >
+                              <SelectItem value="avg" text="Average" />
+                              <SelectItem value="min" text="Minimum" />
+                              <SelectItem value="max" text="Maximum" />
+                              <SelectItem value="sum" text="Sum" />
+                              <SelectItem value="count" text="Count" />
+                            </Select>
+                          </Column>
+                          <Column lg={3} md={4} sm={4}>
+                            <Select
+                              id="time-bucket-timestamp"
+                              labelText="Timestamp Column"
+                              value={timeBucketTimestampCol}
+                              onChange={(e) => setTimeBucketTimestampCol(e.target.value)}
+                            >
+                              <SelectItem value="" text="Select timestamp..." />
+                              {availableColumns.map(col => (
+                                <SelectItem key={col} value={col} text={col} />
+                              ))}
+                            </Select>
+                          </Column>
+                          <Column lg={3} md={4} sm={4}>
+                            <div className="value-cols-selector">
+                              <label className="cds--label">Value Columns to Aggregate</label>
+                              <div className="column-tags">
+                                {availableColumns.filter(c => c !== timeBucketTimestampCol).map(col => (
+                                  <Tag
+                                    key={col}
+                                    type={timeBucketValueCols.includes(col) ? 'blue' : 'gray'}
+                                    onClick={() => {
+                                      setTimeBucketValueCols(prev =>
+                                        prev.includes(col)
+                                          ? prev.filter(c => c !== col)
+                                          : [...prev, col]
+                                      );
+                                    }}
+                                    className="column-tag"
+                                  >
+                                    {col}
+                                  </Tag>
+                                ))}
+                              </div>
+                            </div>
+                          </Column>
+                        </Grid>
+                      ) : timeBucketTimestampCol ? (
+                        <div className="saved-values-display">
+                          <Grid narrow>
+                            <Column lg={3} md={4} sm={4}>
+                              <div className="saved-value-field">
+                                <label className="cds--label">Interval</label>
+                                <Tag type="teal">{timeBucketInterval}s</Tag>
+                              </div>
+                            </Column>
+                            <Column lg={3} md={4} sm={4}>
+                              <div className="saved-value-field">
+                                <label className="cds--label">Function</label>
+                                <Tag type="purple">{timeBucketFunction}</Tag>
+                              </div>
+                            </Column>
+                            <Column lg={3} md={4} sm={4}>
+                              <div className="saved-value-field">
+                                <label className="cds--label">Timestamp</label>
+                                <Tag type="blue">{timeBucketTimestampCol}</Tag>
+                              </div>
+                            </Column>
+                            <Column lg={3} md={4} sm={4}>
+                              <div className="saved-value-field">
+                                <label className="cds--label">Value Columns</label>
+                                <div className="column-tags">
+                                  {timeBucketValueCols.map(col => (
+                                    <Tag key={col} type="blue">{col}</Tag>
+                                  ))}
+                                </div>
+                              </div>
+                            </Column>
+                          </Grid>
+                          <p className="run-query-hint" style={{ marginTop: '0.5rem' }}>Run query to modify time bucket settings</p>
+                        </div>
+                      ) : (
+                        <p className="run-query-hint">Capture sample data to configure time bucket aggregation</p>
+                      )
+                    )}
+                    {!timeBucketEnabled && (
+                      <p className="no-filters-message">
+                        Enable to aggregate streaming data into time buckets (e.g., 1-minute averages). Server-side aggregation reduces data volume for high-frequency streams.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {filteredPreviewData && (
                   <div className="data-preview">

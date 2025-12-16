@@ -285,6 +285,11 @@
       }
     }
 
+    // Axis labels row - starts on new line below column selectors
+    .axis-labels-row {
+      margin-top: spacing.$spacing-04;
+    }
+
     .run-query-hint {
       color: var(--cds-text-secondary);
       font-size: 0.875rem;
@@ -380,6 +385,127 @@
       margin-top: spacing.$spacing-04;
       padding-top: spacing.$spacing-04;
       border-top: 1px solid var(--cds-border-subtle-01);
+    }
+  }
+
+  // Sliding window section
+  .sliding-window-section {
+    margin-top: spacing.$spacing-05;
+    padding: spacing.$spacing-04;
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: spacing.$spacing-03;
+
+      h4 {
+        color: var(--cds-text-primary);
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin: 0;
+      }
+    }
+
+    // Grid should use full width - remove Carbon Grid padding
+    .cds--grid {
+      padding-left: 0;
+      padding-right: 0;
+      margin-left: 0;
+      margin-right: 0;
+      max-width: none;
+
+      // Make columns fill available space evenly
+      .cds--col,
+      [class*="cds--col-"] {
+        flex: 1 1 0;
+        max-width: none;
+      }
+    }
+
+    .no-filters-message {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      margin: 0;
+    }
+
+    .run-query-hint {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      font-style: italic;
+      margin: 0;
+    }
+  }
+
+  // Time bucket section (for socket streaming datasources)
+  .time-bucket-section {
+    margin-top: spacing.$spacing-05;
+    padding: spacing.$spacing-04;
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
+    border-left: 3px solid #0f62fe; // Blue accent to distinguish streaming feature
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: spacing.$spacing-03;
+
+      h4 {
+        color: var(--cds-text-primary);
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin: 0;
+      }
+    }
+
+    // Grid should use full width - remove Carbon Grid padding
+    .cds--grid {
+      padding-left: 0;
+      padding-right: 0;
+      margin-left: 0;
+      margin-right: 0;
+      max-width: none;
+
+      // Make columns fill available space evenly
+      .cds--col,
+      [class*="cds--col-"] {
+        flex: 1 1 0;
+        max-width: none;
+      }
+    }
+
+    .value-cols-selector {
+      .column-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: spacing.$spacing-02;
+        margin-top: spacing.$spacing-02;
+
+        .column-tag {
+          cursor: pointer;
+          transition: all 0.15s ease;
+
+          &:hover {
+            opacity: 0.8;
+          }
+        }
+      }
+    }
+
+    .no-filters-message {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      margin: 0;
+    }
+
+    .run-query-hint {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      font-style: italic;
+      margin: 0;
     }
   }
 

@@ -36,6 +36,51 @@
     }
   }
 
+  // Page toolbar with search and view toggle
+  .page-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 spacing.$spacing-06 spacing.$spacing-05;
+    gap: spacing.$spacing-04;
+    flex-shrink: 0;
+
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-04;
+
+      .cds--search {
+        width: 300px;
+        background-color: var(--cds-layer-01);
+      }
+
+      // Content switcher for view toggle
+      .cds--content-switcher {
+        flex-shrink: 100;
+
+        .cds--content-switcher-btn {
+          padding: 0;
+          min-width: 40px;
+          width: 40px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          svg {
+            margin: 0;
+          }
+        }
+      }
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-04;
+    }
+  }
+
   .error-message {
     flex-shrink: 0;
     margin: 0 spacing.$spacing-06;
@@ -44,6 +89,152 @@
     color: var(--cds-notification-error-text);
     border-left: 3px solid var(--cds-danger-01);
     border-radius: 4px;
+  }
+
+  // Datasources content area (for tile view)
+  .datasources-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 spacing.$spacing-06 spacing.$spacing-06;
+  }
+
+  // Datasources grid (tile view)
+  .datasources-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: spacing.$spacing-05;
+  }
+
+  // Datasource tile styling
+  .datasource-tile {
+    background-color: var(--cds-layer-01);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    min-height: 220px;
+    overflow: visible;
+
+    &:hover {
+      background-color: #262626;
+      border-color: #0f62fe;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      z-index: 10;
+
+      .tile-actions {
+        opacity: 1;
+      }
+    }
+
+    .tile-icon-header {
+      width: 100%;
+      height: 100px;
+      background-color: #1c1c1c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #525252;
+    }
+
+    .tile-content {
+      flex: 1;
+      padding: spacing.$spacing-04;
+      display: flex;
+      flex-direction: column;
+      gap: spacing.$spacing-03;
+
+      .tile-header {
+        display: flex;
+        align-items: center;
+        gap: spacing.$spacing-03;
+
+        h3 {
+          color: var(--cds-text-primary);
+          font-size: 1rem;
+          font-weight: 600;
+          margin: 0;
+          flex: 1;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .info-button {
+          background: none;
+          border: none;
+          padding: spacing.$spacing-02;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #6f6f6f;
+          transition: color 0.2s ease;
+          flex-shrink: 0;
+
+          &:hover {
+            color: #78a9ff;
+          }
+        }
+      }
+
+      .tile-meta {
+        display: flex;
+        gap: spacing.$spacing-02;
+        flex-wrap: wrap;
+      }
+
+      .tile-date {
+        color: #6f6f6f;
+        font-size: 0.75rem;
+        margin-top: auto;
+      }
+    }
+
+    .tile-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: spacing.$spacing-02;
+      padding: spacing.$spacing-03 spacing.$spacing-04;
+      border-top: 1px solid #393939;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+
+      .cds--btn--icon-only {
+        color: #f4f4f4 !important;
+
+        svg {
+          fill: #f4f4f4 !important;
+        }
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+        }
+      }
+
+      // Edit button hover - blue
+      .cds--btn--icon-only:first-child:hover {
+        color: #78a9ff !important;
+        background-color: rgba(15, 98, 254, 0.1);
+
+        svg {
+          fill: #78a9ff !important;
+        }
+      }
+
+      // Delete button hover - red
+      .cds--btn--icon-only:last-child:hover {
+        color: #fa4d56 !important;
+        background-color: rgba(218, 30, 40, 0.1);
+
+        svg {
+          fill: #fa4d56 !important;
+        }
+      }
+    }
   }
 
   // DataTable container with scrolling

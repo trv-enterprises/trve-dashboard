@@ -16,9 +16,13 @@ import {
   IconButton,
   Loading,
   Tag,
-  Link
+  Link,
+  Tile,
+  ContentSwitcher,
+  Switch,
+  Tooltip
 } from '@carbon/react';
-import { TrashCan, DataBase } from '@carbon/icons-react';
+import { TrashCan, DataBase, List, Grid, Edit, Information, Sql, Api, Document, NetworkEnterprise } from '@carbon/icons-react';
 import apiClient from '../api/client';
 import './DatasourcesPage.scss';
 
@@ -39,6 +43,18 @@ function DatasourcesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortKey, setSortKey] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'tile'
+
+  // Get icon for datasource type
+  const getTypeIcon = (type) => {
+    const icons = {
+      'sql': Sql,
+      'api': Api,
+      'csv': Document,
+      'socket': NetworkEnterprise
+    };
+    return icons[type?.toLowerCase()] || DataBase;
+  };
 
   // Fetch data sources from API
   useEffect(() => {
@@ -192,106 +208,200 @@ function DatasourcesPage() {
         </p>
       </div>
 
-      {/* Data Table with Toolbar */}
-      <DataTable rows={rows} headers={headers} isSortable>
-        {({ rows, headers, getTableProps, getHeaderProps, getRowProps, onInputChange }) => (
-          <TableContainer>
-            <TableToolbar>
-              <TableToolbarContent>
-                <TableToolbarSearch
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    onInputChange(e);
-                  }}
-                  placeholder="Search"
-                  persistent
-                />
-                <Button
-                  onClick={handleCreate}
-                  size="md"
-                  kind="primary"
-                >
-                  Create
-                </Button>
-              </TableToolbarContent>
-            </TableToolbar>
-            <Table {...getTableProps()}>
-              <TableHead>
-                <TableRow>
-                  {headers.map((header) => (
-                    <TableHeader
-                      {...getHeaderProps({ header })}
-                      key={header.key}
-                      isSortable={header.isSortable}
-                      isSortHeader={sortKey === header.key}
-                      sortDirection={sortKey === header.key ? sortDirection.toUpperCase() : 'NONE'}
-                      onClick={() => header.isSortable && handleSort(header.key)}
-                    >
-                      {header.header}
-                    </TableHeader>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={headers.length}>
-                      <div className="empty-state">
-                        <DataBase size={64} />
-                        <h3>No data sources available</h3>
-                        <p>
-                          Looks like you haven't added any data sources. Click{' '}
-                          <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
-                          {' '}to get started.
-                        </p>
+      {/* Toolbar */}
+      <div className="page-toolbar">
+        <div className="toolbar-left">
+          <TableToolbarSearch
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search"
+            persistent
+          />
+          <ContentSwitcher
+            onChange={(e) => setViewMode(e.name)}
+            selectedIndex={viewMode === 'list' ? 0 : 1}
+            size="md"
+          >
+            <Switch name="list">
+              <List size={16} />
+            </Switch>
+            <Switch name="tile">
+              <Grid size={16} />
+            </Switch>
+          </ContentSwitcher>
+        </div>
+        <div className="toolbar-actions">
+          <Button
+            onClick={handleCreate}
+            size="md"
+            kind="primary"
+          >
+            Create
+          </Button>
+        </div>
+      </div>
+
+      {/* Tile View */}
+      {viewMode === 'tile' && (
+        <div className="datasources-content">
+          {filteredAndSortedDatasources.length === 0 ? (
+            <div className="empty-state">
+              <DataBase size={64} />
+              <h3>No data sources available</h3>
+              <p>
+                Looks like you haven't added any data sources. Click{' '}
+                <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
+                {' '}to get started.
+              </p>
+            </div>
+          ) : (
+            <div className="datasources-grid">
+              {filteredAndSortedDatasources.map((datasource) => {
+                const TypeIcon = getTypeIcon(datasource.type);
+                return (
+                  <Tile
+                    key={datasource.id}
+                    className="datasource-tile"
+                    onClick={() => handleRowClick(datasource)}
+                  >
+                    {/* Icon Header */}
+                    <div className="tile-icon-header">
+                      <TypeIcon size={48} />
+                    </div>
+
+                    {/* Content */}
+                    <div className="tile-content">
+                      <div className="tile-header">
+                        <h3>{datasource.name}</h3>
+                        {datasource.description && (
+                          <Tooltip label={datasource.description} align="bottom">
+                            <button type="button" className="info-button" onClick={(e) => e.stopPropagation()}>
+                              <Information size={16} />
+                            </button>
+                          </Tooltip>
+                        )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  rows.map((row) => {
-                    const datasource = getDatasourceById(row.id);
-                    return (
-                      <TableRow
-                        {...getRowProps({ row })}
-                        key={row.id}
-                        onClick={() => handleRowClick(datasource)}
-                        className="clickable-row"
+
+                      <div className="tile-meta">
+                        <Tag type={getTypeColor(datasource.type)} size="sm">
+                          {datasource.type?.toUpperCase() || 'N/A'}
+                        </Tag>
+                      </div>
+
+                      <div className="tile-date">
+                        Updated: {formatDate(datasource.updated_at)}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="tile-actions">
+                      <IconButton
+                        kind="ghost"
+                        label="Edit"
+                        onClick={(e) => { e.stopPropagation(); handleRowClick(datasource); }}
+                        size="sm"
                       >
-                        {row.cells.map((cell) => {
-                          if (cell.info.header === 'type') {
-                            return (
-                              <TableCell key={cell.id}>
-                                <Tag type={getTypeColor(cell.value)} size="md">
-                                  {cell.value?.toUpperCase() || 'N/A'}
-                                </Tag>
-                              </TableCell>
-                            );
-                          }
-                          if (cell.info.header === 'actions') {
-                            return (
-                              <TableCell key={cell.id} className="actions-cell">
-                                <IconButton
-                                  kind="ghost"
-                                  label="Delete"
-                                  onClick={(e) => handleDelete(e, datasource)}
-                                  size="sm"
-                                >
-                                  <TrashCan size={16} />
-                                </IconButton>
-                              </TableCell>
-                            );
-                          }
-                          return <TableCell key={cell.id}>{cell.value}</TableCell>;
-                        })}
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </DataTable>
+                        <Edit size={16} />
+                      </IconButton>
+                      <IconButton
+                        kind="ghost"
+                        label="Delete"
+                        onClick={(e) => handleDelete(e, datasource)}
+                        size="sm"
+                      >
+                        <TrashCan size={16} />
+                      </IconButton>
+                    </div>
+                  </Tile>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* List View (DataTable) */}
+      {viewMode === 'list' && (
+        <DataTable rows={rows} headers={headers} isSortable>
+          {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
+            <TableContainer>
+              <Table {...getTableProps()}>
+                <TableHead>
+                  <TableRow>
+                    {headers.map((header) => (
+                      <TableHeader
+                        {...getHeaderProps({ header })}
+                        key={header.key}
+                        isSortable={header.isSortable}
+                        isSortHeader={sortKey === header.key}
+                        sortDirection={sortKey === header.key ? sortDirection.toUpperCase() : 'NONE'}
+                        onClick={() => header.isSortable && handleSort(header.key)}
+                      >
+                        {header.header}
+                      </TableHeader>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={headers.length}>
+                        <div className="empty-state">
+                          <DataBase size={64} />
+                          <h3>No data sources available</h3>
+                          <p>
+                            Looks like you haven't added any data sources. Click{' '}
+                            <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
+                            {' '}to get started.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    rows.map((row) => {
+                      const datasource = getDatasourceById(row.id);
+                      return (
+                        <TableRow
+                          {...getRowProps({ row })}
+                          key={row.id}
+                          onClick={() => handleRowClick(datasource)}
+                          className="clickable-row"
+                        >
+                          {row.cells.map((cell) => {
+                            if (cell.info.header === 'type') {
+                              return (
+                                <TableCell key={cell.id}>
+                                  <Tag type={getTypeColor(cell.value)} size="md">
+                                    {cell.value?.toUpperCase() || 'N/A'}
+                                  </Tag>
+                                </TableCell>
+                              );
+                            }
+                            if (cell.info.header === 'actions') {
+                              return (
+                                <TableCell key={cell.id} className="actions-cell">
+                                  <IconButton
+                                    kind="ghost"
+                                    label="Delete"
+                                    onClick={(e) => handleDelete(e, datasource)}
+                                    size="sm"
+                                  >
+                                    <TrashCan size={16} />
+                                  </IconButton>
+                                </TableCell>
+                              );
+                            }
+                            return <TableCell key={cell.id}>{cell.value}</TableCell>;
+                          })}
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </DataTable>
+      )}
     </div>
   );
 }

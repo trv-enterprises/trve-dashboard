@@ -8,6 +8,7 @@ import {
   Tooltip
 } from '@carbon/react';
 import { Dashboard, View, ChartMultitype, DataBase, Information } from '@carbon/icons-react';
+import { API_BASE } from '../api/client';
 import './ViewDashboardsPage.scss';
 
 /**
@@ -30,7 +31,7 @@ function ViewDashboardsPage() {
   const fetchDashboards = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/dashboards?page=1&page_size=100&include_datasources=true');
+      const response = await fetch(`${API_BASE}/api/dashboards?page=1&page_size=100&include_datasources=true`);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -59,10 +60,16 @@ function ViewDashboardsPage() {
     return dashboard.datasource_names || [];
   };
 
-  const filteredDashboards = dashboards.filter(dashboard =>
-    dashboard.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (dashboard.description && dashboard.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredDashboards = dashboards.filter(dashboard => {
+    const term = searchTerm.toLowerCase();
+    // Check name and description
+    if (dashboard.name.toLowerCase().includes(term)) return true;
+    if (dashboard.description && dashboard.description.toLowerCase().includes(term)) return true;
+    // Check datasource names
+    const dsNames = getDatasourceNames(dashboard);
+    if (dsNames.some(name => name.toLowerCase().includes(term))) return true;
+    return false;
+  });
 
   if (loading) {
     return (

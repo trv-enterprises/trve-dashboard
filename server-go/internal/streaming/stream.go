@@ -284,9 +284,15 @@ func (s *Stream) broadcast(records []models.Record) {
 	}
 	s.mu.RUnlock()
 
+	// Get the aggregator registry for feeding bucket aggregators
+	registry := GetRegistry()
+
 	for _, record := range records {
 		// Add to buffer
 		s.buffer.Push(record)
+
+		// Feed to bucket aggregators for this datasource
+		registry.FeedRecord(s.datasourceID, record)
 
 		// Send to all subscribers (non-blocking)
 		for _, ch := range subscribers {

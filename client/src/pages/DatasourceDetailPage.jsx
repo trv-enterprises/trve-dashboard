@@ -18,6 +18,7 @@ import {
   InlineNotification
 } from '@carbon/react';
 import { Save, Close, TrashCan, Play } from '@carbon/icons-react';
+import { API_BASE } from '../api/client';
 import './DatasourceDetailPage.scss';
 
 /**
@@ -58,7 +59,7 @@ function DatasourceDetailPage() {
   const fetchDatasource = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3001/api/datasources/${id}`);
+      const response = await fetch(`${API_BASE}/api/datasources/${id}`);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -87,7 +88,7 @@ function DatasourceDetailPage() {
       return;
     }
     try {
-      const response = await fetch('http://localhost:3001/api/datasources');
+      const response = await fetch(`${API_BASE}/api/datasources`);
       if (!response.ok) throw new Error('Failed to fetch data sources');
       const datasources = await response.json();
       const duplicate = datasources.find(ds =>
@@ -207,13 +208,13 @@ function DatasourceDetailPage() {
 
       let response;
       if (isCreateMode) {
-        response = await fetch('http://localhost:3001/api/datasources', {
+        response = await fetch(`${API_BASE}/api/datasources`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
       } else {
-        response = await fetch(`http://localhost:3001/api/datasources/${id}`, {
+        response = await fetch(`${API_BASE}/api/datasources/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

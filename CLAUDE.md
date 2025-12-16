@@ -473,6 +473,8 @@ const Component = () => {
 - **Tabbed Panel Layout**: Allow panels to contain multiple charts with tabs to switch between
 - **Data Source Testing in Editor**: Add connection test capability to data source editor UI (backend API already exists at `/api/datasources/test`)
 - **Dashboard Design Preset Sizes**: Implement solution for layout dimensions/aspect ratios for fullscreen viewing
+- **Fix `include_datasources` Aggregation**: The `ListWithDatasources` MongoDB aggregation in `dashboard_repository.go` has a bug where `panel_count` returns 0. Currently worked around by fetching dashboards, charts, and datasources separately client-side. Fix the aggregation to reduce API calls as dashboard count grows.
+- **Prometheus Data Source**: Add Prometheus as a new data source type with schema discovery, visual query builder, and AI integration. See [docs/PROMETHEUS_INTEGRATION.md](docs/PROMETHEUS_INTEGRATION.md) for full plan.
 - Manage Mode implementation
 - User authentication
 - EdgeLake integration
@@ -495,10 +497,11 @@ const Component = () => {
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
 - [TECH_STACK_SUMMARY.md](docs/TECH_STACK_SUMMARY.md) - Technology decisions
 - [REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md) - Refactoring roadmap
+- [PROMETHEUS_INTEGRATION.md](docs/PROMETHEUS_INTEGRATION.md) - Prometheus data source integration plan
 - Swagger UI: http://localhost:3001/swagger/index.html
 
 ---
 
-**Last Updated**: 2025-12-06
-**Build**: 203
+**Last Updated**: 2025-12-15
+**Build**: 337
 - Capture Simulator Websocket: websocat ws://100.74.102.38:8081/ws

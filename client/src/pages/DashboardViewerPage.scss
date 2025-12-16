@@ -106,6 +106,37 @@
           flex-shrink: 0;
         }
       }
+
+      // Overflow menu styling for actions dropdown
+      .cds--overflow-menu {
+        color: #c6c6c6;
+
+        &:hover {
+          background-color: #393939;
+        }
+
+        svg {
+          fill: #c6c6c6;
+        }
+      }
+
+      // Force tooltip to appear on the left side
+      .cds--overflow-menu__wrapper .cds--popover-container {
+        .cds--popover {
+          inset: auto auto auto auto !important;
+          transform: translateX(-100%) translateY(-50%) !important;
+          top: 50% !important;
+          left: -16px !important;
+        }
+
+        .cds--popover-caret {
+          inset: auto auto auto auto !important;
+          top: 50% !important;
+          right: -6px !important;
+          left: auto !important;
+          transform: translateY(-50%) rotate(-90deg) !important;
+        }
+      }
     }
   }
 

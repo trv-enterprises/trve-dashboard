@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SideNavItems, Tag, Tooltip } from '@carbon/react';
 import { Dashboard } from '@carbon/icons-react';
+import { API_BASE } from '../../api/client';
 import './ViewModeNav.scss';
 
 /**
@@ -20,7 +21,7 @@ function ViewModeNav({ location, navigate }) {
 
   const fetchDashboards = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/dashboards?page=1&page_size=100&include_datasources=true');
+      const response = await fetch(`${API_BASE}/api/dashboards?page=1&page_size=100&include_datasources=true`);
       if (response.ok) {
         const data = await response.json();
         if (data.dashboards) {

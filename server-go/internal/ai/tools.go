@@ -80,6 +80,30 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 			},
 		},
 		{
+			Name:        "update_sliding_window",
+			Description: anthropic.String("Configure a time-based sliding window to show only recent data. Essential for streaming/real-time charts to prevent unbounded data growth."),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"duration":      map[string]interface{}{"type": "integer", "description": "Window duration in seconds (e.g., 300 for last 5 minutes, 3600 for last hour)"},
+					"timestamp_col": map[string]interface{}{"type": "string", "description": "Name of the timestamp column in the data"},
+				},
+				Required: []string{"duration", "timestamp_col"},
+			},
+		},
+		{
+			Name:        "update_time_bucket",
+			Description: anthropic.String("Configure time-bucketed aggregation for streaming data. Aggregates raw streaming data into time buckets (e.g., 1-minute averages). Only works with socket/streaming data sources."),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"interval":      map[string]interface{}{"type": "integer", "description": "Bucket interval in seconds (e.g., 60 for 1-minute buckets, 3600 for hourly)"},
+					"function":      map[string]interface{}{"type": "string", "description": "Aggregation function", "enum": []string{"avg", "min", "max", "sum", "count"}},
+					"value_cols":    map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Columns to aggregate (numeric values)"},
+					"timestamp_col": map[string]interface{}{"type": "string", "description": "Column containing timestamps for bucket alignment"},
+				},
+				Required: []string{"interval", "function", "value_cols", "timestamp_col"},
+			},
+		},
+		{
 			Name:        "set_custom_code",
 			Description: anthropic.String("Enable custom code mode and set React component code. Use this for complex charts not supported by standard config."),
 			InputSchema: anthropic.ToolInputSchemaParam{
@@ -164,25 +188,27 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 
 // ToolName constants for easier reference
 const (
-	ToolUpdateChartConfig  = "update_chart_config"
-	ToolUpdateDataMapping  = "update_data_mapping"
-	ToolUpdateQueryConfig  = "update_query_config"
-	ToolUpdateFilters      = "update_filters"
-	ToolUpdateAggregation  = "update_aggregation"
-	ToolSetCustomCode      = "set_custom_code"
-	ToolUpdateChartOptions = "update_chart_options"
-	ToolQueryDatasource    = "query_datasource"
-	ToolListDatasources    = "list_datasources"
-	ToolPreviewData        = "preview_data"
-	ToolGetChartState      = "get_chart_state"
-	ToolSuggestMissing     = "suggest_missing_tools"
+	ToolUpdateChartConfig   = "update_chart_config"
+	ToolUpdateDataMapping   = "update_data_mapping"
+	ToolUpdateQueryConfig   = "update_query_config"
+	ToolUpdateFilters       = "update_filters"
+	ToolUpdateAggregation   = "update_aggregation"
+	ToolUpdateSlidingWindow = "update_sliding_window"
+	ToolUpdateTimeBucket    = "update_time_bucket"
+	ToolSetCustomCode       = "set_custom_code"
+	ToolUpdateChartOptions  = "update_chart_options"
+	ToolQueryDatasource     = "query_datasource"
+	ToolListDatasources     = "list_datasources"
+	ToolPreviewData         = "preview_data"
+	ToolGetChartState       = "get_chart_state"
+	ToolSuggestMissing      = "suggest_missing_tools"
 )
 
 // IsChartUpdateTool returns true if the tool modifies the chart
 func IsChartUpdateTool(toolName string) bool {
 	switch toolName {
 	case ToolUpdateChartConfig, ToolUpdateDataMapping, ToolUpdateQueryConfig,
-		ToolUpdateFilters, ToolUpdateAggregation, ToolSetCustomCode, ToolUpdateChartOptions:
+		ToolUpdateFilters, ToolUpdateAggregation, ToolUpdateSlidingWindow, ToolUpdateTimeBucket, ToolSetCustomCode, ToolUpdateChartOptions:
 		return true
 	default:
 		return false

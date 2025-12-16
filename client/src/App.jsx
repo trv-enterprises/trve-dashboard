@@ -18,6 +18,7 @@ import {
   Menu,
   Close
 } from '@carbon/icons-react';
+import { API_BASE } from './api/client';
 import DatasourcesPage from './pages/DatasourcesPage';
 import DatasourceDetailPage from './pages/DatasourceDetailPage';
 import ChartsListPage from './pages/ChartsListPage';
@@ -70,7 +71,7 @@ function AppContent() {
   useEffect(() => {
     const fetchFirstDashboard = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/dashboards?page=1&page_size=1');
+        const response = await fetch(`${API_BASE}/api/dashboards?page=1&page_size=1`);
         if (response.ok) {
           const data = await response.json();
           if (data.dashboards && data.dashboards.length > 0) {

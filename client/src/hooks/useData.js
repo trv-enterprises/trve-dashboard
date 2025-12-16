@@ -2,6 +2,7 @@
  * useData Hook
  * React hook for fetching data from datasources with caching
  * Automatically uses SSE streaming for socket datasources, polling for others
+ * Supports time-bucketed aggregation for socket datasources via timeBucket option
  *
  * Usage:
  * const { data, loading, error, refetch } = useData({
@@ -11,7 +12,13 @@
  *     type: 'api',
  *     params: {}
  *   },
- *   refreshInterval: 5000 // Optional: auto-refresh every 5 seconds (ignored for streaming)
+ *   refreshInterval: 5000, // Optional: auto-refresh every 5 seconds (ignored for streaming)
+ *   timeBucket: {          // Optional: server-side aggregation for socket datasources
+ *     interval: 60,        // Bucket size in seconds
+ *     function: 'avg',     // avg, sum, min, max, count
+ *     value_cols: ['temp', 'humidity'],
+ *     timestamp_col: 'timestamp'
+ *   }
  * });
  *
  * Returns data in format: { columns: [], rows: [] }
@@ -19,11 +26,9 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { queryData } from '../api/dataClient';
-import apiClient from '../api/client';
+import apiClient, { API_BASE } from '../api/client';
 
-const API_BASE = 'http://localhost:3001';
-
-export function useData({ datasourceId, query, refreshInterval = null, useCache = true, maxBuffer = 1000 }) {
+export function useData({ datasourceId, query, refreshInterval = null, useCache = true, maxBuffer = 1000, timeBucket = null }) {
   // Common state
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -105,7 +110,15 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     });
   }, [maxBuffer]);
 
-  // Connect to SSE stream for socket datasources
+  // Serialize timeBucket for stable dependency comparison
+  const timeBucketKey = useMemo(() => JSON.stringify(timeBucket), [timeBucket]);
+
+  // Check if we should use aggregated streaming
+  const useAggregated = useMemo(() => {
+    return timeBucket && timeBucket.interval > 0 && timeBucket.timestamp_col && timeBucket.value_cols?.length > 0;
+  }, [timeBucket]);
+
+  // Connect to SSE stream for socket datasources (raw or aggregated)
   useEffect(() => {
     if (typeLoading || datasourceType !== 'socket' || !datasourceId) {
       return;
@@ -114,8 +127,93 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     mountedRef.current = true;
     let reconnectTimeout = null;
     let reconnectDelay = 1000;
+    let abortController = null;
 
-    const connect = () => {
+    const connectAggregated = async () => {
+      if (!mountedRef.current) return;
+
+      // Use fetch with streaming for POST endpoint
+      abortController = new AbortController();
+      const url = `${API_BASE}/api/datasources/${datasourceId}/stream/aggregated`;
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            interval: timeBucket.interval,
+            function: timeBucket.function || 'avg',
+            value_cols: timeBucket.value_cols,
+            timestamp_col: timeBucket.timestamp_col,
+            series_col: timeBucket.series_col || '' // Column for bucket partitioning (e.g., location)
+          }),
+          signal: abortController.signal
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        setConnected(true);
+        setError(null);
+        setLoading(false);
+        setSource('aggregated-stream');
+        reconnectDelay = 1000;
+
+        // Read the streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (mountedRef.current) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Parse SSE events from buffer
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (line.startsWith('event: ')) {
+              const eventType = line.substring(7);
+              const nextLine = lines[i + 1];
+              if (nextLine && nextLine.startsWith('data: ')) {
+                const data = nextLine.substring(6);
+                i++; // Skip the data line
+
+                if (eventType === 'bucket' && mountedRef.current) {
+                  try {
+                    const bucket = JSON.parse(data);
+                    // Remove internal bucket metadata before processing
+                    const { _bucket_function, _bucket_interval, _bucket_timestamp, ...record } = bucket;
+                    processStreamRecord(record);
+                  } catch (err) {
+                    console.error('[useData] Error parsing bucket:', err);
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return; // Normal cleanup
+
+        console.error('[useData] Aggregated stream error:', err);
+        if (mountedRef.current) {
+          setConnected(false);
+          setError(new Error('Connection lost, reconnecting...'));
+          reconnectTimeout = setTimeout(() => {
+            connectAggregated();
+          }, reconnectDelay);
+          reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+        }
+      }
+    };
+
+    const connectRaw = () => {
       if (!mountedRef.current) return;
 
       const url = `${API_BASE}/api/datasources/${datasourceId}/stream`;
@@ -159,7 +257,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
         if (mountedRef.current) {
           setError(new Error('Connection lost, reconnecting...'));
           reconnectTimeout = setTimeout(() => {
-            connect();
+            connectRaw();
           }, reconnectDelay);
 
           // Exponential backoff (max 30 seconds)
@@ -168,7 +266,12 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
       };
     };
 
-    connect();
+    // Choose connection type based on timeBucket
+    if (useAggregated) {
+      connectAggregated();
+    } else {
+      connectRaw();
+    }
 
     // Cleanup on unmount or type change
     return () => {
@@ -176,12 +279,15 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
       }
+      if (abortController) {
+        abortController.abort();
+      }
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
     };
-  }, [datasourceId, datasourceType, typeLoading, processStreamRecord]);
+  }, [datasourceId, datasourceType, typeLoading, processStreamRecord, useAggregated, timeBucketKey]);
 
   // === POLLING LOGIC (for non-socket datasources) ===
   const fetchData = useCallback(async () => {
@@ -294,11 +400,12 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     loading: typeLoading || loading,
     error,
     refetch,
-    source: datasourceType === 'socket' ? 'stream' : source,
+    source: datasourceType === 'socket' ? (useAggregated ? 'aggregated-stream' : 'stream') : source,
     cached: source === 'cache' || source === 'partial-cache',
     // Streaming-specific properties
     connected: datasourceType === 'socket' ? connected : null,
     isStreaming: datasourceType === 'socket',
+    isAggregated: datasourceType === 'socket' && useAggregated,
     clearBuffer: datasourceType === 'socket' ? clearBuffer : null,
   };
 }

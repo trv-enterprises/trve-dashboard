@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Select,
   SelectItem,
-  MultiSelect,
   TextInput,
   NumberInput,
   Button,
@@ -44,8 +43,9 @@ const SQLQueryBuilder = ({
 
   // Query builder state
   const [selectedTable, setSelectedTable] = useState('');
-  const [selectedColumns, setSelectedColumns] = useState([]);
+  const [selectedColumns, setSelectedColumns] = useState([]); // Array of {column, aggregate} objects
   const [whereConditions, setWhereConditions] = useState([]);
+  const [groupByColumns, setGroupByColumns] = useState([]); // Columns to group by
   const [orderBy, setOrderBy] = useState({ column: '', direction: 'ASC' });
   const [limit, setLimit] = useState(100);
   const [offset, setOffset] = useState(0);
@@ -69,7 +69,7 @@ const SQLQueryBuilder = ({
     if (onQueryChange) {
       onQueryChange(query);
     }
-  }, [selectedTable, selectedColumns, whereConditions, orderBy, limit, offset]);
+  }, [selectedTable, selectedColumns, whereConditions, groupByColumns, orderBy, limit, offset]);
 
   const fetchSchema = async () => {
     setLoading(true);
@@ -91,12 +91,25 @@ const SQLQueryBuilder = ({
   const buildQuery = () => {
     if (!selectedTable) return '';
 
-    // SELECT clause
-    const columns = selectedColumns.length > 0
-      ? selectedColumns.join(', ')
-      : '*';
+    // SELECT clause - handle aggregates
+    let columnsClause;
+    if (selectedColumns.length > 0) {
+      columnsClause = selectedColumns.map(col => {
+        if (typeof col === 'string') {
+          // Legacy format (just column name)
+          return col;
+        }
+        // New format with optional aggregate: {column, aggregate}
+        if (col.aggregate && col.aggregate !== '') {
+          return `${col.aggregate}(${col.column}) AS ${col.column}_${col.aggregate.toLowerCase()}`;
+        }
+        return col.column;
+      }).join(', ');
+    } else {
+      columnsClause = '*';
+    }
 
-    let query = `SELECT ${columns}\nFROM ${selectedTable}`;
+    let query = `SELECT ${columnsClause}\nFROM ${selectedTable}`;
 
     // WHERE clause
     if (whereConditions.length > 0) {
@@ -113,6 +126,11 @@ const SQLQueryBuilder = ({
         });
         query += `\nWHERE ${whereParts.join('')}`;
       }
+    }
+
+    // GROUP BY clause
+    if (groupByColumns.length > 0) {
+      query += `\nGROUP BY ${groupByColumns.join(', ')}`;
     }
 
     // ORDER BY clause
@@ -135,12 +153,50 @@ const SQLQueryBuilder = ({
     const tableName = e.target.value;
     setSelectedTable(tableName);
     setSelectedColumns([]);
+    setGroupByColumns([]);
     setWhereConditions([]);
     setOrderBy({ column: '', direction: 'ASC' });
   };
 
-  const handleColumnSelect = (selection) => {
-    setSelectedColumns(selection.selectedItems.map(item => item.id));
+  // Add a column with optional aggregate
+  const addColumn = (columnName, aggregate = '') => {
+    setSelectedColumns(prev => {
+      // Check if column already exists
+      const exists = prev.some(c =>
+        (typeof c === 'string' && c === columnName) ||
+        (typeof c === 'object' && c.column === columnName)
+      );
+      if (exists) return prev;
+      return [...prev, { column: columnName, aggregate }];
+    });
+  };
+
+  // Remove a column
+  const removeColumn = (columnName) => {
+    setSelectedColumns(prev => prev.filter(c =>
+      (typeof c === 'string' ? c : c.column) !== columnName
+    ));
+  };
+
+  // Update aggregate function for a column
+  const updateColumnAggregate = (columnName, aggregate) => {
+    setSelectedColumns(prev => prev.map(c => {
+      const name = typeof c === 'string' ? c : c.column;
+      if (name === columnName) {
+        return { column: name, aggregate };
+      }
+      return typeof c === 'string' ? { column: c, aggregate: '' } : c;
+    }));
+  };
+
+  // Toggle GROUP BY column
+  const toggleGroupByColumn = (columnName) => {
+    setGroupByColumns(prev => {
+      if (prev.includes(columnName)) {
+        return prev.filter(c => c !== columnName);
+      }
+      return [...prev, columnName];
+    });
   };
 
   const addWhereCondition = () => {
@@ -267,32 +323,116 @@ const SQLQueryBuilder = ({
           </Select>
         </div>
 
-        {/* Column Selection */}
+        {/* Column Selection with Aggregates */}
         {selectedTable && (
           <div className="builder-section">
-            <h4>Columns</h4>
-            <MultiSelect
-              id="column-select"
-              titleText="Select columns"
-              label={selectedColumns.length > 0 ? `${selectedColumns.length} selected` : 'All columns (*)'}
-              items={columns.map(col => ({
-                id: col.name,
-                label: `${col.name} (${col.type})`,
-              }))}
-              selectedItems={columns.filter(col => selectedColumns.includes(col.name)).map(col => ({
-                id: col.name,
-                label: `${col.name} (${col.type})`,
-              }))}
-              onChange={handleColumnSelect}
-              disabled={disabled}
-            />
+            <div className="section-header">
+              <h4>Columns</h4>
+              <span className="section-hint">
+                {selectedColumns.length === 0 ? 'All columns (*)' : `${selectedColumns.length} selected`}
+              </span>
+            </div>
+
+            {/* Add column dropdown */}
+            <div className="add-column-row">
+              <Select
+                id="add-column-select"
+                labelText=""
+                hideLabel
+                size="sm"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    addColumn(e.target.value);
+                  }
+                }}
+                disabled={disabled}
+              >
+                <SelectItem value="" text="Add column..." />
+                {columns
+                  .filter(col => !selectedColumns.some(sc =>
+                    (typeof sc === 'string' ? sc : sc.column) === col.name
+                  ))
+                  .map(col => (
+                    <SelectItem key={col.name} value={col.name} text={`${col.name} (${col.type})`} />
+                  ))}
+              </Select>
+            </div>
+
+            {/* Selected columns with aggregate options */}
             {selectedColumns.length > 0 && (
-              <div className="selected-tags">
-                {selectedColumns.map(col => (
-                  <Tag key={col} type="blue" size="sm">{col}</Tag>
-                ))}
+              <div className="selected-columns-list">
+                {selectedColumns.map((col) => {
+                  const columnName = typeof col === 'string' ? col : col.column;
+                  const aggregate = typeof col === 'string' ? '' : (col.aggregate || '');
+                  return (
+                    <div key={columnName} className="selected-column-row">
+                      <span className="column-name">{columnName}</span>
+                      <Select
+                        id={`agg-${columnName}`}
+                        labelText=""
+                        hideLabel
+                        size="sm"
+                        value={aggregate}
+                        onChange={(e) => updateColumnAggregate(columnName, e.target.value)}
+                        disabled={disabled}
+                        className="aggregate-select"
+                      >
+                        <SelectItem value="" text="No aggregate" />
+                        <SelectItem value="COUNT" text="COUNT" />
+                        <SelectItem value="SUM" text="SUM" />
+                        <SelectItem value="AVG" text="AVG" />
+                        <SelectItem value="MIN" text="MIN" />
+                        <SelectItem value="MAX" text="MAX" />
+                      </Select>
+                      <IconButton
+                        kind="ghost"
+                        size="sm"
+                        label="Remove"
+                        onClick={() => removeColumn(columnName)}
+                        disabled={disabled}
+                      >
+                        <TrashCan />
+                      </IconButton>
+                    </div>
+                  );
+                })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* GROUP BY */}
+        {selectedTable && selectedColumns.length > 0 && (
+          <div className="builder-section">
+            <div className="section-header">
+              <h4>GROUP BY</h4>
+              <span className="section-hint">
+                {groupByColumns.length > 0 ? `${groupByColumns.length} columns` : 'None'}
+              </span>
+            </div>
+            <div className="group-by-columns">
+              {selectedColumns.map((col) => {
+                const columnName = typeof col === 'string' ? col : col.column;
+                const aggregate = typeof col === 'string' ? '' : (col.aggregate || '');
+                // Only show non-aggregated columns as GROUP BY options
+                if (aggregate) return null;
+                return (
+                  <Tag
+                    key={columnName}
+                    type={groupByColumns.includes(columnName) ? 'blue' : 'gray'}
+                    size="sm"
+                    onClick={() => !disabled && toggleGroupByColumn(columnName)}
+                    className="group-by-tag"
+                  >
+                    {columnName}
+                  </Tag>
+                );
+              })}
+              {selectedColumns.every(col => (typeof col === 'string' ? '' : col.aggregate)) && (
+                <span className="no-columns-hint">Add non-aggregated columns to enable GROUP BY</span>
+              )}
+            </div>
           </div>
         )}
 

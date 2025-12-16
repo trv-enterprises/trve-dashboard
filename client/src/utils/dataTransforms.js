@@ -75,6 +75,70 @@ function applyFilters(rows, columns, filters) {
 }
 
 /**
+ * Apply sliding window filter based on timestamp column
+ * Keeps only rows where timestamp is within the last N seconds
+ * @param {Array} rows - Array of row arrays
+ * @param {Array} columns - Column names
+ * @param {Object} slidingWindow - { duration: seconds, timestampCol: columnName }
+ * @returns {Array} Filtered rows within the time window
+ */
+function applySlidingWindow(rows, columns, slidingWindow) {
+  if (!slidingWindow || !slidingWindow.duration || !slidingWindow.timestampCol) {
+    return rows;
+  }
+
+  const { duration, timestampCol } = slidingWindow;
+  const colIndex = columns.indexOf(timestampCol);
+
+  if (colIndex === -1) {
+    console.warn(`Sliding window timestamp column "${timestampCol}" not found`);
+    return rows;
+  }
+
+  const now = Date.now();
+  const windowStartMs = now - (duration * 1000);
+
+  return rows.filter(row => {
+    const tsValue = row[colIndex];
+    if (tsValue === null || tsValue === undefined) return false;
+
+    // Parse timestamp to milliseconds
+    let tsMs;
+    if (typeof tsValue === 'number') {
+      // Detect if unix seconds or milliseconds
+      if (tsValue > 946684800000 && tsValue < 4102444800000) {
+        // Already in milliseconds (13+ digits, between 2000 and 2100)
+        tsMs = tsValue;
+      } else if (tsValue > 946684800 && tsValue < 4102444800) {
+        // Unix seconds (10 digits)
+        tsMs = tsValue * 1000;
+      } else {
+        tsMs = tsValue;
+      }
+    } else if (typeof tsValue === 'string') {
+      // Try parsing as number first (string unix timestamp)
+      const num = Number(tsValue);
+      if (!isNaN(num) && num > 946684800) {
+        if (num > 946684800000) {
+          tsMs = num; // milliseconds
+        } else {
+          tsMs = num * 1000; // seconds
+        }
+      } else {
+        // Try parsing as ISO date string
+        const parsed = new Date(tsValue);
+        tsMs = isNaN(parsed.getTime()) ? null : parsed.getTime();
+      }
+    } else {
+      return false;
+    }
+
+    if (tsMs === null) return false;
+    return tsMs >= windowStartMs;
+  });
+}
+
+/**
  * Sort rows by a column
  * @param {Array} rows - Array of row arrays
  * @param {Array} columns - Column names
@@ -178,10 +242,11 @@ function applyAggregation(rows, columns, aggregation) {
 
 /**
  * Main transform function
- * Applies filters and aggregations to data from the data layer
+ * Applies filters, sliding window, and aggregations to data from the data layer
  *
  * @param {Object} data - Data from useData hook { columns, rows, metadata }
  * @param {Object} transforms - Transform configuration
+ * @param {Object} transforms.slidingWindow - { duration: seconds, timestampCol: columnName } - time-based window
  * @param {Array} transforms.filters - Array of { field, op, value }
  * @param {Object} transforms.aggregation - { type, sortBy, field }
  * @param {string} transforms.sortBy - Column to sort by
@@ -196,20 +261,23 @@ export function transformData(data, transforms = {}) {
 
   // Handle null transforms (default param only works for undefined, not null)
   const safeTransforms = transforms || {};
-  const { filters, aggregation, sortBy, sortOrder, limit } = safeTransforms;
+  const { filters, aggregation, sortBy, sortOrder, limit, slidingWindow } = safeTransforms;
 
   let rows = [...data.rows];
   const columns = data.columns;
 
-  // 1. Apply filters
+  // 1. Apply sliding window (time-based filter) - do this first to reduce data volume
+  rows = applySlidingWindow(rows, columns, slidingWindow);
+
+  // 2. Apply filters
   rows = applyFilters(rows, columns, filters);
 
-  // 2. Apply sorting (if not part of aggregation)
+  // 3. Apply sorting (if not part of aggregation)
   if (sortBy && (!aggregation || !aggregation.sortBy)) {
     rows = sortRows(rows, columns, sortBy, sortOrder || 'desc');
   }
 
-  // 3. Apply limit (if not part of aggregation)
+  // 4. Apply limit (if not part of aggregation)
   if (limit && (!aggregation || aggregation.type !== 'limit')) {
     rows = rows.slice(0, limit);
   }
@@ -625,12 +693,17 @@ export function formatDataForDisplay(data, options = {}) {
 export function buildTransformsFromMapping(dataMapping) {
   if (!dataMapping) return null;
 
-  const { filters, aggregation, sort_by, sort_order, limit } = dataMapping;
-  const hasTransforms = (filters?.length > 0) || aggregation?.type || sort_by || (limit > 0);
+  const { filters, aggregation, sort_by, sort_order, limit, sliding_window } = dataMapping;
+  const hasSlidingWindow = sliding_window?.duration > 0 && sliding_window?.timestamp_col;
+  const hasTransforms = (filters?.length > 0) || aggregation?.type || sort_by || (limit > 0) || hasSlidingWindow;
 
   if (!hasTransforms) return null;
 
   return {
+    slidingWindow: hasSlidingWindow ? {
+      duration: sliding_window.duration,
+      timestampCol: sliding_window.timestamp_col
+    } : null,
     filters: (filters || []).map(f => ({
       field: f.field,
       op: f.op,

@@ -31,9 +31,11 @@ const DataContext = createContext(null);
  * Custom hook that wraps useData and auto-applies transforms from context
  * When dataMapping is provided to DynamicComponentLoader, the chart's filters
  * are automatically applied to the data without requiring any code changes.
+ * Also supports timeBucket parameter for server-side aggregation of socket streams.
  */
 function useDataWithTransforms(params) {
   const transforms = useContext(TransformsContext);
+  // Pass through all params including timeBucket for aggregated streaming
   const result = useDataOriginal(params);
 
   // Apply transforms if we have them and data is ready
@@ -88,16 +90,28 @@ export default function DynamicComponentLoader({ code, props = {}, dataMapping =
 
   // Use data hook when we need to fetch (always called but disabled when not needed)
   // dataRefreshInterval is in milliseconds, passed from dashboard settings
+  // timeBucket enables server-side aggregation for socket datasources
+  // Include series_col from dataMapping.series for time bucket partitioning
+  const timeBucketConfig = useMemo(() => {
+    if (!dataMapping?.time_bucket) return null;
+    return {
+      ...dataMapping.time_bucket,
+      series_col: dataMapping.series || '' // Include series for bucket partitioning
+    };
+  }, [dataMapping?.time_bucket, dataMapping?.series]);
+
   const {
     data: fetchedData,
     loading: dataLoading,
     error: dataError,
-    isStreaming
+    isStreaming,
+    isAggregated
   } = useDataOriginal({
     datasourceId: shouldFetchData ? effectiveDatasourceId : null,
     query: dataMapping?.query_config || { raw: '', type: 'sql' },
     refreshInterval: dataRefreshInterval,
-    useCache: true
+    useCache: true,
+    timeBucket: timeBucketConfig
   });
 
   // Apply transforms to fetched data
@@ -233,6 +247,11 @@ export default function DynamicComponentLoader({ code, props = {}, dataMapping =
 
   // If we're fetching data ourselves and it's loading (and no data yet)
   if (shouldFetchData && dataLoading && !transformedFetchedData) {
+    const loadingMessage = isAggregated
+      ? 'Connecting to aggregated stream...'
+      : isStreaming
+        ? 'Connecting to stream...'
+        : 'Loading data...';
     return (
       <div style={{
         width: '100%',
@@ -242,7 +261,7 @@ export default function DynamicComponentLoader({ code, props = {}, dataMapping =
         justifyContent: 'center',
         color: '#c6c6c6'
       }}>
-        <Loading description={isStreaming ? 'Connecting to stream...' : 'Loading data...'} withOverlay={false} small />
+        <Loading description={loadingMessage} withOverlay={false} small />
       </div>
     );
   }
