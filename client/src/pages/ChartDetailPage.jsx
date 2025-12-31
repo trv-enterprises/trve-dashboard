@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Loading, Modal } from '@carbon/react';
-import { Save, Close } from '@carbon/icons-react';
+import { Save, Close, ArrowLeft } from '@carbon/icons-react';
 import ChartEditor from '../components/ChartEditor';
 import apiClient from '../api/client';
 import './ChartDetailPage.scss';
@@ -101,7 +101,17 @@ function ChartDetailPage() {
     <div className="chart-detail-page">
       {/* Page header bar with title and actions */}
       <div className="page-header-bar">
-        <h1>{isCreateMode ? 'Create Chart' : 'Edit Chart'}</h1>
+        <div className="header-left">
+          <Button
+            kind="ghost"
+            renderIcon={ArrowLeft}
+            onClick={() => navigate('/design/charts')}
+            size="md"
+          >
+            Back
+          </Button>
+          <h1>{isCreateMode ? 'Create Chart' : 'Edit Chart'}</h1>
+        </div>
         <div className="page-actions">
           <Button
             kind="secondary"

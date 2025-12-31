@@ -1,0 +1,151 @@
+@use '@carbon/styles/scss/spacing' as spacing;
+
+.settings-page {
+  padding: spacing.$spacing-05;
+  max-width: 1200px;
+
+  .page-header {
+    margin-bottom: spacing.$spacing-06;
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 400;
+      margin-bottom: spacing.$spacing-03;
+    }
+
+    .page-description {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      max-width: 600px;
+    }
+  }
+
+  .cds--inline-notification {
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  .cds--tabs {
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  .settings-content {
+    padding-top: spacing.$spacing-05;
+  }
+
+  .settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: spacing.$spacing-05;
+  }
+
+  .setting-card {
+    background: var(--cds-layer-01);
+    padding: spacing.$spacing-05;
+    border-left: 3px solid var(--cds-border-interactive);
+
+    .setting-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: spacing.$spacing-03;
+      flex-wrap: wrap;
+      gap: spacing.$spacing-02;
+    }
+
+    .setting-key-row {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-03;
+      flex-wrap: wrap;
+    }
+
+    .setting-key {
+      font-weight: 600;
+      font-family: var(--cds-code-01);
+      font-size: 0.875rem;
+      color: var(--cds-text-primary);
+    }
+
+    .setting-description {
+      color: var(--cds-text-secondary);
+      font-size: 0.75rem;
+      margin-bottom: spacing.$spacing-04;
+      line-height: 1.4;
+    }
+
+    .setting-value-container {
+      background: var(--cds-field-01);
+      padding: spacing.$spacing-03;
+      border-radius: 4px;
+      margin-bottom: spacing.$spacing-03;
+    }
+
+    .setting-value-simple {
+      font-family: var(--cds-code-01);
+      font-size: 0.875rem;
+      color: var(--cds-text-primary);
+    }
+
+    .setting-value-complex {
+      font-family: var(--cds-code-01);
+      font-size: 0.75rem;
+      color: var(--cds-text-primary);
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .setting-edit {
+      display: flex;
+      flex-direction: column;
+      gap: spacing.$spacing-03;
+
+      .cds--text-input,
+      .cds--number-input {
+        width: 100%;
+      }
+
+      .edit-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: spacing.$spacing-02;
+      }
+    }
+
+    .setting-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: spacing.$spacing-09;
+    color: var(--cds-text-secondary);
+
+    svg {
+      margin-bottom: spacing.$spacing-05;
+      opacity: 0.5;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 400;
+      margin-bottom: spacing.$spacing-03;
+      color: var(--cds-text-primary);
+    }
+
+    p {
+      font-size: 0.875rem;
+    }
+  }
+
+  .error-message {
+    color: var(--cds-text-error);
+    padding: spacing.$spacing-05;
+    background: var(--cds-layer-01);
+    border-radius: 4px;
+  }
+}

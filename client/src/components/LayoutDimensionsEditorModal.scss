@@ -1,0 +1,60 @@
+@use '@carbon/styles/scss/spacing' as spacing;
+
+.layout-dimensions-modal {
+  .cds--modal-container {
+    max-width: 800px;
+  }
+}
+
+.layout-dimensions-editor {
+  .modal-description {
+    margin-bottom: spacing.$spacing-05;
+    color: var(--cds-text-secondary);
+    font-size: 0.875rem;
+  }
+
+  .cds--data-table-container {
+    margin-bottom: spacing.$spacing-05;
+  }
+
+  .cds--data-table {
+    td {
+      vertical-align: middle;
+    }
+
+    .cds--text-input,
+    .cds--number-input {
+      min-width: 100px;
+    }
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: spacing.$spacing-02;
+    justify-content: flex-end;
+  }
+
+  .add-button {
+    margin-top: spacing.$spacing-03;
+  }
+
+  .add-form {
+    background: var(--cds-layer-02);
+    padding: spacing.$spacing-05;
+    border-radius: 4px;
+    margin-top: spacing.$spacing-05;
+
+    .add-form-inputs {
+      display: grid;
+      grid-template-columns: 1fr 150px 150px;
+      gap: spacing.$spacing-05;
+      margin-bottom: spacing.$spacing-05;
+    }
+
+    .add-form-actions {
+      display: flex;
+      gap: spacing.$spacing-03;
+      justify-content: flex-end;
+    }
+  }
+}

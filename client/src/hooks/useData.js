@@ -137,9 +137,16 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
       const url = `${API_BASE}/api/datasources/${datasourceId}/stream/aggregated`;
 
       try {
+        // Build headers including user auth
+        const headers = { 'Content-Type': 'application/json' };
+        const userGuid = apiClient.getCurrentUserGuid();
+        if (userGuid) {
+          headers['X-User-ID'] = userGuid;
+        }
+
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             interval: timeBucket.interval,
             function: timeBucket.function || 'avg',
@@ -216,7 +223,12 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     const connectRaw = () => {
       if (!mountedRef.current) return;
 
-      const url = `${API_BASE}/api/datasources/${datasourceId}/stream`;
+      // EventSource doesn't support custom headers, so pass user_id as query param
+      const userGuid = apiClient.getCurrentUserGuid();
+      let url = `${API_BASE}/api/datasources/${datasourceId}/stream`;
+      if (userGuid) {
+        url += `?user_id=${encodeURIComponent(userGuid)}`;
+      }
       const eventSource = new EventSource(url);
       eventSourceRef.current = eventSource;
 

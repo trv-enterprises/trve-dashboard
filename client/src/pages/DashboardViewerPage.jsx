@@ -240,13 +240,15 @@ function DashboardViewerPage() {
       {/* Header toolbar */}
       <div className="viewer-toolbar">
         <div className="toolbar-left">
-          <IconButton
-            kind="ghost"
-            label="Back to dashboards"
-            onClick={handleBack}
-          >
-            <ArrowLeft size={20} />
-          </IconButton>
+          {!isFullscreen && (
+            <IconButton
+              kind="ghost"
+              label="Back to dashboards"
+              onClick={handleBack}
+            >
+              <ArrowLeft size={20} />
+            </IconButton>
+          )}
           <div className="dashboard-info">
             <h1>{dashboard?.name}</h1>
           </div>
@@ -277,6 +279,7 @@ function DashboardViewerPage() {
             kind="ghost"
             label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             onClick={toggleFullscreen}
+            align="bottom"
           >
             {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
           </IconButton>
@@ -284,6 +287,7 @@ function DashboardViewerPage() {
             kind="ghost"
             label={reduceToFit ? 'Actual size' : 'Fit to screen'}
             onClick={() => setReduceToFit(!reduceToFit)}
+            align="bottom"
           >
             {reduceToFit ? <CenterToFit size={20} /> : <FitToScreen size={20} />}
           </IconButton>

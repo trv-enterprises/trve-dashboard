@@ -212,3 +212,108 @@ func (r *ConfigRepository) CreateIndexes(ctx context.Context) error {
 	_, err := r.collection.Indexes().CreateMany(ctx, indexes)
 	return err
 }
+
+// SettingsItemRepository handles database operations for individual settings
+type SettingsItemRepository struct {
+	collection *mongo.Collection
+}
+
+// NewSettingsItemRepository creates a new SettingsItemRepository
+func NewSettingsItemRepository(db *mongo.Database) *SettingsItemRepository {
+	return &SettingsItemRepository{
+		collection: db.Collection("settings"),
+	}
+}
+
+// GetAllSettings retrieves all configuration items
+func (r *SettingsItemRepository) GetAllSettings(ctx context.Context) ([]models.ConfigItem, error) {
+	cursor, err := r.collection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var items []models.ConfigItem
+	if err := cursor.All(ctx, &items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+// GetSettingByKey retrieves a single setting by key
+func (r *SettingsItemRepository) GetSettingByKey(ctx context.Context, key string) (*models.ConfigItem, error) {
+	var item models.ConfigItem
+	err := r.collection.FindOne(ctx, bson.M{"_id": key}).Decode(&item)
+	if err == mongo.ErrNoDocuments {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+// UpsertSetting creates or updates a setting
+func (r *SettingsItemRepository) UpsertSetting(ctx context.Context, item *models.ConfigItem) error {
+	now := time.Now()
+	item.Updated = now
+
+	filter := bson.M{"_id": item.ID}
+	update := bson.M{
+		"$set": bson.M{
+			"key":         item.Key,
+			"value":       item.Value,
+			"category":    item.Category,
+			"description": item.Description,
+			"updated":     now,
+		},
+		"$setOnInsert": bson.M{
+			"created": now,
+		},
+	}
+
+	opts := options.Update().SetUpsert(true)
+	_, err := r.collection.UpdateOne(ctx, filter, update, opts)
+	return err
+}
+
+// UpdateSettingValue updates only the value of a setting (not hidden flag)
+func (r *SettingsItemRepository) UpdateSettingValue(ctx context.Context, key string, value interface{}) error {
+	now := time.Now()
+
+	filter := bson.M{"_id": key}
+	update := bson.M{
+		"$set": bson.M{
+			"value":   value,
+			"updated": now,
+		},
+	}
+
+	result, err := r.collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
+}
+
+// DeleteSetting removes a setting by key
+func (r *SettingsItemRepository) DeleteSetting(ctx context.Context, key string) error {
+	_, err := r.collection.DeleteOne(ctx, bson.M{"_id": key})
+	return err
+}
+
+// CreateIndexes creates necessary indexes for the settings collection
+func (r *SettingsItemRepository) CreateIndexes(ctx context.Context) error {
+	indexes := []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "category", Value: 1}},
+			Options: options.Index(),
+		},
+	}
+
+	_, err := r.collection.Indexes().CreateMany(ctx, indexes)
+	return err
+}

@@ -15,10 +15,11 @@ import {
   Tab,
   TabPanels,
   TabPanel,
-  InlineNotification
+  InlineNotification,
+  Tag
 } from '@carbon/react';
-import { Save, Close, TrashCan, Play } from '@carbon/icons-react';
-import { API_BASE } from '../api/client';
+import { Save, Close, TrashCan, Play, ConnectionSignal, Checkmark, ErrorFilled, ArrowLeft } from '@carbon/icons-react';
+import apiClient, { API_BASE } from '../api/client';
 import './DatasourceDetailPage.scss';
 
 /**
@@ -46,6 +47,12 @@ function DatasourceDetailPage() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testInput, setTestInput] = useState('{\n  "type": "reading",\n  "data": {\n    "temperature": 23.5,\n    "humidity": 65,\n    "pressure": 1013.25\n  },\n  "timestamp": "2024-01-15T10:30:00Z"\n}');
+
+  // Test connection state
+  const [testing, setTesting] = useState(false);
+  const [showTestModal, setShowTestModal] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [testSchema, setTestSchema] = useState(null);
 
   useEffect(() => {
     if (!isCreateMode) {
@@ -248,6 +255,34 @@ function DatasourceDetailPage() {
   const confirmCancel = () => {
     setShowCancelModal(false);
     navigate('/design/datasources');
+  };
+
+  // Test connection handler
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    setTestSchema(null);
+
+    try {
+      const result = await apiClient.testDatasource(type, config);
+      setTestResult(result);
+
+      // For SQL datasources, schema is included in the test response data
+      if (result.success && type === 'sql' && result.data) {
+        setTestSchema(result.data);
+      }
+
+      setShowTestModal(true);
+    } catch (err) {
+      setTestResult({
+        success: false,
+        status: 'error',
+        message: err.message || 'Connection test failed'
+      });
+      setShowTestModal(true);
+    } finally {
+      setTesting(false);
+    }
   };
 
   // Helper function to extract data by path (mirrors backend logic)
@@ -697,7 +732,17 @@ function DatasourceDetailPage() {
     <div className="datasource-detail-page">
       {/* Page header bar with title and actions */}
       <div className="page-header-bar">
-        <h1>{isCreateMode ? 'Create Data Source' : 'Edit Data Source'}</h1>
+        <div className="header-left">
+          <Button
+            kind="ghost"
+            renderIcon={ArrowLeft}
+            onClick={() => navigate('/design/datasources')}
+            size="md"
+          >
+            Back
+          </Button>
+          <h1>{isCreateMode ? 'Create Data Source' : 'Edit Data Source'}</h1>
+        </div>
         <div className="page-actions">
           <Button
             kind="secondary"
@@ -771,7 +816,18 @@ function DatasourceDetailPage() {
 
         {/* Type-specific configuration */}
         <div className="config-section">
-          <h3>Configuration</h3>
+          <div className="config-section-header">
+            <h3>Configuration</h3>
+            <Button
+              kind="tertiary"
+              renderIcon={ConnectionSignal}
+              onClick={handleTestConnection}
+              disabled={testing}
+              size="sm"
+            >
+              {testing ? 'Testing...' : 'Test Connection'}
+            </Button>
+          </div>
           {type === 'sql' && renderSQLConfig()}
           {type === 'csv' && renderCSVConfig()}
           {type === 'socket' && renderSocketConfig()}
@@ -810,6 +866,70 @@ function DatasourceDetailPage() {
               ? `Create datasource "${name}" of type ${type}?`
               : `Save changes to datasource "${name}"?`}
           </p>
+        </Modal>
+      )}
+
+      {/* Test Connection Results Modal */}
+      {showTestModal && testResult && (
+        <Modal
+          open={true}
+          onRequestClose={() => {
+            setShowTestModal(false);
+            setTestResult(null);
+            setTestSchema(null);
+          }}
+          modalHeading="Connection Test Results"
+          passiveModal
+          size="md"
+          className="test-connection-modal"
+        >
+          <div className="test-result-content">
+            {/* Status indicator */}
+            <div className={`test-status ${testResult.success ? 'success' : 'error'}`}>
+              {testResult.success ? (
+                <Checkmark size={24} />
+              ) : (
+                <ErrorFilled size={24} />
+              )}
+              <span className="status-text">
+                {testResult.success ? 'Connection Successful' : 'Connection Failed'}
+              </span>
+            </div>
+
+            {/* Message */}
+            {testResult.message && (
+              <p className="test-message">{testResult.message}</p>
+            )}
+
+            {/* Response time */}
+            {testResult.response_time && (
+              <p className="response-time">
+                Response time: {testResult.response_time}ms
+              </p>
+            )}
+
+            {/* Schema information for SQL datasources */}
+            {testResult.success && testSchema && testSchema.tables && (
+              <div className="schema-info">
+                <h4>Database Schema</h4>
+                <p className="schema-count">{testSchema.tables.length} tables found</p>
+                <div className="schema-tables">
+                  {testSchema.tables.map((table) => (
+                    <div key={table.name} className="schema-table">
+                      <div className="table-name">{table.name}</div>
+                      <div className="table-columns">
+                        {table.columns && table.columns.map((col) => (
+                          <Tag key={col.name} size="sm" type="cool-gray">
+                            {col.name}
+                          </Tag>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </Modal>
       )}
     </div>

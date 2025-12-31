@@ -143,9 +143,19 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 		},
 		{
 			Name:        "list_datasources",
-			Description: anthropic.String("List all available data sources with their schemas"),
+			Description: anthropic.String("List all available data sources with their types and descriptions"),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{},
+			},
+		},
+		{
+			Name:        "get_datasource_schema",
+			Description: anthropic.String("Get the schema (tables and columns) for a SQL database data source. Use this to discover what tables and columns are available before writing queries."),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"datasource_id": map[string]interface{}{"type": "string", "description": "ID of the SQL data source"},
+				},
+				Required: []string{"datasource_id"},
 			},
 		},
 		{
@@ -188,20 +198,21 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 
 // ToolName constants for easier reference
 const (
-	ToolUpdateChartConfig   = "update_chart_config"
-	ToolUpdateDataMapping   = "update_data_mapping"
-	ToolUpdateQueryConfig   = "update_query_config"
-	ToolUpdateFilters       = "update_filters"
-	ToolUpdateAggregation   = "update_aggregation"
-	ToolUpdateSlidingWindow = "update_sliding_window"
-	ToolUpdateTimeBucket    = "update_time_bucket"
-	ToolSetCustomCode       = "set_custom_code"
-	ToolUpdateChartOptions  = "update_chart_options"
-	ToolQueryDatasource     = "query_datasource"
-	ToolListDatasources     = "list_datasources"
-	ToolPreviewData         = "preview_data"
-	ToolGetChartState       = "get_chart_state"
-	ToolSuggestMissing      = "suggest_missing_tools"
+	ToolUpdateChartConfig    = "update_chart_config"
+	ToolUpdateDataMapping    = "update_data_mapping"
+	ToolUpdateQueryConfig    = "update_query_config"
+	ToolUpdateFilters        = "update_filters"
+	ToolUpdateAggregation    = "update_aggregation"
+	ToolUpdateSlidingWindow  = "update_sliding_window"
+	ToolUpdateTimeBucket     = "update_time_bucket"
+	ToolSetCustomCode        = "set_custom_code"
+	ToolUpdateChartOptions   = "update_chart_options"
+	ToolQueryDatasource      = "query_datasource"
+	ToolListDatasources      = "list_datasources"
+	ToolGetDatasourceSchema  = "get_datasource_schema"
+	ToolPreviewData          = "preview_data"
+	ToolGetChartState        = "get_chart_state"
+	ToolSuggestMissing       = "suggest_missing_tools"
 )
 
 // IsChartUpdateTool returns true if the tool modifies the chart

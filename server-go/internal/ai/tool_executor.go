@@ -32,6 +32,7 @@ type DatasourceRepository interface {
 // DatasourceService interface for data source queries
 type DatasourceService interface {
 	QueryDatasource(ctx context.Context, id string, req *models.QueryRequest) (*models.QueryResponse, error)
+	GetSchema(ctx context.Context, id string) (*models.SchemaResponse, error)
 }
 
 // NewToolExecutor creates a new tool executor
@@ -89,6 +90,8 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, chartID string, chartVer
 		return e.executeQueryDatasource(ctx, input)
 	case ToolListDatasources:
 		return e.executeListDatasources(ctx)
+	case ToolGetDatasourceSchema:
+		return e.executeGetDatasourceSchema(ctx, input)
 	case ToolPreviewData:
 		return e.executePreviewData(ctx, chartID, chartVersion, input)
 	case ToolGetChartState:
@@ -663,6 +666,37 @@ func (e *ToolExecutor) executeListDatasources(ctx context.Context) (*ToolResult,
 		Success: true,
 		Message: fmt.Sprintf("Found %d data source(s)", len(datasources)),
 		Data:    summaries,
+	}, nil
+}
+
+// executeGetDatasourceSchema gets the schema (tables and columns) for a SQL data source
+func (e *ToolExecutor) executeGetDatasourceSchema(ctx context.Context, input json.RawMessage) (*ToolResult, error) {
+	var params struct {
+		DatasourceID string `json:"datasource_id"`
+	}
+	if err := json.Unmarshal(input, &params); err != nil {
+		return &ToolResult{Success: false, Error: "invalid input: " + err.Error()}, nil
+	}
+
+	if params.DatasourceID == "" {
+		return &ToolResult{Success: false, Error: "datasource_id is required"}, nil
+	}
+
+	response, err := e.datasourceSvc.GetSchema(ctx, params.DatasourceID)
+	if err != nil {
+		return &ToolResult{Success: false, Error: "schema discovery failed: " + err.Error()}, nil
+	}
+
+	if !response.Success {
+		return &ToolResult{Success: false, Error: response.Error}, nil
+	}
+
+	// Format schema info for AI consumption
+	tableCount := len(response.Schema.Tables)
+	return &ToolResult{
+		Success: true,
+		Message: fmt.Sprintf("Found %d table(s) in database", tableCount),
+		Data:    response.Schema,
 	}, nil
 }
 

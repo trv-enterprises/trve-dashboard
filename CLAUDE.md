@@ -481,6 +481,10 @@ const Component = () => {
 - ModeContext for shared state (replace localStorage-based mode switching)
 - ErrorBoundary component for crash recovery
 - Entity-specific hooks (useDashboard, useCharts, etc.)
+
+### ⚠️ Known Issues
+- **Firefox: MenuButton alignment** - On the Charts List page, the Create MenuButton has extra spacing from the right edge in Firefox. Works correctly in Chrome and Safari. Root cause: Firefox renders Carbon's MenuButton container differently. Low priority due to Firefox's small market share (~3%).
+
 ---
 
 ## Key Files to Understand
@@ -502,6 +506,6 @@ const Component = () => {
 
 ---
 
-**Last Updated**: 2025-12-15
-**Build**: 337
+**Last Updated**: 2025-12-17
+**Build**: 352
 - Capture Simulator Websocket: websocat ws://100.74.102.38:8081/ws

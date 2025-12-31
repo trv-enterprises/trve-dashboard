@@ -21,6 +21,18 @@ type AppConfig struct {
 	Updated   time.Time              `json:"updated" bson:"updated"`
 }
 
+// ConfigItem represents an individual user-configurable setting stored in MongoDB
+// These settings are synced from user-configurable.yaml on first run and persist in the database
+type ConfigItem struct {
+	ID          string      `json:"id" bson:"_id"`                                       // Unique key (e.g., "layout_dimensions")
+	Key         string      `json:"key" bson:"key"`                                      // Same as ID, for clarity
+	Value       interface{} `json:"value" bson:"value"`                                  // The setting value
+	Category    string      `json:"category,omitempty" bson:"category,omitempty"`        // Grouping category (e.g., "layout")
+	Description string      `json:"description,omitempty" bson:"description,omitempty"`  // Human-readable description
+	Created     time.Time   `json:"created" bson:"created"`
+	Updated     time.Time   `json:"updated" bson:"updated"`
+}
+
 // SystemConfigResponse is the API response for system configuration
 type SystemConfigResponse struct {
 	Settings              map[string]interface{}        `json:"settings"`
@@ -51,3 +63,13 @@ type UpdateConfigRequest struct {
 const (
 	ConfigKeyCurrentDimension = "current_layout_dimension"
 )
+
+// SettingsListResponse is the API response for all user-configurable settings
+type SettingsListResponse struct {
+	Settings []ConfigItem `json:"settings"`
+}
+
+// UpdateSettingRequest is the request body for updating a single setting
+type UpdateSettingRequest struct {
+	Value interface{} `json:"value" binding:"required"`
+}

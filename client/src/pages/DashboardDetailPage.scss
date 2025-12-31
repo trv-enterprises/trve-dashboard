@@ -18,6 +18,12 @@
     border-bottom: 1px solid #393939;
     flex-shrink: 0;
 
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-04;
+    }
+
     h1 {
       color: #f4f4f4;
       font-size: 1.25rem;
@@ -299,16 +305,77 @@
 
     .grid-info {
       display: flex;
-      gap: spacing.$spacing-06;
-      padding: spacing.$spacing-04;
+      justify-content: space-between;
+      align-items: center;
+      padding: spacing.$spacing-02 spacing.$spacing-04;
       background-color: #1a1a1a;
       border-radius: 4px;
       margin-bottom: spacing.$spacing-04;
       font-family: 'IBM Plex Mono', monospace;
       font-size: 0.875rem;
 
-      span {
-        color: #c6c6c6;
+      .grid-info-stats {
+        display: flex;
+        gap: spacing.$spacing-06;
+
+        span {
+          color: #c6c6c6;
+        }
+      }
+
+      .zoom-controls {
+        display: flex;
+        align-items: center;
+        gap: spacing.$spacing-01;
+
+        .cds--btn--icon-only {
+          min-height: 28px;
+          width: 28px;
+          height: 28px;
+          padding: 0;
+
+          svg {
+            fill: #c6c6c6;
+          }
+
+          &:hover:not(:disabled) {
+            background-color: #393939;
+
+            svg {
+              fill: #f4f4f4;
+            }
+          }
+
+          &:disabled {
+            opacity: 0.5;
+          }
+        }
+
+        .zoom-reset {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 48px;
+          height: 28px;
+          padding: 0 spacing.$spacing-02;
+          background: transparent;
+          border: none;
+          border-radius: 4px;
+          color: #c6c6c6;
+          font-family: 'IBM Plex Mono', monospace;
+          font-size: 0.75rem;
+          cursor: pointer;
+
+          &:hover {
+            background-color: #393939;
+            color: #f4f4f4;
+          }
+
+          &:focus {
+            outline: 2px solid #0f62fe;
+            outline-offset: -2px;
+          }
+        }
       }
     }
 

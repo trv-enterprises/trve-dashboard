@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   Header,
@@ -7,7 +7,9 @@ import {
   HeaderGlobalBar,
   HeaderGlobalAction,
   SideNav,
-  Content
+  Content,
+  OverflowMenu,
+  OverflowMenuItem
 } from '@carbon/react';
 import {
   Help,
@@ -16,9 +18,10 @@ import {
   UserAvatar,
   ChartMultitype,
   Menu,
-  Close
+  Close,
+  Checkmark
 } from '@carbon/icons-react';
-import { API_BASE } from './api/client';
+import apiClient, { API_BASE } from './api/client';
 import DatasourcesPage from './pages/DatasourcesPage';
 import DatasourceDetailPage from './pages/DatasourceDetailPage';
 import ChartsListPage from './pages/ChartsListPage';
@@ -32,6 +35,9 @@ import ModeToggle from './components/mode/ModeToggle';
 import DesignModeNav from './components/navigation/DesignModeNav';
 import ViewModeNav from './components/navigation/ViewModeNav';
 import ManageModeNav from './components/navigation/ManageModeNav';
+import UsersListPage from './pages/UsersListPage';
+import UserDetailPage from './pages/UserDetailPage';
+import SettingsPage from './pages/SettingsPage';
 import { MODES } from './config/layoutConfig';
 import buildInfo from '../build.json';
 import './App.scss';
@@ -45,8 +51,64 @@ function AppContent() {
   });
   const [firstDashboardId, setFirstDashboardId] = useState(null);
   const [dashboardsLoaded, setDashboardsLoaded] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userCapabilities, setUserCapabilities] = useState({ can_design: false, can_manage: false });
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Fetch users list on mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await apiClient.getUsers();
+        if (response.users) {
+          setUsers(response.users);
+          // If no current user set, use the saved one from localStorage or default to first user
+          const savedGuid = apiClient.getCurrentUserGuid();
+          const savedUser = savedGuid ? response.users.find(u => u.guid === savedGuid) : null;
+          if (savedUser) {
+            setCurrentUser(savedUser);
+          } else if (response.users.length > 0) {
+            // Default to first user (Admin)
+            handleUserChange(response.users[0]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch users:', err);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  // Fetch current user capabilities when user changes
+  const fetchCapabilities = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const capabilities = await apiClient.getCurrentUser();
+      setUserCapabilities(capabilities);
+      // If current mode is not allowed for this user, switch to VIEW
+      if (currentMode === MODES.DESIGN && !capabilities.can_design) {
+        handleModeChange(MODES.VIEW);
+      } else if (currentMode === MODES.MANAGE && !capabilities.can_manage) {
+        handleModeChange(MODES.VIEW);
+      }
+    } catch (err) {
+      console.error('Failed to fetch capabilities:', err);
+      // Default to VIEW-only if we can't fetch capabilities
+      setUserCapabilities({ can_design: false, can_manage: false });
+    }
+  }, [currentUser, currentMode]);
+
+  useEffect(() => {
+    fetchCapabilities();
+  }, [fetchCapabilities]);
+
+  // Handle user selection change
+  const handleUserChange = (user) => {
+    setCurrentUser(user);
+    apiClient.setCurrentUser(user.guid);
+  };
 
   // Handle mode change and persist to localStorage
   const handleModeChange = (newMode) => {
@@ -124,6 +186,7 @@ function AppContent() {
               <ModeToggle
                 currentMode={currentMode}
                 onModeChange={handleModeChange}
+                capabilities={userCapabilities}
               />
             </div>
             <HeaderGlobalBar>
@@ -136,9 +199,27 @@ function AppContent() {
               <HeaderGlobalAction aria-label="Notifications">
                 <Notification size={20} />
               </HeaderGlobalAction>
-              <HeaderGlobalAction aria-label="User Account">
-                <UserAvatar size={20} />
-              </HeaderGlobalAction>
+              <OverflowMenu
+                aria-label="User Account"
+                renderIcon={() => <UserAvatar size={20} />}
+                flipped
+                menuOptionsClass="user-menu-options"
+              >
+                {users.map((user) => (
+                  <OverflowMenuItem
+                    key={user.guid}
+                    itemText={
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {currentUser?.guid === user.guid && <Checkmark size={16} />}
+                        <span style={{ marginLeft: currentUser?.guid === user.guid ? 0 : '1.5rem' }}>
+                          {user.name}
+                        </span>
+                      </span>
+                    }
+                    onClick={() => handleUserChange(user)}
+                  />
+                ))}
+              </OverflowMenu>
             </HeaderGlobalBar>
           </Header>
         )}
@@ -183,7 +264,10 @@ function AppContent() {
           <Route path="/view/dashboards/:id" element={<DashboardViewerPage />} />
 
           {/* Manage Mode Routes */}
-          <Route path="/manage" element={<div>Manage Settings (Coming in Phase 8)</div>} />
+          <Route path="/manage" element={<Navigate to="/manage/users" replace />} />
+          <Route path="/manage/users" element={<UsersListPage />} />
+          <Route path="/manage/users/:id" element={<UserDetailPage />} />
+          <Route path="/manage/settings" element={<SettingsPage />} />
 
           {/* Legacy routes for backwards compatibility - redirect to design mode */}
           <Route path="/dashboard" element={<Navigate to="/design/dashboards" replace />} />

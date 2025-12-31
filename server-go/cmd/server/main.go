@@ -20,6 +20,7 @@ import (
 	"github.com/tviviano/dashboard/internal/handlers"
 	"github.com/tviviano/dashboard/internal/hub"
 	"github.com/tviviano/dashboard/internal/mcp"
+	"github.com/tviviano/dashboard/internal/middleware"
 	"github.com/tviviano/dashboard/internal/repository"
 	"github.com/tviviano/dashboard/internal/service"
 	"github.com/tviviano/dashboard/internal/streaming"
@@ -94,6 +95,8 @@ func main() {
 	dashboardRepo := repository.NewDashboardRepository(mongodb.Database)
 	aiSessionRepo := repository.NewAISessionRepository(redisClient.Client)
 	configRepo := repository.NewConfigRepository(mongodb.Database)
+	userRepo := repository.NewUserRepository(mongodb.Database)
+	settingsRepo := repository.NewSettingsItemRepository(mongodb.Database)
 
 	// Create chart indexes
 	if err := chartRepo.CreateIndexes(ctx); err != nil {
@@ -105,12 +108,45 @@ func main() {
 		log.Printf("Warning: Failed to create config indexes: %v", err)
 	}
 
+	// Create user indexes
+	if err := userRepo.CreateIndexes(ctx); err != nil {
+		log.Printf("Warning: Failed to create user indexes: %v", err)
+	}
+
+	// Create settings indexes
+	if err := settingsRepo.CreateIndexes(ctx); err != nil {
+		log.Printf("Warning: Failed to create settings indexes: %v", err)
+	}
+
 	// Initialize services
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	chartService := service.NewChartService(chartRepo)
 	dashboardService := service.NewDashboardService(dashboardRepo, mongodb.Database)
 	aiSessionService := service.NewAISessionService(aiSessionRepo, chartRepo)
 	configService := service.NewConfigService(configRepo, cfg)
+	userService := service.NewUserService(userRepo)
+
+	// Load user-configurable settings from separate YAML file
+	userConfig, err := config.LoadUserConfigurableSettings()
+	if err != nil {
+		log.Printf("Warning: Failed to load user-configurable settings: %v", err)
+		userConfig = nil // Will use empty settings
+	}
+	settingsService := service.NewSettingsService(settingsRepo, userConfig)
+
+	// Sync user-configurable settings from YAML file to MongoDB on startup
+	if err := settingsService.SyncSettingsFromConfig(ctx); err != nil {
+		log.Printf("Warning: Failed to sync settings from config: %v", err)
+	} else {
+		fmt.Println("✓ User-configurable settings synced to MongoDB")
+	}
+
+	// Seed pseudo users (Admin, Designer, Support)
+	if err := userService.SeedPseudoUsers(ctx); err != nil {
+		log.Printf("Warning: Failed to seed pseudo users: %v", err)
+	} else {
+		fmt.Println("✓ Pseudo users seeded (Admin, Designer, Support)")
+	}
 
 	// Get the global ChartHub for real-time chart update broadcasts
 	chartHub := hub.GetChartHub()
@@ -140,16 +176,39 @@ func main() {
 	debugHandler := handlers.NewDebugHandler()
 	streamHandler := handlers.NewStreamHandler(streamManager)
 	configHandler := handlers.NewConfigHandler(configService)
+	authHandler := handlers.NewAuthHandler(userService)
+	settingsHandler := handlers.NewSettingsHandler(settingsService)
+
+	// Initialize auth middleware
+	authMiddleware := middleware.NewAuthMiddleware(userService)
 
 	// Initialize MCP
 	mcpRegistry := mcp.NewToolRegistry(datasourceService, dashboardService, chartService)
 	mcpHandler := mcp.NewHandler(mcpRegistry)
 
-	// API routes
+	// API routes with authentication and authorization middleware
 	api := router.Group("/api")
+	api.Use(authMiddleware.Authenticate()) // Authenticate all API requests
+	api.Use(authMiddleware.Authorize())    // Check route permissions
 	{
 		// Health check
 		api.GET("/health", healthCheck(mongodb, redisClient))
+
+		// Auth routes (for getting current user capabilities)
+		auth := api.Group("/auth")
+		{
+			auth.GET("/me", authHandler.GetMe)
+		}
+
+		// User management routes (admin only - enforced by middleware)
+		users := api.Group("/users")
+		{
+			users.GET("", authHandler.ListUsers)
+			users.GET("/:id", authHandler.GetUser)
+			users.POST("", authHandler.CreateUser)
+			users.PUT("/:id", authHandler.UpdateUser)
+			users.DELETE("/:id", authHandler.DeleteUser)
+		}
 
 		// Datasource routes
 		datasources := api.Group("/datasources")
@@ -224,6 +283,9 @@ func main() {
 			configRoutes.GET("/user/:user_id", configHandler.GetUserConfig)
 			configRoutes.PUT("/user/:user_id", configHandler.UpdateUserConfig)
 		}
+
+		// Settings routes (new settings management system)
+		settingsHandler.RegisterRoutes(api)
 	}
 
 	// MCP routes (outside /api group)

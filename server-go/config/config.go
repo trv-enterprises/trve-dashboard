@@ -24,6 +24,21 @@ type Config struct {
 	CORS             CORSConfig                  `mapstructure:"cors"`
 	Swagger          SwaggerConfig               `mapstructure:"swagger"`
 	StaticFiles      StaticFilesConfig           `mapstructure:"static_files"`
+	Settings         []SettingDefinition         `mapstructure:"settings"`
+}
+
+// SettingDefinition represents a configuration setting definition in the YAML file
+// Used for frontend-visible settings that can be stored/modified in MongoDB
+type SettingDefinition struct {
+	Key         string      `mapstructure:"key" json:"key"`                 // Unique identifier for the setting
+	Value       interface{} `mapstructure:"value" json:"value"`             // The setting value
+	Category    string      `mapstructure:"category" json:"category"`       // Grouping category (e.g., "layout", "dashboard")
+	Description string      `mapstructure:"description" json:"description"` // Human-readable description for UI
+}
+
+// UserConfigurableSettings holds settings loaded from user-configurable.yaml
+type UserConfigurableSettings struct {
+	Settings []SettingDefinition `mapstructure:"settings"`
 }
 
 // DashboardConfig holds dashboard-specific settings
@@ -208,4 +223,26 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// LoadUserConfigurableSettings loads user-configurable settings from a separate YAML file
+// These are settings that administrators can modify through the UI
+func LoadUserConfigurableSettings() (*UserConfigurableSettings, error) {
+	v := viper.New()
+	v.SetConfigName("user-configurable")
+	v.SetConfigType("yaml")
+	v.AddConfigPath("./config")
+	v.AddConfigPath(".")
+	v.AddConfigPath("/etc/dashboard")
+
+	if err := v.ReadInConfig(); err != nil {
+		return nil, fmt.Errorf("failed to read user-configurable config file: %w", err)
+	}
+
+	var settings UserConfigurableSettings
+	if err := v.Unmarshal(&settings); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal user-configurable settings: %w", err)
+	}
+
+	return &settings, nil
 }

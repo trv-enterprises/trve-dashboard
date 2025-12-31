@@ -1,0 +1,23 @@
+# User-Configurable Settings
+# These settings can be modified by administrators through the Settings UI.
+# On first run, these values are seeded into MongoDB.
+# Changes made in the UI are persisted in MongoDB and take precedence over this file.
+
+settings:
+  - key: default_layout_dimension
+    category: layout
+    description: "Default layout dimension for new dashboards"
+    value: "1728x1117-MAC"
+
+  - key: layout_dimensions
+    category: layout
+    description: "Available dashboard layout dimension presets"
+    # Using inline JSON format since Viper handles nested maps inconsistently
+    value:
+      - {name: "1728x1117-MAC", max_width: 1728, max_height: 1117}
+      - {name: "1920x1080-HD", max_width: 1920, max_height: 1080}
+      - {name: "2056x1329", max_width: 2056, max_height: 1329}
+      - {name: "2560x1440-2K", max_width: 2560, max_height: 1440}
+      - {name: "2992x1934", max_width: 3008, max_height: 1934}
+      - {name: "3456x2160", max_width: 3456, max_height: 2160}
+      - {name: "3840x2160-4K", max_width: 3840, max_height: 2160}

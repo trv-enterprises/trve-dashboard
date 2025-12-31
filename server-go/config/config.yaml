@@ -114,6 +114,7 @@ cors:
     - Content-Type
     - Authorization
     - Accept
+    - X-User-ID
   expose_headers:
     - Content-Length
   allow_credentials: true
@@ -137,3 +138,79 @@ swagger:
 static_files:
   enabled: false  # Set to true in production, or via DASHBOARD_STATIC_FILES_ENABLED=true
   path: ../client/dist  # Path to built React app (relative to server-go directory)
+
+# Settings that are synced to MongoDB on startup
+# - hidden: true means the setting always reloads from this file on restart (not editable in UI)
+# - hidden: false (default) means the setting persists in MongoDB and is editable in UI
+# - If you change hidden from false to true, the value from this file will take precedence
+settings:
+  - key: layout_dimensions
+    category: layout
+    description: "Available dashboard layout dimension presets"
+    hidden: true
+    value:
+      - name: "1728x1117-MAC"
+        max_width: 1728
+        max_height: 1117
+      - name: "1920x1080-HD"
+        max_width: 1920
+        max_height: 1080
+      - name: "2056x1329"
+        max_width: 2056
+        max_height: 1329
+      - name: "2560x1440-2K"
+        max_width: 2560
+        max_height: 1440
+      - name: "2992x1934"
+        max_width: 3008
+        max_height: 1934
+      - name: "3456x2160"
+        max_width: 3456
+        max_height: 2160
+      - name: "3840x2160-4K"
+        max_width: 3840
+        max_height: 2160
+
+  - key: config_refresh_interval
+    category: dashboard
+    description: "How often (in seconds) the frontend should refresh dashboard/chart config from the database"
+    hidden: false
+    value: 120
+
+  - key: default_layout_dimension
+    category: layout
+    description: "Default layout dimension for new dashboards"
+    hidden: false
+    value: "1728x1117-MAC"
+
+  - key: max_code_size
+    category: validation
+    description: "Maximum allowed size (in bytes) for component code"
+    hidden: true
+    value: 100000
+
+  - key: dangerous_patterns
+    category: validation
+    description: "Regex patterns that are not allowed in component code"
+    hidden: true
+    value:
+      - "eval"
+      - "Function"
+      - "innerHTML"
+      - "dangerouslySetInnerHTML"
+      - "import.*http"
+      - "require\\("
+      - "process\\."
+      - "__dirname"
+      - "__filename"
+
+  - key: allowed_imports
+    category: validation
+    description: "Allowed import packages for component code"
+    hidden: true
+    value:
+      - "react"
+      - "echarts"
+      - "echarts-for-react"
+      - "@carbon/react"
+      - "@carbon/icons-react"

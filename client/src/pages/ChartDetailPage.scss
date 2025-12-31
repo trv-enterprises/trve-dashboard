@@ -18,6 +18,12 @@
     border-bottom: 1px solid #393939;
     flex-shrink: 0;
 
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-04;
+    }
+
     h1 {
       color: #f4f4f4;
       font-size: 1.25rem;

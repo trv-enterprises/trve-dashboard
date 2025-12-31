@@ -81,6 +81,12 @@
     }
   }
 
+  // MenuButton container fix - Carbon sets max-width: 18rem by default
+  .cds--menu-button__container {
+    max-width: none !important;
+    width: auto !important;
+  }
+
   .error-message {
     flex-shrink: 0;
     margin: 0 spacing.$spacing-06;

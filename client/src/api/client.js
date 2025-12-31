@@ -21,15 +21,42 @@ export const API_BASE = API_BASE_URL;
 class APIClient {
   constructor(baseURL = API_BASE_URL) {
     this.baseURL = baseURL;
+    this.currentUserGuid = null;
+  }
+
+  // Set the current user GUID for authentication
+  setCurrentUser(guid) {
+    this.currentUserGuid = guid;
+    if (guid) {
+      localStorage.setItem('currentUserGuid', guid);
+    } else {
+      localStorage.removeItem('currentUserGuid');
+    }
+  }
+
+  // Get the current user GUID (from memory or localStorage)
+  getCurrentUserGuid() {
+    if (!this.currentUserGuid) {
+      this.currentUserGuid = localStorage.getItem('currentUserGuid');
+    }
+    return this.currentUserGuid;
   }
 
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    // Add user authentication header if we have a current user
+    const userGuid = this.getCurrentUserGuid();
+    if (userGuid) {
+      headers['X-User-ID'] = userGuid;
+    }
+
     const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
       ...options,
     };
 
@@ -213,6 +240,13 @@ class APIClient {
     });
   }
 
+  async testDatasource(type, config) {
+    return this.request('/api/datasources/test', {
+      method: 'POST',
+      body: JSON.stringify({ type, config }),
+    });
+  }
+
   // AI Session endpoints
   async createAISession(chartId = null) {
     const payload = chartId ? { chart_id: chartId } : {};
@@ -274,6 +308,55 @@ class APIClient {
     return this.request(`/api/config/user/${userId}`, {
       method: 'PUT',
       body: JSON.stringify({ settings }),
+    });
+  }
+
+  // User/Auth endpoints
+  async getUsers() {
+    return this.request('/api/users');
+  }
+
+  async getCurrentUser() {
+    return this.request('/api/auth/me');
+  }
+
+  async getUser(id) {
+    return this.request(`/api/users/${id}`);
+  }
+
+  async createUser(user) {
+    return this.request('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(user),
+    });
+  }
+
+  async updateUser(id, updates) {
+    return this.request(`/api/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteUser(id) {
+    return this.request(`/api/users/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Settings endpoints
+  async getSettings() {
+    return this.request('/api/settings');
+  }
+
+  async getSetting(key) {
+    return this.request(`/api/settings/${key}`);
+  }
+
+  async updateSetting(key, value) {
+    return this.request(`/api/settings/${key}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
     });
   }
 }

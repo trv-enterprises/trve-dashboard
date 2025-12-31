@@ -1,17 +1,22 @@
 import { SideNavItems, SideNavLink } from '@carbon/react';
-import { Settings, SettingsAdjust } from '@carbon/icons-react';
+import { Settings, SettingsAdjust, UserMultiple } from '@carbon/icons-react';
 import './ManageModeNav.scss';
 
 /**
  * ManageModeNav Component
  *
  * Navigation for Manage Mode - system administration and monitoring.
- * This is a placeholder that will be expanded in Phase 8.
  */
 function ManageModeNav({ location, navigate }) {
   const manageNavItems = [
     {
-      path: '/manage',
+      path: '/manage/users',
+      icon: UserMultiple,
+      label: 'Users',
+      description: 'User management'
+    },
+    {
+      path: '/manage/settings',
       icon: SettingsAdjust,
       label: 'Settings',
       description: 'System administration'

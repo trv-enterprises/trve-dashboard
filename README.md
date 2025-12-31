@@ -140,6 +140,33 @@ Create charts using natural language:
 - **CSV**: File-based with filtering and header detection
 - **WebSocket**: Real-time data streams with parser configuration
 
+### MCP Server (Model Context Protocol)
+A standalone MCP server allows external AI agents (like Claude Desktop) to query your data sources:
+
+```bash
+# Build the MCP server
+cd server-go
+go build -o bin/mcp-server cmd/mcp-server/main.go
+
+# Add to Claude Desktop config (~/Library/Application Support/Claude/claude_desktop_config.json):
+{
+  "mcpServers": {
+    "dashboard-datasources": {
+      "command": "/path/to/dashboard/server-go/bin/mcp-server",
+      "args": []
+    }
+  }
+}
+```
+
+**Available MCP Tools:**
+| Tool | Description |
+|------|-------------|
+| `list_datasources` | List all data sources with types and descriptions |
+| `get_datasource` | Get detailed info about a specific data source |
+| `get_schema` | Get database schema for SQL data sources |
+| `query_datasource` | Execute queries against any data source type |
+
 ### Dynamic Component Loading
 Components are stored as JavaScript code and evaluated at runtime with access to:
 - React hooks: `useState`, `useEffect`, `useMemo`, `useCallback`, `useRef`
@@ -162,7 +189,9 @@ dashboard/
 │   └── package.json
 │
 ├── server-go/                 # Go Backend
-│   ├── cmd/server/main.go    # Entry point
+│   ├── cmd/
+│   │   ├── server/main.go    # Main API server entry point
+│   │   └── mcp-server/main.go # MCP server for external AI agents
 │   ├── internal/
 │   │   ├── database/         # MongoDB, Redis connections
 │   │   ├── datasource/       # SQL, API, CSV, Socket adapters

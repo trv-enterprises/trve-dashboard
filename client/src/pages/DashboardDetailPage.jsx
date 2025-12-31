@@ -27,7 +27,11 @@ import {
   View,
   ChartBar,
   Catalog,
-  Information
+  Information,
+  ZoomIn,
+  ZoomOut,
+  FitToScreen,
+  ArrowLeft
 } from '@carbon/icons-react';
 import AiIcon from '../components/icons/AiIcon';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
@@ -109,6 +113,12 @@ function DashboardDetailPage() {
   const [dimensions, setDimensions] = useState([]);
   const [currentDimension, setCurrentDimension] = useState('');
   const [dimensionLoading, setDimensionLoading] = useState(true);
+
+  // Zoom state
+  const [zoom, setZoom] = useState(100);
+  const zoomIn = () => setZoom(z => Math.min(z + 10, 100));
+  const zoomOut = () => setZoom(z => Math.max(z - 10, 10));
+  const zoomReset = () => setZoom(100);
 
   // Grid configuration - fixed 64x36px cells (16:9 aspect ratio)
   // Larger dimensions = more cells, not bigger cells
@@ -406,8 +416,10 @@ function DashboardDetailPage() {
   const getGridPosition = (e) => {
     if (!gridRef.current) return null;
     const rect = gridRef.current.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / CELL_WIDTH);
-    const y = Math.floor((e.clientY - rect.top) / CELL_HEIGHT);
+    // Account for zoom: the visual cell size is scaled, so divide mouse offset by zoom factor
+    const scale = zoom / 100;
+    const x = Math.floor((e.clientX - rect.left) / (CELL_WIDTH * scale));
+    const y = Math.floor((e.clientY - rect.top) / (CELL_HEIGHT * scale));
     return { x: Math.max(0, Math.min(x, GRID_COLS - 1)), y: Math.max(0, y) };
   };
 
@@ -880,7 +892,17 @@ function DashboardDetailPage() {
     <div className="dashboard-detail-page">
       {/* Page header with title and actions */}
       <div className="page-header-bar">
-        <h1>Edit Dashboard</h1>
+        <div className="header-left">
+          <Button
+            kind="ghost"
+            renderIcon={ArrowLeft}
+            onClick={() => navigate(getReturnPath())}
+            size="md"
+          >
+            Back
+          </Button>
+          <h1>Edit Dashboard</h1>
+        </div>
         <div className="page-actions">
           <Button
             kind="secondary"
@@ -1034,12 +1056,42 @@ function DashboardDetailPage() {
 
       {/* Panel grid */}
       <div className="components-section">
-        {/* Grid info */}
+        {/* Grid info with zoom controls */}
         <div className="grid-info">
-          <span>Layout: {GRID_COLS * CELL_WIDTH}×{GRID_ROWS * CELL_HEIGHT}px</span>
-          <span>Grid: {GRID_COLS} columns × {GRID_ROWS} rows</span>
-          <span>Cell: {CELL_WIDTH}×{CELL_HEIGHT}px</span>
-          <span>Panels: {panels.length}</span>
+          <div className="grid-info-stats">
+            <span>Layout: {GRID_COLS * CELL_WIDTH}×{GRID_ROWS * CELL_HEIGHT}px</span>
+            <span>Grid: {GRID_COLS} columns × {GRID_ROWS} rows</span>
+            <span>Cell: {CELL_WIDTH}×{CELL_HEIGHT}px</span>
+            <span>Panels: {panels.length}</span>
+          </div>
+          <div className="zoom-controls">
+            <IconButton
+              kind="ghost"
+              size="sm"
+              label="Zoom out"
+              onClick={zoomOut}
+              disabled={zoom <= 10}
+            >
+              <ZoomOut size={16} />
+            </IconButton>
+            <button
+              type="button"
+              className="zoom-reset"
+              onClick={zoomReset}
+              title="Reset to 100%"
+            >
+              {zoom}%
+            </button>
+            <IconButton
+              kind="ghost"
+              size="sm"
+              label="Zoom in"
+              onClick={zoomIn}
+              disabled={zoom >= 100}
+            >
+              <ZoomIn size={16} />
+            </IconButton>
+          </div>
         </div>
 
         {/* Visual grid layout */}
@@ -1054,7 +1106,9 @@ function DashboardDetailPage() {
               gridTemplateRows: `repeat(${GRID_ROWS + OVERFLOW_ROWS}, ${CELL_HEIGHT}px)`,
               '--cell-width': `${CELL_WIDTH}px`,
               '--grid-visible-width': `${GRID_COLS * CELL_WIDTH}px`,
-              '--grid-visible-height': `${GRID_ROWS * CELL_HEIGHT}px`
+              '--grid-visible-height': `${GRID_ROWS * CELL_HEIGHT}px`,
+              transform: `scale(${zoom / 100})`,
+              transformOrigin: 'top left'
             }}
             onMouseDown={handleGridMouseDown}
             onMouseMove={handleGridMouseMove}

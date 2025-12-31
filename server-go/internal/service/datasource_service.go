@@ -196,6 +196,8 @@ func (s *DatasourceService) TestDatasource(ctx context.Context, req *models.Test
 	var response *models.TestDatasourceResponse
 
 	switch req.Type {
+	case models.DatasourceTypeSQL:
+		response = s.testSQLConnection(req.Config.SQL)
 	case models.DatasourceTypeAPI:
 		response = s.testAPIConnection(ctx, req.Config.API)
 	case models.DatasourceTypeCSV:
@@ -236,6 +238,8 @@ func (s *DatasourceService) CheckHealth(ctx context.Context, id string) (*models
 	var testResponse *models.TestDatasourceResponse
 
 	switch datasource.Type {
+	case models.DatasourceTypeSQL:
+		testResponse = s.testSQLConnection(datasource.Config.SQL)
 	case models.DatasourceTypeAPI:
 		testResponse = s.testAPIConnection(ctx, datasource.Config.API)
 	case models.DatasourceTypeCSV:
@@ -504,6 +508,36 @@ func (s *DatasourceService) testFileConnection(config *models.CSVConfig) *models
 		Status:  models.HealthStatusHealthy,
 		Message: fmt.Sprintf("File accessible (size: %d bytes)", info.Size()),
 	}
+}
+
+// testSQLConnection tests a SQL database connection
+func (s *DatasourceService) testSQLConnection(config *models.SQLConfig) *models.TestDatasourceResponse {
+	// Use the datasource package to create and test the connection
+	sqlDS, err := datasource.NewSQLDataSource(config)
+	if err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+	defer sqlDS.Close()
+
+	// Connection successful, now fetch schema
+	response := &models.TestDatasourceResponse{
+		Success: true,
+		Status:  models.HealthStatusHealthy,
+		Message: fmt.Sprintf("Connection successful (driver: %s)", config.Driver),
+	}
+
+	// Try to get schema info and include it in the response
+	ctx := context.Background()
+	schema, err := sqlDS.GetSchema(ctx)
+	if err == nil && schema != nil {
+		response.Data = schema
+	}
+
+	return response
 }
 
 // QueryDatasource executes a query against a datasource
