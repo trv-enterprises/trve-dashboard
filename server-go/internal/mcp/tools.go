@@ -883,8 +883,14 @@ func parseDatasourceConfig(dsType models.DatasourceType, configMap map[string]in
 		}
 	case models.DatasourceTypeSQL:
 		config.SQL = &models.SQLConfig{
-			Driver:           getString(configMap, "driver"),
-			ConnectionString: getString(configMap, "connection_string"),
+			Driver:   getString(configMap, "driver"),
+			Host:     getString(configMap, "host"),
+			Port:     getInt(configMap, "port"),
+			Database: getString(configMap, "database"),
+			Username: getString(configMap, "username"),
+			Password: getString(configMap, "password"),
+			SSL:      getBool(configMap, "ssl"),
+			Options:  getString(configMap, "options"),
 		}
 	case models.DatasourceTypeCSV:
 		config.CSV = &models.CSVConfig{

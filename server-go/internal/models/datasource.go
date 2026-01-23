@@ -15,16 +15,18 @@ const (
 	QueryTypeCSVFilter    QueryType = "csv_filter"
 	QueryTypeStreamFilter QueryType = "stream_filter"
 	QueryTypeAPI          QueryType = "api"
+	QueryTypeTSStore      QueryType = "tsstore"
 )
 
 // DatasourceType represents the type of data source
 type DatasourceType string
 
 const (
-	DatasourceTypeSQL    DatasourceType = "sql"
-	DatasourceTypeCSV    DatasourceType = "csv"
-	DatasourceTypeSocket DatasourceType = "socket"
-	DatasourceTypeAPI    DatasourceType = "api"
+	DatasourceTypeSQL     DatasourceType = "sql"
+	DatasourceTypeCSV     DatasourceType = "csv"
+	DatasourceTypeSocket  DatasourceType = "socket"
+	DatasourceTypeAPI     DatasourceType = "api"
+	DatasourceTypeTSStore DatasourceType = "tsstore"
 )
 
 // HealthStatus represents the health status of a data source
@@ -36,6 +38,10 @@ const (
 	HealthStatusUnhealthy HealthStatus = "unhealthy"
 	HealthStatusDegraded  HealthStatus = "degraded"
 )
+
+// SecretMaskedValue is the placeholder shown for masked secrets
+// Frontend uses this to detect if a secret field has a value set
+const SecretMaskedValue = "********"
 
 // Query represents a query to execute against a datasource
 type Query struct {
@@ -66,35 +72,36 @@ type Datasource struct {
 	ID          primitive.ObjectID `json:"id" bson:"_id,omitempty"`
 	Name        string             `json:"name" bson:"name" binding:"required"`
 	Description string             `json:"description" bson:"description"`
-	Type        DatasourceType     `json:"type" bson:"type" binding:"required,oneof=sql csv socket api"`
+	Type        DatasourceType     `json:"type" bson:"type" binding:"required,oneof=sql csv socket api tsstore"`
 	Config      DatasourceConfig   `json:"config" bson:"config" binding:"required"`
 	Health      HealthInfo         `json:"health" bson:"health"`
 	Tags        []string           `json:"tags,omitempty" bson:"tags,omitempty"`
+	MaskSecrets bool               `json:"mask_secrets" bson:"mask_secrets"` // If true, secrets are masked in API responses
 	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
 	UpdatedAt   time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
 // DatasourceConfig holds type-specific configuration
 type DatasourceConfig struct {
-	SQL    *SQLConfig    `json:"sql,omitempty" bson:"sql,omitempty"`
-	CSV    *CSVConfig    `json:"csv,omitempty" bson:"csv,omitempty"`
-	Socket *SocketConfig `json:"socket,omitempty" bson:"socket,omitempty"`
-	API    *APIConfig    `json:"api,omitempty" bson:"api,omitempty"`
+	SQL     *SQLConfig     `json:"sql,omitempty" bson:"sql,omitempty"`
+	CSV     *CSVConfig     `json:"csv,omitempty" bson:"csv,omitempty"`
+	Socket  *SocketConfig  `json:"socket,omitempty" bson:"socket,omitempty"`
+	API     *APIConfig     `json:"api,omitempty" bson:"api,omitempty"`
+	TSStore *TSStoreConfig `json:"tsstore,omitempty" bson:"tsstore,omitempty"`
 }
 
 // SQLConfig represents configuration for SQL databases
 type SQLConfig struct {
-	Driver          string            `json:"driver" bson:"driver" binding:"required,oneof=postgres mysql sqlite mssql oracle"`
-	ConnectionString string           `json:"connection_string" bson:"connection_string" binding:"required"`
-	Host            string            `json:"host,omitempty" bson:"host,omitempty"`
-	Port            int               `json:"port,omitempty" bson:"port,omitempty"`
-	Database        string            `json:"database,omitempty" bson:"database,omitempty"`
-	Username        string            `json:"username,omitempty" bson:"username,omitempty"`
-	Password        string            `json:"password,omitempty" bson:"password,omitempty"`
-	SSL             bool              `json:"ssl,omitempty" bson:"ssl,omitempty"`
-	MaxConnections  int               `json:"max_connections,omitempty" bson:"max_connections,omitempty"`
-	Timeout         int               `json:"timeout,omitempty" bson:"timeout,omitempty"` // seconds
-	Options         map[string]string `json:"options,omitempty" bson:"options,omitempty"`
+	Driver         string `json:"driver" bson:"driver" binding:"required,oneof=postgres mysql sqlite mssql oracle"`
+	Host           string `json:"host,omitempty" bson:"host,omitempty"`
+	Port           int    `json:"port,omitempty" bson:"port,omitempty"`
+	Database       string `json:"database,omitempty" bson:"database,omitempty"`
+	Username       string `json:"username,omitempty" bson:"username,omitempty"`
+	Password       string `json:"password,omitempty" bson:"password,omitempty"`
+	SSL            bool   `json:"ssl,omitempty" bson:"ssl,omitempty"`
+	MaxConnections int    `json:"max_connections,omitempty" bson:"max_connections,omitempty"`
+	Timeout        int    `json:"timeout,omitempty" bson:"timeout,omitempty"` // seconds
+	Options        string `json:"options,omitempty" bson:"options,omitempty"` // Optional connection parameters (e.g., "sslmode=require&connect_timeout=10")
 }
 
 // CSVConfig represents configuration for CSV files
@@ -145,17 +152,17 @@ type SocketParserConfig struct {
 
 // APIConfig represents configuration for REST API data sources
 type APIConfig struct {
-	URL             string             `json:"url" bson:"url" binding:"required,url"`
-	Method          string             `json:"method" bson:"method" binding:"required,oneof=GET POST PUT DELETE PATCH"`
-	Headers         map[string]string  `json:"headers,omitempty" bson:"headers,omitempty"`
-	QueryParams     map[string]string  `json:"query_params,omitempty" bson:"query_params,omitempty"`
-	Body            string             `json:"body,omitempty" bson:"body,omitempty"`
-	AuthType        string             `json:"auth_type,omitempty" bson:"auth_type,omitempty"` // none, bearer, basic, api-key
+	URL             string             `json:"url" bson:"url" binding:"required"`                       // Full API endpoint URL
+	Method          string             `json:"method" bson:"method"`                                    // HTTP method (GET, POST, etc.)
+	Headers         map[string]string  `json:"headers,omitempty" bson:"headers,omitempty"`              // Request headers
+	AuthType        string             `json:"auth_type,omitempty" bson:"auth_type,omitempty"`          // none, bearer, basic, api-key
 	AuthCredentials map[string]string  `json:"auth_credentials,omitempty" bson:"auth_credentials,omitempty"`
-	Timeout         int                `json:"timeout,omitempty" bson:"timeout,omitempty"` // seconds
+	QueryParams     map[string]string  `json:"query_params,omitempty" bson:"query_params,omitempty"`    // Query parameters
+	Body            string             `json:"body,omitempty" bson:"body,omitempty"`                    // Request body template
+	Timeout         int                `json:"timeout,omitempty" bson:"timeout,omitempty"`              // seconds
 	RetryCount      int                `json:"retry_count,omitempty" bson:"retry_count,omitempty"`
-	RetryDelay      int                `json:"retry_delay,omitempty" bson:"retry_delay,omitempty"` // milliseconds
-	ResponseConfig  *APIResponseConfig `json:"response_config,omitempty" bson:"response_config,omitempty"`
+	RetryDelay      int                `json:"retry_delay,omitempty" bson:"retry_delay,omitempty"`      // milliseconds
+	ResponseConfig  *APIResponseConfig `json:"response_config,omitempty" bson:"response_config,omitempty"` // Response parsing config
 }
 
 // APIResponseConfig specifies how to parse API responses
@@ -163,6 +170,17 @@ type APIResponseConfig struct {
 	// DataPath is the JSON path to the array of records (e.g., "data", "results", "items")
 	// If empty, assumes response is already an array or will be parsed as key-value pairs
 	DataPath string `json:"data_path,omitempty" bson:"data_path,omitempty"`
+}
+
+// TSStoreConfig represents configuration for TSStore (timeseries store) data sources
+// TSStore stores arbitrary objects at timestamps, using a block-based storage system.
+// Data does not have a predefined schema - schema is inferred from the first N records.
+type TSStoreConfig struct {
+	URL       string            `json:"url" bson:"url" binding:"required"`                    // Base URL of TSStore API (e.g., "http://localhost:8080")
+	StoreName string            `json:"store_name" bson:"store_name" binding:"required"`      // Name of the store to query
+	APIKey    string            `json:"api_key,omitempty" bson:"api_key,omitempty"`           // Optional API key for authentication
+	Headers   map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`           // Additional HTTP headers
+	Timeout   int               `json:"timeout,omitempty" bson:"timeout,omitempty"`           // Request timeout in seconds (default: 30)
 }
 
 // HealthInfo represents health check information
@@ -178,9 +196,10 @@ type HealthInfo struct {
 type CreateDatasourceRequest struct {
 	Name        string           `json:"name" binding:"required"`
 	Description string           `json:"description"`
-	Type        DatasourceType   `json:"type" binding:"required,oneof=sql csv socket api"`
+	Type        DatasourceType   `json:"type" binding:"required,oneof=sql csv socket api tsstore"`
 	Config      DatasourceConfig `json:"config" binding:"required"`
 	Tags        []string         `json:"tags,omitempty"`
+	MaskSecrets *bool            `json:"mask_secrets,omitempty"` // If true, secrets are masked in API responses (default: true)
 }
 
 // UpdateDatasourceRequest represents request to update a data source
@@ -189,11 +208,12 @@ type UpdateDatasourceRequest struct {
 	Description string           `json:"description,omitempty"`
 	Config      DatasourceConfig `json:"config,omitempty"`
 	Tags        []string         `json:"tags,omitempty"`
+	MaskSecrets *bool            `json:"mask_secrets,omitempty"` // If provided, updates secret masking setting
 }
 
 // TestDatasourceRequest represents request to test a data source connection
 type TestDatasourceRequest struct {
-	Type   DatasourceType   `json:"type" binding:"required,oneof=sql csv socket api"`
+	Type   DatasourceType   `json:"type" binding:"required,oneof=sql csv socket api tsstore"`
 	Config DatasourceConfig `json:"config" binding:"required"`
 }
 
@@ -253,4 +273,93 @@ type SchemaResponse struct {
 	Schema   *SchemaInfo `json:"schema,omitempty"`
 	Error    string      `json:"error,omitempty"`
 	Duration int64       `json:"duration"` // milliseconds
+}
+
+// SanitizeForAPI returns a copy of the datasource with sensitive fields masked.
+// This should be called before returning datasource data via API responses.
+// Sensitive fields are replaced with SecretMaskedValue ("********") if they have a value.
+func (d *Datasource) SanitizeForAPI() *Datasource {
+	if !d.MaskSecrets {
+		return d
+	}
+
+	// Create a deep copy to avoid modifying the original
+	sanitized := *d
+
+	// Sanitize SQL config
+	if d.Config.SQL != nil {
+		sqlCopy := *d.Config.SQL
+		if sqlCopy.Password != "" {
+			sqlCopy.Password = SecretMaskedValue
+		}
+		sanitized.Config.SQL = &sqlCopy
+	}
+
+	// Sanitize API config
+	if d.Config.API != nil {
+		apiCopy := *d.Config.API
+		if len(apiCopy.AuthCredentials) > 0 {
+			maskedCreds := make(map[string]string)
+			for k := range apiCopy.AuthCredentials {
+				maskedCreds[k] = SecretMaskedValue
+			}
+			apiCopy.AuthCredentials = maskedCreds
+		}
+		// Also mask Authorization header if present
+		if len(apiCopy.Headers) > 0 {
+			headersCopy := make(map[string]string)
+			for k, v := range apiCopy.Headers {
+				if k == "Authorization" || k == "authorization" || k == "X-API-Key" || k == "x-api-key" {
+					headersCopy[k] = SecretMaskedValue
+				} else {
+					headersCopy[k] = v
+				}
+			}
+			apiCopy.Headers = headersCopy
+		}
+		sanitized.Config.API = &apiCopy
+	}
+
+	// Sanitize TSStore config
+	if d.Config.TSStore != nil {
+		tsCopy := *d.Config.TSStore
+		if tsCopy.APIKey != "" {
+			tsCopy.APIKey = SecretMaskedValue
+		}
+		sanitized.Config.TSStore = &tsCopy
+	}
+
+	// Sanitize Socket config (headers may contain auth tokens)
+	if d.Config.Socket != nil {
+		socketCopy := *d.Config.Socket
+		if len(socketCopy.Headers) > 0 {
+			headersCopy := make(map[string]string)
+			for k, v := range socketCopy.Headers {
+				if k == "Authorization" || k == "authorization" || k == "X-API-Key" || k == "x-api-key" {
+					headersCopy[k] = SecretMaskedValue
+				} else {
+					headersCopy[k] = v
+				}
+			}
+			socketCopy.Headers = headersCopy
+		}
+		sanitized.Config.Socket = &socketCopy
+	}
+
+	return &sanitized
+}
+
+// HasSecret checks if a field currently has a secret value set (not empty).
+// Used by frontend to show "********" vs empty field.
+func (d *Datasource) HasSecret(fieldPath string) bool {
+	switch fieldPath {
+	case "sql.password":
+		return d.Config.SQL != nil && d.Config.SQL.Password != ""
+	case "api.auth_credentials":
+		return d.Config.API != nil && len(d.Config.API.AuthCredentials) > 0
+	case "tsstore.api_key":
+		return d.Config.TSStore != nil && d.Config.TSStore.APIKey != ""
+	default:
+		return false
+	}
 }

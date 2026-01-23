@@ -43,12 +43,19 @@ func (s *DatasourceService) CreateDatasource(ctx context.Context, req *models.Cr
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
+	// Default MaskSecrets to true if not specified
+	maskSecrets := true
+	if req.MaskSecrets != nil {
+		maskSecrets = *req.MaskSecrets
+	}
+
 	datasource := &models.Datasource{
 		Name:        req.Name,
 		Description: req.Description,
 		Type:        req.Type,
 		Config:      req.Config,
 		Tags:        req.Tags,
+		MaskSecrets: maskSecrets,
 		Health: models.HealthInfo{
 			Status: models.HealthStatusUnknown,
 		},
@@ -145,8 +152,17 @@ func (s *DatasourceService) UpdateDatasource(ctx context.Context, id string, req
 		datasource.Description = req.Description
 	}
 
+	// MaskSecrets cannot be changed after creation (security constraint)
+	// If provided and different from current value, reject the update
+	if req.MaskSecrets != nil && *req.MaskSecrets != datasource.MaskSecrets {
+		return nil, fmt.Errorf("mask_secrets cannot be changed after datasource creation")
+	}
+
 	// Update config if provided and validate
-	if req.Config.API != nil || req.Config.Socket != nil || req.Config.CSV != nil || req.Config.SQL != nil {
+	if req.Config.API != nil || req.Config.Socket != nil || req.Config.CSV != nil || req.Config.SQL != nil || req.Config.TSStore != nil {
+		// Preserve existing secrets if masked value is sent
+		preserveSecrets(&req.Config, &datasource.Config)
+
 		if err := s.validateConfig(datasource.Type, req.Config); err != nil {
 			return nil, fmt.Errorf("invalid configuration: %w", err)
 		}
@@ -162,6 +178,61 @@ func (s *DatasourceService) UpdateDatasource(ctx context.Context, id string, req
 	}
 
 	return datasource, nil
+}
+
+// preserveSecrets copies secret values from existing config if the new config contains the masked value.
+// This allows the frontend to send "********" for unchanged secrets without losing the actual value.
+func preserveSecrets(newConfig, existingConfig *models.DatasourceConfig) {
+	// Preserve SQL secrets
+	if newConfig.SQL != nil && existingConfig.SQL != nil {
+		if newConfig.SQL.Password == models.SecretMaskedValue {
+			newConfig.SQL.Password = existingConfig.SQL.Password
+		}
+	}
+
+	// Preserve API secrets
+	if newConfig.API != nil && existingConfig.API != nil {
+		// Preserve auth credentials
+		if len(newConfig.API.AuthCredentials) > 0 && len(existingConfig.API.AuthCredentials) > 0 {
+			for k, v := range newConfig.API.AuthCredentials {
+				if v == models.SecretMaskedValue {
+					if existingVal, ok := existingConfig.API.AuthCredentials[k]; ok {
+						newConfig.API.AuthCredentials[k] = existingVal
+					}
+				}
+			}
+		}
+		// Preserve sensitive headers
+		if len(newConfig.API.Headers) > 0 && len(existingConfig.API.Headers) > 0 {
+			for k, v := range newConfig.API.Headers {
+				if v == models.SecretMaskedValue {
+					if existingVal, ok := existingConfig.API.Headers[k]; ok {
+						newConfig.API.Headers[k] = existingVal
+					}
+				}
+			}
+		}
+	}
+
+	// Preserve TSStore secrets
+	if newConfig.TSStore != nil && existingConfig.TSStore != nil {
+		if newConfig.TSStore.APIKey == models.SecretMaskedValue {
+			newConfig.TSStore.APIKey = existingConfig.TSStore.APIKey
+		}
+	}
+
+	// Preserve Socket header secrets
+	if newConfig.Socket != nil && existingConfig.Socket != nil {
+		if len(newConfig.Socket.Headers) > 0 && len(existingConfig.Socket.Headers) > 0 {
+			for k, v := range newConfig.Socket.Headers {
+				if v == models.SecretMaskedValue {
+					if existingVal, ok := existingConfig.Socket.Headers[k]; ok {
+						newConfig.Socket.Headers[k] = existingVal
+					}
+				}
+			}
+		}
+	}
 }
 
 // DeleteDatasource deletes a datasource by ID
@@ -208,6 +279,8 @@ func (s *DatasourceService) TestDatasource(ctx context.Context, req *models.Test
 			Status:  models.HealthStatusHealthy,
 			Message: "WebSocket validation successful (connection test requires runtime connection)",
 		}
+	case models.DatasourceTypeTSStore:
+		response = s.testTSStoreConnection(ctx, req.Config.TSStore)
 	default:
 		return &models.TestDatasourceResponse{
 			Success: false,
@@ -250,6 +323,8 @@ func (s *DatasourceService) CheckHealth(ctx context.Context, id string) (*models
 			Status:  models.HealthStatusHealthy,
 			Message: "WebSocket configuration valid",
 		}
+	case models.DatasourceTypeTSStore:
+		testResponse = s.testTSStoreConnection(ctx, datasource.Config.TSStore)
 	}
 
 	health.Status = testResponse.Status
@@ -297,6 +372,12 @@ func (s *DatasourceService) validateConfig(dsType models.DatasourceType, config 
 		}
 		return s.validateCSVConfig(config.CSV)
 
+	case models.DatasourceTypeTSStore:
+		if config.TSStore == nil {
+			return fmt.Errorf("TSStore configuration is required for TSStore datasource")
+		}
+		return s.validateTSStoreConfig(config.TSStore)
+
 	default:
 		return fmt.Errorf("unsupported datasource type: %s", dsType)
 	}
@@ -308,11 +389,13 @@ func (s *DatasourceService) validateAPIConfig(config *models.APIConfig) error {
 		return fmt.Errorf("URL is required")
 	}
 
-	validMethods := map[string]bool{
-		"GET": true, "POST": true, "PUT": true, "DELETE": true, "PATCH": true,
-	}
-	if !validMethods[config.Method] {
-		return fmt.Errorf("invalid HTTP method: %s", config.Method)
+	if config.Method != "" {
+		validMethods := map[string]bool{
+			"GET": true, "POST": true, "PUT": true, "DELETE": true, "PATCH": true,
+		}
+		if !validMethods[config.Method] {
+			return fmt.Errorf("invalid HTTP method: %s", config.Method)
+		}
 	}
 
 	if config.Timeout < 0 {
@@ -336,15 +419,33 @@ func (s *DatasourceService) validateSQLConfig(config *models.SQLConfig) error {
 		return fmt.Errorf("database driver is required")
 	}
 
-	if config.ConnectionString == "" {
-		return fmt.Errorf("connection string is required")
-	}
-
 	validDrivers := map[string]bool{
 		"postgres": true, "mysql": true, "sqlite": true, "mssql": true, "oracle": true,
 	}
 	if !validDrivers[config.Driver] {
 		return fmt.Errorf("unsupported database driver: %s", config.Driver)
+	}
+
+	// SQLite only needs database (file path)
+	if config.Driver == "sqlite" {
+		if config.Database == "" {
+			return fmt.Errorf("database path is required for SQLite")
+		}
+		return nil
+	}
+
+	// Other drivers need host, database, and username
+	if config.Host == "" {
+		return fmt.Errorf("host is required")
+	}
+	if config.Database == "" {
+		return fmt.Errorf("database name is required")
+	}
+	if config.Username == "" {
+		return fmt.Errorf("username is required")
+	}
+	if config.Port == 0 {
+		return fmt.Errorf("port is required")
 	}
 
 	return nil
@@ -380,6 +481,18 @@ func (s *DatasourceService) validateCSVConfig(config *models.CSVConfig) error {
 	return nil
 }
 
+// validateTSStoreConfig validates TSStore configuration
+func (s *DatasourceService) validateTSStoreConfig(config *models.TSStoreConfig) error {
+	if config.URL == "" {
+		return fmt.Errorf("TSStore URL is required")
+	}
+	if config.StoreName == "" {
+		return fmt.Errorf("store name is required")
+	}
+
+	return nil
+}
+
 // testAPIConnection tests an API connection
 func (s *DatasourceService) testAPIConnection(ctx context.Context, config *models.APIConfig) *models.TestDatasourceResponse {
 	timeout := 30 * time.Second
@@ -391,7 +504,12 @@ func (s *DatasourceService) testAPIConnection(ctx context.Context, config *model
 		Timeout: timeout,
 	}
 
-	req, err := http.NewRequestWithContext(ctx, config.Method, config.URL, nil)
+	method := "GET"
+	if config.Method != "" {
+		method = config.Method
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, config.URL, nil)
 	if err != nil {
 		return &models.TestDatasourceResponse{
 			Success: false,
@@ -408,14 +526,29 @@ func (s *DatasourceService) testAPIConnection(ctx context.Context, config *model
 	// Add auth headers
 	if config.AuthType == "bearer" && config.AuthCredentials["token"] != "" {
 		req.Header.Set("Authorization", "Bearer "+config.AuthCredentials["token"])
+	} else if config.AuthType == "basic" {
+		username := config.AuthCredentials["username"]
+		password := config.AuthCredentials["password"]
+		if username != "" || password != "" {
+			req.SetBasicAuth(username, password)
+		}
 	} else if config.AuthType == "api-key" {
 		if key := config.AuthCredentials["key"]; key != "" {
-			if header := config.AuthCredentials["header"]; header != "" {
-				req.Header.Set(header, key)
-			} else {
-				req.Header.Set("X-API-Key", key)
+			headerName := config.AuthCredentials["header"]
+			if headerName == "" {
+				headerName = "X-API-Key"
 			}
+			req.Header.Set(headerName, key)
 		}
+	}
+
+	// Add query params
+	if len(config.QueryParams) > 0 {
+		q := req.URL.Query()
+		for key, value := range config.QueryParams {
+			q.Add(key, value)
+		}
+		req.URL.RawQuery = q.Encode()
 	}
 
 	resp, err := client.Do(req)
@@ -538,6 +671,34 @@ func (s *DatasourceService) testSQLConnection(config *models.SQLConfig) *models.
 	}
 
 	return response
+}
+
+// testTSStoreConnection tests a TSStore connection
+func (s *DatasourceService) testTSStoreConnection(ctx context.Context, config *models.TSStoreConfig) *models.TestDatasourceResponse {
+	tsDS, err := datasource.NewTSStoreDataSource(config)
+	if err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Failed to create TSStore datasource: %v", err),
+		}
+	}
+	defer tsDS.Close()
+
+	// Test the connection
+	if err := tsDS.TestConnection(ctx); err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+
+	return &models.TestDatasourceResponse{
+		Success: true,
+		Status:  models.HealthStatusHealthy,
+		Message: fmt.Sprintf("Connection successful (store: %s)", config.StoreName),
+	}
 }
 
 // QueryDatasource executes a query against a datasource

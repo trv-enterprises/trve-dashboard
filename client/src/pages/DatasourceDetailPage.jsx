@@ -26,8 +26,11 @@ import './DatasourceDetailPage.scss';
  * DatasourceDetailPage Component
  *
  * Create/Edit datasource with type-specific configuration forms.
- * Supports 4 datasource types: SQL, CSV, Socket, API
+ * Supports 5 datasource types: SQL, CSV, Socket, API, TSStore
  */
+// Constant for masked secret value - must match backend SecretMaskedValue
+const SECRET_MASKED_VALUE = '********';
+
 function DatasourceDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -66,13 +69,7 @@ function DatasourceDetailPage() {
   const fetchDatasource = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/datasources/${id}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await apiClient.getDatasource(id);
       console.log('Datasource response:', data);
 
       setDatasource(data);
@@ -95,9 +92,8 @@ function DatasourceDetailPage() {
       return;
     }
     try {
-      const response = await fetch(`${API_BASE}/api/datasources`);
-      if (!response.ok) throw new Error('Failed to fetch data sources');
-      const datasources = await response.json();
+      const response = await apiClient.getDatasources();
+      const datasources = response.datasources || [];
       const duplicate = datasources.find(ds =>
         ds.name.toLowerCase() === nameToCheck.trim().toLowerCase() &&
         ds.id !== id
@@ -119,7 +115,6 @@ function DatasourceDetailPage() {
         return {
           sql: {
             driver: 'postgres',
-            connection_string: '',
             host: '',
             port: 5432,
             database: '',
@@ -127,7 +122,8 @@ function DatasourceDetailPage() {
             password: '',
             ssl: false,
             max_connections: 10,
-            timeout: 30
+            timeout: 30,
+            options: ''
           }
         };
       case 'csv':
@@ -171,6 +167,15 @@ function DatasourceDetailPage() {
             retry_delay: 1000
           }
         };
+      case 'tsstore':
+        return {
+          tsstore: {
+            url: '',
+            store_name: '',
+            api_key: '',
+            timeout: 30
+          }
+        };
       default:
         return {};
     }
@@ -202,43 +207,61 @@ function DatasourceDetailPage() {
     setHasChanges(true);
   };
 
+  // Prepare config for save, preserving masked secrets
+  const prepareConfigForSave = (configToSave) => {
+    const prepared = JSON.parse(JSON.stringify(configToSave)); // Deep clone
+
+    // For SQL: if password is empty and was masked, keep the masked value
+    if (prepared.sql) {
+      if (prepared.sql.password === '' && datasource?.config?.sql?.password === SECRET_MASKED_VALUE) {
+        prepared.sql.password = SECRET_MASKED_VALUE;
+      }
+    }
+
+    // For TSStore: if api_key is empty and was masked, keep the masked value
+    if (prepared.tsstore) {
+      if (prepared.tsstore.api_key === '' && datasource?.config?.tsstore?.api_key === SECRET_MASKED_VALUE) {
+        prepared.tsstore.api_key = SECRET_MASKED_VALUE;
+      }
+    }
+
+    // For API: preserve masked auth_credentials
+    if (prepared.api && prepared.api.auth_credentials) {
+      const originalCreds = datasource?.config?.api?.auth_credentials || {};
+      for (const key in prepared.api.auth_credentials) {
+        if (prepared.api.auth_credentials[key] === '' && originalCreds[key] === SECRET_MASKED_VALUE) {
+          prepared.api.auth_credentials[key] = SECRET_MASKED_VALUE;
+        }
+      }
+    }
+
+    return prepared;
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
+      const preparedConfig = isCreateMode ? config : prepareConfigForSave(config);
+
       const payload = {
         name,
         description,
         type,
-        config,
+        config: preparedConfig,
         tags
       };
 
-      let response;
       if (isCreateMode) {
-        response = await fetch(`${API_BASE}/api/datasources`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        await apiClient.createDatasource(payload);
       } else {
-        response = await fetch(`${API_BASE}/api/datasources/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        await apiClient.updateDatasource(id, payload);
       }
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setHasChanges(false);
-        setShowSaveModal(false);
-        navigate('/design/datasources');
-      } else {
-        alert(`Failed to save: ${data.error || 'Unknown error'}`);
-      }
+      setHasChanges(false);
+      setShowSaveModal(false);
+      navigate('/design/datasources');
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      alert(`Failed to save: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -348,6 +371,7 @@ function DatasourceDetailPage() {
 
   const renderSQLConfig = () => {
     const sqlConfig = config.sql || {};
+    const isSQLite = sqlConfig.driver === 'sqlite';
     return (
       <div className="config-form">
         <Select
@@ -363,61 +387,61 @@ function DatasourceDetailPage() {
           <SelectItem value="oracle" text="Oracle" />
         </Select>
 
-        <TextInput
-          id="sql-connection-string"
-          labelText="Connection String"
-          value={sqlConfig.connection_string || ''}
-          onChange={(e) => updateConfig('sql.connection_string', e.target.value)}
-          placeholder="postgres://user:pass@host:port/db"
-        />
-
-        <div className="form-row">
-          <TextInput
-            id="sql-host"
-            labelText="Host"
-            value={sqlConfig.host || ''}
-            onChange={(e) => updateConfig('sql.host', e.target.value)}
-            placeholder="localhost"
-          />
-          <NumberInput
-            id="sql-port"
-            label="Port"
-            value={sqlConfig.port || 5432}
-            onChange={(e) => updateConfig('sql.port', e.imaginaryTarget.value)}
-            min={1}
-            max={65535}
-          />
-        </div>
-
-        <div className="form-row">
-          <TextInput
-            id="sql-database"
-            labelText="Database"
-            value={sqlConfig.database || ''}
-            onChange={(e) => updateConfig('sql.database', e.target.value)}
-          />
-          <TextInput
-            id="sql-username"
-            labelText="Username"
-            value={sqlConfig.username || ''}
-            onChange={(e) => updateConfig('sql.username', e.target.value)}
-          />
-        </div>
+        {!isSQLite && (
+          <div className="form-row">
+            <TextInput
+              id="sql-host"
+              labelText="Host"
+              value={sqlConfig.host || ''}
+              onChange={(e) => updateConfig('sql.host', e.target.value)}
+              placeholder="localhost"
+            />
+            <NumberInput
+              id="sql-port"
+              label="Port"
+              value={sqlConfig.port || 5432}
+              onChange={(e) => updateConfig('sql.port', e.imaginaryTarget.value)}
+              min={1}
+              max={65535}
+            />
+          </div>
+        )}
 
         <TextInput
-          id="sql-password"
-          labelText="Password"
-          type="password"
-          value={sqlConfig.password || ''}
-          onChange={(e) => updateConfig('sql.password', e.target.value)}
+          id="sql-database"
+          labelText={isSQLite ? "Database Path" : "Database"}
+          value={sqlConfig.database || ''}
+          onChange={(e) => updateConfig('sql.database', e.target.value)}
+          placeholder={isSQLite ? "/path/to/database.db or :memory:" : "database_name"}
         />
 
-        <Checkbox
-          id="sql-ssl"
-          labelText="Use SSL"
-          checked={sqlConfig.ssl || false}
-          onChange={(e) => updateConfig('sql.ssl', e.target.checked)}
-        />
+        {!isSQLite && (
+          <>
+            <div className="form-row">
+              <TextInput
+                id="sql-username"
+                labelText="Username"
+                value={sqlConfig.username || ''}
+                onChange={(e) => updateConfig('sql.username', e.target.value)}
+              />
+              <TextInput
+                id="sql-password"
+                labelText="Password"
+                type="password"
+                value={sqlConfig.password === SECRET_MASKED_VALUE ? '' : (sqlConfig.password || '')}
+                onChange={(e) => updateConfig('sql.password', e.target.value)}
+                placeholder={sqlConfig.password === SECRET_MASKED_VALUE ? 'Password is set (enter new value to change)' : 'Enter password'}
+              />
+            </div>
+
+            <Checkbox
+              id="sql-ssl"
+              labelText="Use SSL"
+              checked={sqlConfig.ssl || false}
+              onChange={(e) => updateConfig('sql.ssl', e.target.checked)}
+            />
+          </>
+        )}
 
         <div className="form-row">
           <NumberInput
@@ -437,6 +461,15 @@ function DatasourceDetailPage() {
             max={300}
           />
         </div>
+
+        <TextInput
+          id="sql-options"
+          labelText="Optional Parameters"
+          value={sqlConfig.options || ''}
+          onChange={(e) => updateConfig('sql.options', e.target.value)}
+          placeholder="e.g., sslmode=verify-full or application_name=dashboard"
+          helperText="Additional driver-specific connection parameters"
+        />
       </div>
     );
   };
@@ -621,7 +654,7 @@ function DatasourceDetailPage() {
                 {parsedOutput.success && parsedOutput.fields.length > 0 && (
                   <div className="extracted-fields">
                     <span className="fields-label">Fields: </span>
-                    {parsedOutput.fields.map((field, i) => (
+                    {parsedOutput.fields.map((field) => (
                       <span key={field} className="field-tag">{field}</span>
                     ))}
                   </div>
@@ -663,13 +696,72 @@ function DatasourceDetailPage() {
           id="api-auth-type"
           labelText="Authentication"
           value={apiConfig.auth_type || 'none'}
-          onChange={(e) => updateConfig('api.auth_type', e.target.value)}
+          onChange={(e) => {
+            updateConfig('api.auth_type', e.target.value);
+            // Clear auth credentials when changing type
+            updateConfig('api.auth_credentials', {});
+          }}
         >
           <SelectItem value="none" text="None" />
           <SelectItem value="bearer" text="Bearer Token" />
           <SelectItem value="basic" text="Basic Auth" />
           <SelectItem value="api-key" text="API Key" />
         </Select>
+
+        {/* Bearer Token auth */}
+        {apiConfig.auth_type === 'bearer' && (
+          <TextInput
+            id="api-auth-bearer-token"
+            labelText="Bearer Token"
+            type="password"
+            value={apiConfig.auth_credentials?.token === SECRET_MASKED_VALUE ? '' : (apiConfig.auth_credentials?.token || '')}
+            onChange={(e) => updateConfig('api.auth_credentials', { ...apiConfig.auth_credentials, token: e.target.value })}
+            placeholder={apiConfig.auth_credentials?.token === SECRET_MASKED_VALUE ? 'Token is set (enter new value to change)' : 'Enter bearer token'}
+          />
+        )}
+
+        {/* Basic Auth */}
+        {apiConfig.auth_type === 'basic' && (
+          <div className="form-row">
+            <TextInput
+              id="api-auth-basic-username"
+              labelText="Username"
+              value={apiConfig.auth_credentials?.username || ''}
+              onChange={(e) => updateConfig('api.auth_credentials', { ...apiConfig.auth_credentials, username: e.target.value })}
+              placeholder="Enter username"
+            />
+            <TextInput
+              id="api-auth-basic-password"
+              labelText="Password"
+              type="password"
+              value={apiConfig.auth_credentials?.password === SECRET_MASKED_VALUE ? '' : (apiConfig.auth_credentials?.password || '')}
+              onChange={(e) => updateConfig('api.auth_credentials', { ...apiConfig.auth_credentials, password: e.target.value })}
+              placeholder={apiConfig.auth_credentials?.password === SECRET_MASKED_VALUE ? 'Password is set (enter new value to change)' : 'Enter password'}
+            />
+          </div>
+        )}
+
+        {/* API Key auth */}
+        {apiConfig.auth_type === 'api-key' && (
+          <div className="form-row">
+            <TextInput
+              id="api-auth-apikey-header"
+              labelText="Header Name"
+              value={apiConfig.auth_credentials?.header || 'X-API-Key'}
+              onChange={(e) => updateConfig('api.auth_credentials', { ...apiConfig.auth_credentials, header: e.target.value })}
+              placeholder="X-API-Key"
+              helperText="HTTP header name for the API key"
+            />
+            <TextInput
+              id="api-auth-apikey-value"
+              labelText="API Key"
+              type="password"
+              value={apiConfig.auth_credentials?.key === SECRET_MASKED_VALUE ? '' : (apiConfig.auth_credentials?.key || '')}
+              onChange={(e) => updateConfig('api.auth_credentials', { ...apiConfig.auth_credentials, key: e.target.value })}
+              placeholder={apiConfig.auth_credentials?.key === SECRET_MASKED_VALUE ? 'API key is set (enter new value to change)' : 'Enter API key'}
+            />
+          </div>
+        )}
 
         <TextArea
           id="api-body"
@@ -706,6 +798,51 @@ function DatasourceDetailPage() {
           onChange={(e) => updateConfig('api.retry_delay', e.imaginaryTarget.value)}
           min={100}
           max={10000}
+        />
+      </div>
+    );
+  };
+
+  const renderTSStoreConfig = () => {
+    const tsstoreConfig = config.tsstore || {};
+    return (
+      <div className="config-form">
+        <TextInput
+          id="tsstore-url"
+          labelText="TSStore URL"
+          value={tsstoreConfig.url || ''}
+          onChange={(e) => updateConfig('tsstore.url', e.target.value)}
+          placeholder="http://localhost:8080"
+          helperText="Base URL of the TSStore server"
+        />
+
+        <TextInput
+          id="tsstore-store-name"
+          labelText="Store Name"
+          value={tsstoreConfig.store_name || ''}
+          onChange={(e) => updateConfig('tsstore.store_name', e.target.value)}
+          placeholder="my-timeseries-store"
+          helperText="Name of the timeseries store to connect to"
+        />
+
+        <TextInput
+          id="tsstore-api-key"
+          labelText="API Key (optional)"
+          type="password"
+          value={tsstoreConfig.api_key === SECRET_MASKED_VALUE ? '' : (tsstoreConfig.api_key || '')}
+          onChange={(e) => updateConfig('tsstore.api_key', e.target.value)}
+          placeholder={tsstoreConfig.api_key === SECRET_MASKED_VALUE ? 'API key is set (enter new value to change)' : 'Enter API key'}
+          helperText="API key for authentication (if required)"
+        />
+
+        <NumberInput
+          id="tsstore-timeout"
+          label="Timeout (seconds)"
+          value={tsstoreConfig.timeout || 30}
+          onChange={(e) => updateConfig('tsstore.timeout', e.imaginaryTarget.value)}
+          min={1}
+          max={300}
+          helperText="Request timeout in seconds"
         />
       </div>
     );
@@ -811,6 +948,7 @@ function DatasourceDetailPage() {
             <SelectItem value="csv" text="CSV File" />
             <SelectItem value="socket" text="Socket/WebSocket" />
             <SelectItem value="api" text="REST API" />
+            <SelectItem value="tsstore" text="TSStore (Timeseries)" />
           </Select>
         </div>
 
@@ -832,6 +970,7 @@ function DatasourceDetailPage() {
           {type === 'csv' && renderCSVConfig()}
           {type === 'socket' && renderSocketConfig()}
           {type === 'api' && renderAPIConfig()}
+          {type === 'tsstore' && renderTSStoreConfig()}
         </div>
       </div>
 

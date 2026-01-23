@@ -29,10 +29,102 @@ func mapDriverName(driver string) string {
 	return driver
 }
 
+// buildConnectionString constructs a connection string from individual config fields
+func buildConnectionString(config *models.SQLConfig) string {
+	switch config.Driver {
+	case "postgres":
+		// PostgreSQL format: host=localhost port=5432 user=postgres password=secret dbname=mydb sslmode=disable
+		connStr := fmt.Sprintf("host=%s port=%d user=%s dbname=%s",
+			config.Host, config.Port, config.Username, config.Database)
+		if config.Password != "" {
+			connStr += fmt.Sprintf(" password=%s", config.Password)
+		}
+		if config.SSL {
+			connStr += " sslmode=require"
+		} else {
+			connStr += " sslmode=disable"
+		}
+		if config.Timeout > 0 {
+			connStr += fmt.Sprintf(" connect_timeout=%d", config.Timeout)
+		}
+		if config.Options != "" {
+			// Options should be space-separated key=value pairs for postgres
+			connStr += " " + config.Options
+		}
+		return connStr
+
+	case "mysql":
+		// MySQL format: user:password@tcp(host:port)/dbname?params
+		connStr := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
+			config.Username, config.Password, config.Host, config.Port, config.Database)
+		params := []string{}
+		if config.SSL {
+			params = append(params, "tls=true")
+		}
+		if config.Timeout > 0 {
+			params = append(params, fmt.Sprintf("timeout=%ds", config.Timeout))
+		}
+		if config.Options != "" {
+			params = append(params, config.Options)
+		}
+		if len(params) > 0 {
+			connStr += "?" + joinParams(params, "&")
+		}
+		return connStr
+
+	case "sqlite":
+		// SQLite format: file path or :memory:
+		connStr := config.Database
+		if config.Options != "" {
+			connStr += "?" + config.Options
+		}
+		return connStr
+
+	case "mssql":
+		// MSSQL format: sqlserver://user:password@host:port?database=dbname
+		connStr := fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s",
+			config.Username, config.Password, config.Host, config.Port, config.Database)
+		if config.SSL {
+			connStr += "&encrypt=true"
+		}
+		if config.Timeout > 0 {
+			connStr += fmt.Sprintf("&connection+timeout=%d", config.Timeout)
+		}
+		if config.Options != "" {
+			connStr += "&" + config.Options
+		}
+		return connStr
+
+	case "oracle":
+		// Oracle format: user/password@host:port/database
+		connStr := fmt.Sprintf("%s/%s@%s:%d/%s",
+			config.Username, config.Password, config.Host, config.Port, config.Database)
+		return connStr
+
+	default:
+		// Fallback - try postgres-style
+		return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s",
+			config.Host, config.Port, config.Username, config.Password, config.Database)
+	}
+}
+
+// joinParams joins parameters with a separator
+func joinParams(params []string, sep string) string {
+	result := ""
+	for i, p := range params {
+		if i > 0 {
+			result += sep
+		}
+		result += p
+	}
+	return result
+}
+
 // NewSQLDataSource creates a new SQL datasource
 func NewSQLDataSource(config *models.SQLConfig) (*SQLDataSource, error) {
 	driverName := mapDriverName(config.Driver)
-	db, err := sql.Open(driverName, config.ConnectionString)
+	connectionString := buildConnectionString(config)
+	db, err := sql.Open(driverName, connectionString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
