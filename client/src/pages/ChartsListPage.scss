@@ -221,6 +221,18 @@
         }
       }
 
+      .tile-dashboards {
+        display: flex;
+        align-items: center;
+        gap: spacing.$spacing-02;
+        color: #c6c6c6;
+        font-size: 0.75rem;
+
+        svg {
+          color: #6f6f6f;
+        }
+      }
+
       .tile-date {
         color: #6f6f6f;
         font-size: 0.75rem;

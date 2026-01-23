@@ -159,6 +159,11 @@
         min-width: 0; // Allow grid to shrink below content size
         width: auto;
         height: auto;
+
+        .panel-container {
+          min-height: 0; // Allow panels to shrink
+          min-width: 0;
+        }
       }
     }
 
@@ -195,7 +200,7 @@
 
           .chart-name {
             color: #f4f4f4;
-            font-size: 0.875rem;
+            font-size: calc(0.875rem * var(--title-scale, 1));
             font-weight: 600;
             text-align: center;
             white-space: nowrap;
@@ -230,7 +235,6 @@
           .echarts-for-react {
             width: 100% !important;
             height: 100% !important;
-            min-height: 150px;
           }
         }
 

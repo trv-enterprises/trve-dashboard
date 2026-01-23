@@ -567,23 +567,23 @@ const SQLQueryBuilder = ({
               <NumberInput
                 id="limit"
                 label="Limit"
-                hideLabel
                 size="sm"
                 min={0}
                 max={10000}
                 value={limit}
                 onChange={(e, { value }) => setLimit(value)}
                 disabled={disabled}
+                className="compact-limit-input"
               />
               <NumberInput
                 id="offset"
                 label="Offset"
-                hideLabel
                 size="sm"
                 min={0}
                 value={offset}
                 onChange={(e, { value }) => setOffset(value)}
                 disabled={disabled}
+                className="compact-limit-input"
               />
             </div>
           </div>

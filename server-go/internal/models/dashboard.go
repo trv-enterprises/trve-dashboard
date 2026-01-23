@@ -114,6 +114,7 @@ type DashboardSettings struct {
 	IsPublic        bool   `json:"is_public" bson:"is_public"`
 	AllowExport     bool   `json:"allow_export" bson:"allow_export"`
 	LayoutDimension string `json:"layout_dimension,omitempty" bson:"layout_dimension,omitempty"`
+	TitleScale      int    `json:"title_scale,omitempty" bson:"title_scale,omitempty"` // Title font scale % (default 100, range 50-200)
 }
 
 // CreateDashboardRequest represents a request to create a dashboard

@@ -269,6 +269,20 @@ func (a *Agent) buildMessages(history []models.AIMessage, newUserContent string)
 			if len(content) > 0 {
 				messages = append(messages, anthropic.NewAssistantMessage(content...))
 			}
+
+			// If assistant message had tool calls, add the tool results as the next user message
+			// This is required by the Anthropic API - every tool_use must have a corresponding tool_result
+			if len(msg.ToolCalls) > 0 {
+				toolResults := make([]anthropic.ContentBlockParamUnion, 0, len(msg.ToolCalls))
+				for _, tc := range msg.ToolCalls {
+					toolResults = append(toolResults, anthropic.NewToolResultBlock(
+						tc.ID,
+						tc.Output,
+						false, // not an error
+					))
+				}
+				messages = append(messages, anthropic.NewUserMessage(toolResults...))
+			}
 		}
 	}
 

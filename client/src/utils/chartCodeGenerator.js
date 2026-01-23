@@ -134,11 +134,13 @@ function generateDataDrivenCode(chart) {
   const { chart_type, datasource_id, query_config, data_mapping } = chart;
   const queryRaw = query_config?.raw || '';
   const queryType = query_config?.type || 'sql';
+  const queryParams = query_config?.params || {};
   const xAxis = data_mapping?.x_axis || '';
   const yAxis = data_mapping?.y_axis || [];
   const xAxisLabel = data_mapping?.x_axis_label || '';
   const yAxisLabel = data_mapping?.y_axis_label || '';
   const xAxisFormat = data_mapping?.x_axis_format || 'chart';
+  const seriesCol = data_mapping?.series || ''; // Column to split series by (e.g., location)
 
   const transforms = buildTransformsConfig(data_mapping);
   const hasTransforms = !!transforms;
@@ -147,22 +149,22 @@ function generateDataDrivenCode(chart) {
 
   // Handle pie charts
   if (chart_type === 'pie') {
-    return generatePieCode(datasource_id, queryRaw, queryType, xAxis, yAxis[0], transforms, xAxisFormat);
+    return generatePieCode(datasource_id, queryRaw, queryType, xAxis, yAxis[0], transforms, xAxisFormat, queryParams);
   }
 
   // Handle gauge charts
   if (chart_type === 'gauge') {
-    return generateGaugeCode(datasource_id, queryRaw, queryType, yAxis[0], transforms);
+    return generateGaugeCode(datasource_id, queryRaw, queryType, yAxis[0], transforms, chart.options, queryParams);
   }
 
   // Handle scatter charts
   if (chart_type === 'scatter') {
-    return generateScatterCode(datasource_id, queryRaw, queryType, xAxis, yAxis[0], transforms, xAxisLabel, yAxisLabel);
+    return generateScatterCode(datasource_id, queryRaw, queryType, xAxis, yAxis[0], transforms, xAxisLabel, yAxisLabel, queryParams);
   }
 
   // Handle dataview (table) charts
   if (chart_type === 'dataview') {
-    return generateDataViewCode(datasource_id, queryRaw, queryType, data_mapping, transforms);
+    return generateDataViewCode(datasource_id, queryRaw, queryType, data_mapping, transforms, queryParams);
   }
 
   // Standard axis-based charts (bar, line, area)
@@ -170,22 +172,76 @@ function generateDataDrivenCode(chart) {
   const areaStyle = chart_type === 'area' ? 'areaStyle: {},' : '';
   const smooth = (chart_type === 'line' || chart_type === 'area') ? 'smooth: true,' : '';
 
-  const seriesCode = yAxis.length > 1
-    ? `const yColumns = [${yAxisStr}];
+  // Generate series code based on whether we have a series column for splitting
+  let seriesCode;
+  let legendCode = '';
+
+  if (seriesCol) {
+    // Split data into multiple series by a column (e.g., location)
+    seriesCode = `// Group data by series column: ${seriesCol}
+  const cols = ${hasTransforms ? 'transformed' : 'data'}.columns;
+  const seriesColIdx = cols.indexOf('${seriesCol}');
+  const xColIdx = cols.indexOf('${xAxis}');
+  const yColIdx = cols.indexOf('${yAxis[0] || 'value'}');
+
+  // Get unique series values
+  const seriesValues = [...new Set(rows.map(r => r[seriesColIdx]))].filter(v => v != null);
+
+  // Get unique x-axis values (timestamps) and sort them
+  const uniqueX = [...new Set(rows.map(r => r[xColIdx]))].sort((a, b) => a - b);
+
+  // Build series for each unique value in series column
+  const series = seriesValues.map(seriesVal => {
+    // Filter rows for this series and create a map of x -> y
+    const seriesRows = rows.filter(r => r[seriesColIdx] === seriesVal);
+    const dataMap = new Map(seriesRows.map(r => [r[xColIdx], r[yColIdx]]));
+
+    // Map to unique x values to maintain alignment
+    const data = uniqueX.map(x => dataMap.get(x) ?? null);
+
+    return {
+      name: String(seriesVal),
+      data: data,
+      type: '${chartTypeForSeries}',
+      ${areaStyle}
+      ${smooth}
+    };
+  });
+
+  // Format categories from unique x values
+  const categories = uniqueX.map(x => formatCellValue(x, '${xAxis}', { timestampFormat: '${xAxisFormat}' }));`;
+    legendCode = `legend: { data: seriesValues.map(String), bottom: 0 },`;
+  } else if (yAxis.length > 1) {
+    // Multiple y columns as separate series
+    seriesCode = `const yColumns = [${yAxisStr}];
     const series = yColumns.map((col) => ({
       name: col,
       data: rows.map(r => r[${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(col)]),
       type: '${chartTypeForSeries}',
       ${areaStyle}
       ${smooth}
-    }));`
-    : `const series = [{
+    }));
+
+  // Format x-axis values
+  const xAxisCol = '${xAxis}';
+  const xIdx = ${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(xAxisCol);
+  const categories = rows.map(r => formatCellValue(r[xIdx], xAxisCol, { timestampFormat: '${xAxisFormat}' }));`;
+    legendCode = `legend: { data: [${yAxisStr}], bottom: 0 },`;
+  } else {
+    // Single series
+    seriesCode = `const series = [{
       data: rows.map(r => r[${hasTransforms ? 'transformed' : 'data'}.columns.indexOf('${yAxis[0] || 'value'}')]),
       type: '${chartTypeForSeries}',
       ${areaStyle}
       ${smooth}
       itemStyle: { color: '#0f62fe' }
-    }];`;
+    }];
+
+  // Format x-axis values
+  const xAxisCol = '${xAxis}';
+  const xIdx = ${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(xAxisCol);
+  const categories = rows.map(r => formatCellValue(r[xIdx], xAxisCol, { timestampFormat: '${xAxisFormat}' }));`;
+  }
 
   return `const Component = () => {
   const { data, loading, error } = useData({
@@ -193,7 +249,7 @@ function generateDataDrivenCode(chart) {
     query: {
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
-      params: {}
+      params: ${JSON.stringify(queryParams)}
     },
     refreshInterval: 30000
   });
@@ -206,11 +262,6 @@ function generateDataDrivenCode(chart) {
   const transforms = ${JSON.stringify(transforms)};
   const transformed = transformData(data, transforms);
   const rows = transformed.rows;` : `const rows = data.rows;`}
-
-  // Format x-axis values
-  const xAxisCol = '${xAxis}';
-  const xIdx = ${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(xAxisCol);
-  const categories = rows.map(r => formatCellValue(r[xIdx], xAxisCol, { timestampFormat: '${xAxisFormat}' }));
 
   ${seriesCode}
 
@@ -244,7 +295,7 @@ function generateDataDrivenCode(chart) {
         return result;
       }
     },
-    ${yAxis.length > 1 ? `legend: { data: [${yAxisStr}], bottom: 0 },` : ''}
+    ${legendCode}
     xAxis: { type: 'category', data: categories${chart_type === 'area' ? ', boundaryGap: false' : ''}${xAxisLabel ? `, name: '${xAxisLabel}'` : ''} },
     yAxis: { type: 'value'${yAxisLabel ? `, name: '${yAxisLabel}'` : ''} },
     series: series
@@ -319,9 +370,10 @@ function generateStaticCode(chartType) {
 };`,
     gauge: `const Component = () => {
   const option = {
+    backgroundColor: 'transparent',
     series: [{
       type: 'gauge',
-      progress: { show: true, width: 18 },
+      progress: { show: false },
       axisLine: { lineStyle: { width: 18 } },
       axisTick: { show: false },
       splitLine: { length: 15, lineStyle: { width: 2, color: '#999' } },
@@ -391,7 +443,7 @@ function generateStaticCode(chartType) {
 }
 
 // Helper functions for specific chart types
-function generatePieCode(datasourceId, queryRaw, queryType, xAxis, yAxis, transforms, xAxisFormat) {
+function generatePieCode(datasourceId, queryRaw, queryType, xAxis, yAxis, transforms, xAxisFormat, queryParams = {}) {
   const hasTransforms = !!transforms;
   return `const Component = () => {
   const { data, loading, error } = useData({
@@ -399,7 +451,7 @@ function generatePieCode(datasourceId, queryRaw, queryType, xAxis, yAxis, transf
     query: {
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
-      params: {}
+      params: ${JSON.stringify(queryParams)}
     },
     refreshInterval: 30000
   });
@@ -435,15 +487,46 @@ function generatePieCode(datasourceId, queryRaw, queryType, xAxis, yAxis, transf
 };`;
 }
 
-function generateGaugeCode(datasourceId, queryRaw, queryType, yAxis, transforms) {
+function generateGaugeCode(datasourceId, queryRaw, queryType, yAxis, transforms, chartOptions = {}, queryParams = {}) {
   const hasTransforms = !!transforms;
+
+  // Extract gauge options with defaults
+  const gaugeMin = chartOptions?.gaugeMin ?? 0;
+  const gaugeMax = chartOptions?.gaugeMax ?? 100;
+  const warningThreshold = (chartOptions?.gaugeWarningThreshold ?? 70) / 100; // Convert to 0-1 range
+  const dangerThreshold = (chartOptions?.gaugeDangerThreshold ?? 90) / 100;   // Convert to 0-1 range
+  const unit = chartOptions?.gaugeUnit || '';
+  const lineThickness = (chartOptions?.gaugeLineThickness ?? 8) / 100; // Convert to decimal (1-16% -> 0.01-0.16)
+
+  // Format detail formatter based on unit
+  const detailFormatter = unit ? `'{value}${unit}'` : "'{value}'";
+
   return `const Component = () => {
+  const containerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 200, height: 200 });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      // Only update if size changed by more than 1px to prevent resize loops
+      setContainerSize(prev => {
+        if (Math.abs(prev.width - width) > 1 || Math.abs(prev.height - height) > 1) {
+          return { width, height };
+        }
+        return prev;
+      });
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   const { data, loading, error } = useData({
     datasourceId: '${datasourceId}',
     query: {
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
-      params: {}
+      params: ${JSON.stringify(queryParams)}
     },
     refreshInterval: 30000
   });
@@ -461,26 +544,50 @@ function generateGaugeCode(datasourceId, queryRaw, queryType, yAxis, transforms)
   const yIdx = columns.indexOf('${yAxis || 'value'}');
   const value = rows.length > 0 ? Number(rows[0][yIdx]) : 0;
 
+  // Calculate responsive sizes based on container - all proportional, no minimums
+  const minDim = Math.min(containerSize.width, containerSize.height);
+  const baseFontSize = Math.floor(minDim * 0.12);
+  const labelFontSize = Math.floor(minDim * 0.06);
+  const axisLineWidth = Math.floor(minDim * ${lineThickness});
+  const splitLineLength = Math.floor(minDim * 0.05);
+  const anchorSize = Math.floor(minDim * 0.08);
+
   const option = {
+    backgroundColor: 'transparent',
     series: [{
       type: 'gauge',
-      progress: { show: true, width: 18 },
-      axisLine: { lineStyle: { width: 18 } },
+      min: ${gaugeMin},
+      max: ${gaugeMax},
+      progress: { show: false },
+      axisLine: {
+        lineStyle: {
+          width: axisLineWidth,
+          color: [
+            [${warningThreshold}, '#24a148'],  // Green: 0 to warning
+            [${dangerThreshold}, '#f1c21b'],   // Yellow: warning to danger
+            [1, '#da1e28']                      // Red: danger to 100%
+          ]
+        }
+      },
       axisTick: { show: false },
-      splitLine: { length: 15, lineStyle: { width: 2, color: '#999' } },
-      axisLabel: { distance: 25, color: '#999', fontSize: 14 },
-      anchor: { show: true, showAbove: true, size: 25, itemStyle: { borderWidth: 10 } },
+      splitLine: { length: splitLineLength, lineStyle: { width: 2, color: '#999' } },
+      axisLabel: { distance: Math.floor(minDim * 0.08), color: '#999', fontSize: labelFontSize },
+      anchor: { show: true, showAbove: true, size: anchorSize, itemStyle: { borderWidth: Math.floor(anchorSize * 0.4) } },
       title: { show: false },
-      detail: { valueAnimation: true, fontSize: 40, offsetCenter: [0, '70%'] },
+      detail: { valueAnimation: true, fontSize: baseFontSize, offsetCenter: [0, '70%'], formatter: ${detailFormatter} },
       data: [{ value: value, name: '${yAxis || 'Value'}' }]
     }]
   };
 
-  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+  return (
+    <div ref={containerRef} style={{ height: '100%', width: '100%' }}>
+      <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />
+    </div>
+  );
 };`;
 }
 
-function generateScatterCode(datasourceId, queryRaw, queryType, xAxis, yAxis, transforms, xAxisLabel, yAxisLabel) {
+function generateScatterCode(datasourceId, queryRaw, queryType, xAxis, yAxis, transforms, xAxisLabel, yAxisLabel, queryParams = {}) {
   const hasTransforms = !!transforms;
   return `const Component = () => {
   const { data, loading, error } = useData({
@@ -488,7 +595,7 @@ function generateScatterCode(datasourceId, queryRaw, queryType, xAxis, yAxis, tr
     query: {
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
-      params: {}
+      params: ${JSON.stringify(queryParams)}
     },
     refreshInterval: 30000
   });
@@ -518,7 +625,7 @@ function generateScatterCode(datasourceId, queryRaw, queryType, xAxis, yAxis, tr
 };`;
 }
 
-function generateDataViewCode(datasourceId, queryRaw, queryType, dataMapping, transforms) {
+function generateDataViewCode(datasourceId, queryRaw, queryType, dataMapping, transforms, queryParams = {}) {
   const hasTransforms = !!transforms;
   const visibleColumns = dataMapping?.visible_columns || [];
   const hasVisibleColumns = visibleColumns.length > 0;
@@ -530,7 +637,7 @@ function generateDataViewCode(datasourceId, queryRaw, queryType, dataMapping, tr
     query: {
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
-      params: {}
+      params: ${JSON.stringify(queryParams)}
     },
     refreshInterval: 30000
   });

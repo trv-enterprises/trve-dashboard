@@ -24,7 +24,7 @@ import {
   Switch,
   Tooltip
 } from '@carbon/react';
-import { TrashCan, ChartLineSmooth, List, Grid, Edit, DataBase, Information } from '@carbon/icons-react';
+import { TrashCan, ChartLineSmooth, List, Grid, Edit, DataBase, Information, Dashboard } from '@carbon/icons-react';
 import AiIcon from '../components/icons/AiIcon';
 import apiClient from '../api/client';
 import ChartDeleteDialog from '../components/ChartDeleteDialog';
@@ -43,6 +43,7 @@ function ChartsListPage() {
   const navigate = useNavigate();
   const [charts, setCharts] = useState([]);
   const [datasources, setDatasources] = useState({});
+  const [dashboardCounts, setDashboardCounts] = useState({}); // Map of chart_id -> dashboard count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,10 +61,11 @@ function ChartsListPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Fetch charts and data sources in parallel
-      const [chartsData, datasourcesData] = await Promise.all([
+      // Fetch charts, data sources, and dashboards in parallel
+      const [chartsData, datasourcesData, dashboardsData] = await Promise.all([
         apiClient.getCharts(),
-        apiClient.getDatasources()
+        apiClient.getDatasources(),
+        apiClient.getDashboards()
       ]);
 
       if (chartsData.charts) {
@@ -81,6 +83,22 @@ function ChartsListPage() {
           dsMap[ds.id] = ds.name;
         });
         setDatasources(dsMap);
+      }
+
+      // Build dashboard count map by chart_id
+      if (dashboardsData.dashboards) {
+        const counts = {};
+        dashboardsData.dashboards.forEach(dashboard => {
+          // Each dashboard has panels, each panel can have a chart_id
+          if (dashboard.panels) {
+            dashboard.panels.forEach(panel => {
+              if (panel.chart_id) {
+                counts[panel.chart_id] = (counts[panel.chart_id] || 0) + 1;
+              }
+            });
+          }
+        });
+        setDashboardCounts(counts);
       }
     } catch (err) {
       setError(err.message);
@@ -180,6 +198,10 @@ function ChartsListPage() {
       if (sortKey === 'datasource') {
         aVal = datasources[a.datasource_id] || '';
         bVal = datasources[b.datasource_id] || '';
+      } else if (sortKey === 'dashboards') {
+        // Handle dashboards count sorting
+        aVal = dashboardCounts[a.id] || 0;
+        bVal = dashboardCounts[b.id] || 0;
       } else {
         aVal = a[sortKey] || '';
         bVal = b[sortKey] || '';
@@ -189,7 +211,7 @@ function ChartsListPage() {
       if (sortKey === 'updated') {
         aVal = new Date(aVal).getTime() || 0;
         bVal = new Date(bVal).getTime() || 0;
-      } else {
+      } else if (sortKey !== 'dashboards') {
         aVal = String(aVal).toLowerCase();
         bVal = String(bVal).toLowerCase();
       }
@@ -200,12 +222,13 @@ function ChartsListPage() {
     });
 
     return result;
-  }, [charts, datasources, searchTerm, sortKey, sortDirection]);
+  }, [charts, datasources, dashboardCounts, searchTerm, sortKey, sortDirection]);
 
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
     { key: 'chart_type', header: 'Type', isSortable: true },
     { key: 'datasource', header: 'Data Source', isSortable: true },
+    { key: 'dashboards', header: 'Dashboards', isSortable: true },
     { key: 'status', header: 'Status', isSortable: true },
     { key: 'description', header: 'Description', isSortable: false },
     { key: 'updated', header: 'Last modified', isSortable: true },
@@ -217,6 +240,7 @@ function ChartsListPage() {
     name: chart.name,
     chart_type: chart.chart_type,
     datasource: datasources[chart.datasource_id] || 'None',
+    dashboards: dashboardCounts[chart.id] || 0,
     status: chart.status || 'draft',
     description: chart.description || '',
     updated: formatDate(chart.updated)
@@ -342,7 +366,9 @@ function ChartsListPage() {
                         {chart.chart_type?.toUpperCase() || 'N/A'}
                       </Tag>
                       <Tag type={chart.status === 'final' ? 'green' : 'gray'} size="sm">
-                        {chart.status?.toUpperCase() || 'DRAFT'}
+                        {chart.status === 'draft'
+                          ? (chart.version > 0 ? `DRAFT (v${chart.version} saved)` : 'DRAFT')
+                          : `V${chart.version || 0}`}
                       </Tag>
                     </div>
 
@@ -350,6 +376,13 @@ function ChartsListPage() {
                       <div className="tile-datasource">
                         <DataBase size={14} />
                         <span>{datasources[chart.datasource_id]}</span>
+                      </div>
+                    )}
+
+                    {dashboardCounts[chart.id] > 0 && (
+                      <div className="tile-dashboards">
+                        <Dashboard size={14} />
+                        <span>{dashboardCounts[chart.id]} dashboard{dashboardCounts[chart.id] !== 1 ? 's' : ''}</span>
                       </div>
                     )}
 
@@ -450,11 +483,17 @@ function ChartsListPage() {
                               );
                             }
                             if (cell.info.header === 'status') {
+                              const isDraft = cell.value === 'draft';
+                              const chartVersion = chart?.version || 0;
+                              const hasSavedVersion = isDraft && chartVersion > 0;
                               const statusColor = cell.value === 'final' ? 'green' : 'gray';
+                              const statusLabel = isDraft
+                                ? (hasSavedVersion ? `DRAFT (v${chartVersion} saved)` : 'DRAFT')
+                                : `V${chartVersion}`;
                               return (
                                 <TableCell key={cell.id}>
                                   <Tag type={statusColor} size="md">
-                                    {cell.value?.toUpperCase() || 'DRAFT'}
+                                    {statusLabel}
                                   </Tag>
                                 </TableCell>
                               );

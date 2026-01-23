@@ -14,6 +14,9 @@ import './ModeToggle.scss';
  * @param {object} capabilities - User capabilities { can_design, can_manage }
  */
 function ModeToggle({ currentMode, onModeChange, capabilities = {} }) {
+  // Check if user has any capabilities beyond view-only
+  const hasDesignOrManage = capabilities.can_design || capabilities.can_manage;
+
   const allModes = [
     {
       id: MODES.VIEW,
@@ -39,10 +42,16 @@ function ModeToggle({ currentMode, onModeChange, capabilities = {} }) {
   ];
 
   // Filter modes based on user capabilities
+  // Hide View button if user only has view access (no mode switching needed)
   const modes = allModes.filter(mode => {
+    // If user only has view access, don't show the View button (they're always in view mode)
+    if (mode.id === MODES.VIEW && !hasDesignOrManage) return false;
     if (!mode.requiresCapability) return true;
     return capabilities[mode.requiresCapability] === true;
   });
+
+  // If no modes to show (view-only user), don't render anything
+  if (modes.length === 0) return null;
 
   return (
     <div className="mode-selector">

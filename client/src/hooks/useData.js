@@ -27,6 +27,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { queryData } from '../api/dataClient';
 import apiClient, { API_BASE } from '../api/client';
+import StreamConnectionManager from '../utils/streamConnectionManager';
 
 export function useData({ datasourceId, query, refreshInterval = null, useCache = true, maxBuffer = 1000, timeBucket = null }) {
   // Common state
@@ -35,6 +36,8 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
   const [error, setError] = useState(null);
   const [source, setSource] = useState(null);
   const [connected, setConnected] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const [disconnectedSince, setDisconnectedSince] = useState(null);
 
   // Datasource type detection
   const [datasourceType, setDatasourceType] = useState(null);
@@ -46,6 +49,8 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
   const intervalRef = useRef(null);
   const eventSourceRef = useRef(null);
   const columnsRef = useRef([]);
+  const disconnectedSinceRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
 
   // Serialize query for stable dependency comparison
   const queryKey = useMemo(() => JSON.stringify(query), [query]);
@@ -118,6 +123,60 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     return timeBucket && timeBucket.interval > 0 && timeBucket.timestamp_col && timeBucket.value_cols?.length > 0;
   }, [timeBucket]);
 
+  // Grace period before showing error (30 seconds)
+  const ERROR_GRACE_PERIOD = 30000;
+  // Retry interval after grace period (keep trying every 30 seconds)
+  const RETRY_INTERVAL = 30000;
+
+  // Helper to format disconnection time
+  const formatDisconnectTime = (timestamp) => {
+    if (!timestamp) return '';
+    return new Date(timestamp).toLocaleTimeString();
+  };
+
+  // Handle connection error with grace period
+  const handleConnectionError = useCallback((reconnectFn) => {
+    if (!mountedRef.current) return;
+
+    // Track first disconnection time
+    if (!disconnectedSinceRef.current) {
+      disconnectedSinceRef.current = Date.now();
+      setDisconnectedSince(disconnectedSinceRef.current);
+    }
+
+    reconnectAttemptsRef.current += 1;
+    setConnected(false);
+    setReconnecting(true);
+
+    const timeSinceDisconnect = Date.now() - disconnectedSinceRef.current;
+
+    // Only show error after grace period
+    if (timeSinceDisconnect >= ERROR_GRACE_PERIOD) {
+      const disconnectTime = formatDisconnectTime(disconnectedSinceRef.current);
+      setError(new Error(`Connection lost since ${disconnectTime}, retrying...`));
+    }
+
+    // Always retry at regular intervals (don't give up)
+    const delay = timeSinceDisconnect < ERROR_GRACE_PERIOD
+      ? Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), ERROR_GRACE_PERIOD - timeSinceDisconnect)
+      : RETRY_INTERVAL;
+
+    return setTimeout(reconnectFn, delay);
+  }, []);
+
+  // Handle successful connection
+  const handleConnectionSuccess = useCallback(() => {
+    if (!mountedRef.current) return;
+
+    setConnected(true);
+    setReconnecting(false);
+    setError(null);
+    setLoading(false);
+    disconnectedSinceRef.current = null;
+    setDisconnectedSince(null);
+    reconnectAttemptsRef.current = 0;
+  }, []);
+
   // Connect to SSE stream for socket datasources (raw or aggregated)
   useEffect(() => {
     if (typeLoading || datasourceType !== 'socket' || !datasourceId) {
@@ -126,7 +185,6 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
 
     mountedRef.current = true;
     let reconnectTimeout = null;
-    let reconnectDelay = 1000;
     let abortController = null;
 
     const connectAggregated = async () => {
@@ -161,11 +219,8 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
           throw new Error(`HTTP ${response.status}`);
         }
 
-        setConnected(true);
-        setError(null);
-        setLoading(false);
+        handleConnectionSuccess();
         setSource('aggregated-stream');
-        reconnectDelay = 1000;
 
         // Read the streaming response
         const reader = response.body.getReader();
@@ -210,79 +265,71 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
 
         console.error('[useData] Aggregated stream error:', err);
         if (mountedRef.current) {
-          setConnected(false);
-          setError(new Error('Connection lost, reconnecting...'));
-          reconnectTimeout = setTimeout(() => {
-            connectAggregated();
-          }, reconnectDelay);
-          reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+          reconnectTimeout = handleConnectionError(connectAggregated);
         }
       }
     };
 
-    const connectRaw = () => {
+    // Reference to unsubscribe function for shared connection
+    let unsubscribeFromManager = null;
+
+    const connectRawShared = () => {
       if (!mountedRef.current) return;
 
-      // EventSource doesn't support custom headers, so pass user_id as query param
-      const userGuid = apiClient.getCurrentUserGuid();
-      let url = `${API_BASE}/api/datasources/${datasourceId}/stream`;
-      if (userGuid) {
-        url += `?user_id=${encodeURIComponent(userGuid)}`;
+      // Use shared connection manager for raw streams
+      const manager = StreamConnectionManager.getInstance();
+
+      // First, load any buffered data from the manager
+      const bufferedRecords = manager.getBuffer(datasourceId);
+      if (bufferedRecords.length > 0) {
+        bufferedRecords.forEach(record => {
+          if (mountedRef.current) {
+            processStreamRecord(record);
+          }
+        });
       }
-      const eventSource = new EventSource(url);
-      eventSourceRef.current = eventSource;
 
-      eventSource.onopen = () => {
-        if (!mountedRef.current) return;
-        setConnected(true);
-        setError(null);
-        setLoading(false);
+      // Subscribe to the shared connection
+      unsubscribeFromManager = manager.subscribe(
+        datasourceId,
+        (record) => {
+          if (mountedRef.current) {
+            processStreamRecord(record);
+          }
+        },
+        {
+          onConnect: () => {
+            if (mountedRef.current) {
+              handleConnectionSuccess();
+              setSource('stream');
+            }
+          },
+          onDisconnect: () => {
+            if (mountedRef.current) {
+              handleConnectionError(() => {}); // Will be handled by manager's reconnect
+            }
+          },
+          onReconnecting: (attempts, delay) => {
+            if (mountedRef.current) {
+              setReconnecting(true);
+            }
+          }
+        }
+      );
+
+      // Check if already connected
+      const status = manager.getStatus(datasourceId);
+      if (status.connected) {
+        handleConnectionSuccess();
         setSource('stream');
-        reconnectDelay = 1000; // Reset backoff on successful connection
-      };
-
-      eventSource.addEventListener('record', (event) => {
-        if (!mountedRef.current) return;
-        try {
-          const record = JSON.parse(event.data);
-          processStreamRecord(record);
-        } catch (err) {
-          console.error('[useData] Error parsing stream record:', err);
-        }
-      });
-
-      eventSource.addEventListener('heartbeat', () => {
-        // Heartbeat received, connection is alive
-      });
-
-      eventSource.onerror = (err) => {
-        if (!mountedRef.current) return;
-
-        console.error('[useData] EventSource error:', err);
-        setConnected(false);
-
-        // Close the errored connection
-        eventSource.close();
-        eventSourceRef.current = null;
-
-        // Attempt to reconnect with exponential backoff
-        if (mountedRef.current) {
-          setError(new Error('Connection lost, reconnecting...'));
-          reconnectTimeout = setTimeout(() => {
-            connectRaw();
-          }, reconnectDelay);
-
-          // Exponential backoff (max 30 seconds)
-          reconnectDelay = Math.min(reconnectDelay * 2, 30000);
-        }
-      };
+      }
     };
 
     // Choose connection type based on timeBucket
     if (useAggregated) {
       connectAggregated();
     } else {
-      connectRaw();
+      connectRawShared();
     }
 
     // Cleanup on unmount or type change
@@ -294,15 +341,25 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
       if (abortController) {
         abortController.abort();
       }
+      // Unsubscribe from shared connection manager
+      if (unsubscribeFromManager) {
+        unsubscribeFromManager();
+        unsubscribeFromManager = null;
+      }
+      // Legacy cleanup (for aggregated streams which still use direct EventSource)
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
     };
-  }, [datasourceId, datasourceType, typeLoading, processStreamRecord, useAggregated, timeBucketKey]);
+  }, [datasourceId, datasourceType, typeLoading, processStreamRecord, useAggregated, timeBucketKey, handleConnectionError, handleConnectionSuccess]);
 
   // === POLLING LOGIC (for non-socket datasources) ===
-  const fetchData = useCallback(async () => {
+  // isInitialFetch tracks whether this is the first load (shows loading state)
+  // vs a background refresh (keeps showing current data)
+  const isInitialFetchRef = useRef(true);
+
+  const fetchData = useCallback(async (forceShowLoading = false) => {
     if (!datasourceId || !query) {
       setError(new Error('datasourceId and query are required'));
       setLoading(false);
@@ -317,7 +374,11 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     fetchingRef.current = true;
 
     try {
-      setLoading(true);
+      // Only show loading spinner on initial fetch or when explicitly requested
+      // This prevents the chart from going blank during auto-refresh
+      if (isInitialFetchRef.current || forceShowLoading) {
+        setLoading(true);
+      }
       setError(null);
 
       const result = await queryData(datasourceId, query, useCache);
@@ -326,6 +387,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
         setData(result.data);
         setSource(result.source);
         setLoading(false);
+        isInitialFetchRef.current = false; // Mark initial fetch as complete
       }
     } catch (err) {
       if (mountedRef.current) {
@@ -336,6 +398,11 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
       fetchingRef.current = false;
     }
   }, [datasourceId, queryKey, useCache]);
+
+  // Reset initial fetch flag when datasource or query changes
+  useEffect(() => {
+    isInitialFetchRef.current = true;
+  }, [datasourceId, queryKey]);
 
   // Initial fetch for non-socket datasources
   useEffect(() => {
@@ -371,7 +438,8 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
   }, [refreshInterval, fetchData, datasourceType, typeLoading]);
 
   // Refetch function (bypasses cache for polling, clears buffer for streaming)
-  const refetch = useCallback(async () => {
+  // showLoading: if true, shows loading spinner during refetch (default: false for seamless updates)
+  const refetch = useCallback(async (showLoading = false) => {
     if (datasourceType === 'socket') {
       // For streaming, clear the buffer
       setData({ columns: columnsRef.current, rows: [] });
@@ -382,7 +450,10 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     fetchingRef.current = true;
 
     try {
-      setLoading(true);
+      // Only show loading if explicitly requested
+      if (showLoading) {
+        setLoading(true);
+      }
       setError(null);
 
       const result = await queryData(datasourceId, query, false);
@@ -419,5 +490,8 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     isStreaming: datasourceType === 'socket',
     isAggregated: datasourceType === 'socket' && useAggregated,
     clearBuffer: datasourceType === 'socket' ? clearBuffer : null,
+    // Reconnection state (for overlay errors)
+    reconnecting: datasourceType === 'socket' ? reconnecting : false,
+    disconnectedSince: datasourceType === 'socket' ? disconnectedSince : null,
   };
 }

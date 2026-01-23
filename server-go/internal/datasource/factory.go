@@ -121,6 +121,12 @@ func (f *DataSourceFactory) CreateFromConfig(ds *models.Datasource) (models.Data
 		}
 		return NewAPIDataSource(ds.Config.API)
 
+	case models.DatasourceTypeTSStore:
+		if ds.Config.TSStore == nil {
+			return nil, fmt.Errorf("TSStore configuration is required")
+		}
+		return NewTSStoreDataSource(ds.Config.TSStore)
+
 	default:
 		return nil, fmt.Errorf("unsupported datasource type: %s", ds.Type)
 	}

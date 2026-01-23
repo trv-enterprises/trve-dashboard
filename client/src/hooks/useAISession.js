@@ -124,10 +124,12 @@ export function useAISession(chartId = null) {
   // Handle WebSocket events
   // Backend sends: { type: "...", data: {...}, timestamp: "..." }
   const handleWSEvent = useCallback((event) => {
-    const eventData = event.data || {}; // The nested data field
+    // Early return for ping events - no state changes needed
+    if (event.type === 'ping') {
+      return;
+    }
 
-    // Debug: log all WebSocket events
-    console.log('[WS] Event received:', event.type, eventData);
+    const eventData = event.data || {}; // The nested data field
 
     switch (event.type) {
       case 'connected':
@@ -171,8 +173,6 @@ export function useAISession(chartId = null) {
       case 'chart_update':
         // Chart was modified by AI
         console.log('[WS] Chart update received:', eventData.chart?.id, 'type:', eventData.chart?.chart_type, 'datasource:', eventData.chart?.datasource_id);
-        console.log('[WS] Chart update - component_code present:', !!eventData.chart?.component_code, 'length:', eventData.chart?.component_code?.length || 0);
-        console.log('[WS] Chart update - full chart keys:', eventData.chart ? Object.keys(eventData.chart) : 'no chart');
         if (eventData.chart) {
           setChart(eventData.chart);
         }
@@ -197,10 +197,6 @@ export function useAISession(chartId = null) {
       case 'error':
         setError(eventData.error || 'An error occurred');
         setThinking(false);
-        break;
-
-      case 'ping':
-        // Keep-alive, no action needed
         break;
 
       default:
@@ -275,7 +271,12 @@ export function useAISession(chartId = null) {
       setMessages([]);
       setChart(null);
       sessionIdRef.current = null;
-      startingRef.current = false; // Reset guard to allow new session
+      // Keep startingRef.current = true to prevent useEffect from restarting session
+      // after cancel. The component will unmount/navigate away, and a fresh mount
+      // will have a fresh ref. This prevents the race condition where:
+      // 1. cancelSession sets session=null
+      // 2. useEffect sees !session and calls startSession
+      // 3. startSession creates a NEW draft after we just deleted one
     }
   }, []);
 

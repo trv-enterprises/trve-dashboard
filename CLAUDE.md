@@ -463,6 +463,7 @@ const Component = () => {
 - **AI Builder (Phases 1-7)**: Full-page AI chat with SSE streaming, MCP tools, session management
 - **AI Session API**: Start, message, save, cancel endpoints with `/api/ai/session`
 - **Custom AI Icon**: Replaced WatsonxAi with custom sparkle icon component
+- **SQL Data Source Refactor**: Removed connection_string field; connection strings now built from individual fields (host, port, database, username, password, ssl, options)
 
 ### 🚧 In Progress
 - AI Builder Phase 8: Polish & Testing
@@ -506,6 +507,19 @@ const Component = () => {
 
 ---
 
-**Last Updated**: 2025-12-17
-**Build**: 352
-- Capture Simulator Websocket: websocat ws://100.74.102.38:8081/ws
+**Last Updated**: 2026-01-23
+**Build**: 446
+
+## Simulator Services
+
+Simulators are hosted on **trv-srv-001 (100.127.19.27)** with port range 21xxx:
+
+| Service | Endpoint |
+|---------|----------|
+| ts-store | http://100.127.19.27:21080 |
+| WebSocket | ws://100.127.19.27:21081/ws |
+| REST API | http://100.127.19.27:21082 |
+| CSV Server | http://100.127.19.27:21083 |
+| PostgreSQL | 100.127.19.27:21432 |
+
+See `simulators/README.md` for full documentation.

@@ -94,10 +94,10 @@ export const carbonLightTheme = {
   },
 
   grid: {
-    top: 60, // Space for title + legend
-    left: '3%',
-    right: '4%',
-    bottom: '3%',
+    top: 30, // Space for title + legend (reduced by 50%)
+    left: '1.5%',
+    right: '2%',
+    bottom: '1.5%',
     containLabel: true,
   },
 
@@ -487,10 +487,10 @@ export const carbonDarkTheme = {
   },
 
   grid: {
-    top: 60, // Space for title + legend
-    left: '3%',
-    right: '4%',
-    bottom: '3%',
+    top: 30, // Space for title + legend (reduced by 50%)
+    left: '1.5%',
+    right: '2%',
+    bottom: '1.5%',
     containLabel: true,
   },
 

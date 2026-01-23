@@ -45,7 +45,8 @@ func (h *DatasourceHandler) CreateDatasource(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, datasource)
+	// Sanitize sensitive fields before returning
+	c.JSON(http.StatusCreated, datasource.SanitizeForAPI())
 }
 
 // ListDatasources handles datasource listing
@@ -79,8 +80,14 @@ func (h *DatasourceHandler) ListDatasources(c *gin.Context) {
 		return
 	}
 
+	// Sanitize sensitive fields before returning
+	sanitizedDatasources := make([]*models.Datasource, len(datasources))
+	for i, ds := range datasources {
+		sanitizedDatasources[i] = ds.SanitizeForAPI()
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"datasources": datasources,
+		"datasources": sanitizedDatasources,
 		"total":       total,
 		"limit":       limit,
 		"offset":      offset,
@@ -110,7 +117,8 @@ func (h *DatasourceHandler) GetDatasource(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, datasource)
+	// Sanitize sensitive fields before returning
+	c.JSON(http.StatusOK, datasource.SanitizeForAPI())
 }
 
 // UpdateDatasource handles datasource updates
@@ -145,7 +153,8 @@ func (h *DatasourceHandler) UpdateDatasource(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, datasource)
+	// Sanitize sensitive fields before returning
+	c.JSON(http.StatusOK, datasource.SanitizeForAPI())
 }
 
 // DeleteDatasource handles datasource deletion

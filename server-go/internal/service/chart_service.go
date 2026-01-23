@@ -32,10 +32,17 @@ func (s *ChartService) CreateChart(ctx context.Context, req *models.CreateChartR
 		return nil, fmt.Errorf("chart with name '%s' already exists", req.Name)
 	}
 
+	// Default title to name if not provided
+	title := req.Title
+	if title == "" {
+		title = req.Name
+	}
+
 	chart := &models.Chart{
 		Version:       1,
 		Status:        models.ChartStatusFinal,
 		Name:          req.Name,
+		Title:         title,
 		Description:   req.Description,
 		ChartType:     req.ChartType,
 		DatasourceID:  req.DatasourceID,
@@ -188,6 +195,9 @@ func (s *ChartService) UpdateChart(ctx context.Context, id string, req *models.U
 	}
 
 	// Update fields if provided
+	if req.Title != nil {
+		chart.Title = *req.Title
+	}
 	if req.Description != nil {
 		chart.Description = *req.Description
 	}

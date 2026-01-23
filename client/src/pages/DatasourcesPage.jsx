@@ -22,7 +22,7 @@ import {
   Switch,
   Tooltip
 } from '@carbon/react';
-import { TrashCan, DataBase, List, Grid, Edit, Information, Sql, Api, Document, NetworkEnterprise } from '@carbon/icons-react';
+import { TrashCan, DataBase, List, Grid, Edit, Information, Sql, Api, Document, NetworkEnterprise, ChartLineSmooth } from '@carbon/icons-react';
 import apiClient from '../api/client';
 import './DatasourcesPage.scss';
 
@@ -38,6 +38,7 @@ import './DatasourcesPage.scss';
 function DatasourcesPage() {
   const navigate = useNavigate();
   const [datasources, setDatasources] = useState([]);
+  const [chartCounts, setChartCounts] = useState({}); // Map of datasource_id -> chart count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,14 +65,29 @@ function DatasourcesPage() {
   const fetchDatasources = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.getDatasources();
+      // Fetch data sources and charts in parallel
+      const [datasourcesData, chartsData] = await Promise.all([
+        apiClient.getDatasources(),
+        apiClient.getCharts()
+      ]);
 
-      if (data.datasources) {
-        setDatasources(data.datasources);
-      } else if (data.error) {
-        setError(data.error);
+      if (datasourcesData.datasources) {
+        setDatasources(datasourcesData.datasources);
+      } else if (datasourcesData.error) {
+        setError(datasourcesData.error);
       } else {
         setDatasources([]);
+      }
+
+      // Build chart count map by datasource_id
+      if (chartsData.charts) {
+        const counts = {};
+        chartsData.charts.forEach(chart => {
+          if (chart.datasource_id) {
+            counts[chart.datasource_id] = (counts[chart.datasource_id] || 0) + 1;
+          }
+        });
+        setChartCounts(counts);
       }
     } catch (err) {
       setError(err.message);
@@ -142,14 +158,22 @@ function DatasourcesPage() {
 
     // Sort
     result.sort((a, b) => {
-      let aVal = a[sortKey] || '';
-      let bVal = b[sortKey] || '';
+      let aVal, bVal;
+
+      // Handle charts count sorting
+      if (sortKey === 'charts') {
+        aVal = chartCounts[a.id] || 0;
+        bVal = chartCounts[b.id] || 0;
+      } else {
+        aVal = a[sortKey] || '';
+        bVal = b[sortKey] || '';
+      }
 
       // Handle date sorting
       if (sortKey === 'updated_at') {
         aVal = new Date(aVal).getTime() || 0;
         bVal = new Date(bVal).getTime() || 0;
-      } else {
+      } else if (sortKey !== 'charts') {
         aVal = String(aVal).toLowerCase();
         bVal = String(bVal).toLowerCase();
       }
@@ -160,11 +184,12 @@ function DatasourcesPage() {
     });
 
     return result;
-  }, [datasources, searchTerm, sortKey, sortDirection]);
+  }, [datasources, chartCounts, searchTerm, sortKey, sortDirection]);
 
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
     { key: 'type', header: 'Type', isSortable: true },
+    { key: 'charts', header: 'Charts', isSortable: true },
     { key: 'description', header: 'Description', isSortable: false },
     { key: 'updated_at', header: 'Last modified', isSortable: true },
     { key: 'actions', header: '', isSortable: false }
@@ -174,6 +199,7 @@ function DatasourcesPage() {
     id: datasource.id,
     name: datasource.name,
     type: datasource.type,
+    charts: chartCounts[datasource.id] || 0,
     description: datasource.description || '',
     updated_at: formatDate(datasource.updated_at)
   }));
@@ -286,6 +312,13 @@ function DatasourcesPage() {
                           {datasource.type?.toUpperCase() || 'N/A'}
                         </Tag>
                       </div>
+
+                      {chartCounts[datasource.id] > 0 && (
+                        <div className="tile-charts">
+                          <ChartLineSmooth size={14} />
+                          <span>{chartCounts[datasource.id]} chart{chartCounts[datasource.id] !== 1 ? 's' : ''}</span>
+                        </div>
+                      )}
 
                       <div className="tile-date">
                         Updated: {formatDate(datasource.updated_at)}

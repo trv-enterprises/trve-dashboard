@@ -75,13 +75,18 @@ function AIChartPreview({ chart, onNameChange }) {
     fetchDatasourceInfo();
   }, [chart?.datasource_id]);
 
+  // Check if chart component fetches its own data (has useData embedded)
+  // If so, we don't need to fetch data ourselves - the component will do it
+  const chartFetchesOwnData = chart?.component_code?.includes('useData(');
+
   // Auto-run query when datasource or query config changes
+  // Only fetch if the chart expects data as a prop (doesn't have useData embedded)
   useEffect(() => {
-    if (chart?.datasource_id) {
-      console.log('[AIChartPreview] Auto-running query due to chart update - datasource:', chart.datasource_id);
+    if (chart?.datasource_id && !chartFetchesOwnData) {
+      console.log('[AIChartPreview] Auto-running query - chart expects data as prop');
       runQuery();
     }
-  }, [chart?.datasource_id, chart?.query_config?.raw]);
+  }, [chart?.datasource_id, chart?.query_config?.raw, chartFetchesOwnData]);
 
   // Handle name editing
   const startEditName = () => {
@@ -365,7 +370,7 @@ function AIChartPreview({ chart, onNameChange }) {
               <div className="chart-preview-container">
                 <DynamicComponentLoader
                   code={chart.component_code}
-                  props={{ data: transformedData }}
+                  props={chartFetchesOwnData ? {} : { data: transformedData }}
                 />
               </div>
             ) : (

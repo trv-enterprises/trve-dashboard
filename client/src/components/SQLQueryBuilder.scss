@@ -221,10 +221,12 @@
   // LIMIT row
   .limit-row {
     display: flex;
-    gap: spacing.$spacing-03;
+    gap: spacing.$spacing-07;
+    align-items: flex-end;
 
-    .cds--number {
-      flex: 1;
+    .compact-limit-input {
+      width: 150px;
+      flex: 0 0 auto;
     }
   }
 

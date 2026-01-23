@@ -17,7 +17,8 @@ type Chart struct {
 	ID            string                 `json:"id" bson:"id"`                           // UUID - same across versions
 	Version       int                    `json:"version" bson:"version"`                 // Version number (1, 2, 3...)
 	Status        string                 `json:"status" bson:"status"`                   // "draft" | "final"
-	Name          string                 `json:"name" bson:"name" binding:"required"`
+	Name          string                 `json:"name" bson:"name" binding:"required"`    // Unique identifier
+	Title         string                 `json:"title" bson:"title"`                     // Display title (defaults to Name if empty)
 	Description   string                 `json:"description" bson:"description"`
 	ChartType     string                 `json:"chart_type" bson:"chart_type"`           // bar, line, pie, gauge, etc.
 	DatasourceID  string                 `json:"datasource_id" bson:"datasource_id"`     // Reference to data source
@@ -37,6 +38,7 @@ type Chart struct {
 // @Description Request body for creating a new chart
 type CreateChartRequest struct {
 	Name          string                 `json:"name" binding:"required"`
+	Title         string                 `json:"title"`
 	Description   string                 `json:"description"`
 	ChartType     string                 `json:"chart_type"`
 	DatasourceID  string                 `json:"datasource_id"`
@@ -53,6 +55,7 @@ type CreateChartRequest struct {
 // @Description Request body for updating an existing chart
 type UpdateChartRequest struct {
 	Name          *string                 `json:"name,omitempty"`
+	Title         *string                 `json:"title,omitempty"`
 	Description   *string                 `json:"description,omitempty"`
 	ChartType     *string                 `json:"chart_type,omitempty"`
 	DatasourceID  *string                 `json:"datasource_id,omitempty"`

@@ -142,6 +142,11 @@ button.cds--header__action {
   }
 }
 
+// Header name adjustment when no nav toggle (View mode)
+.header-name--no-toggle {
+  padding-left: spacing.$spacing-05;
+}
+
 // Header layout groups
 .header-mode-group {
   display: flex;

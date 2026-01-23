@@ -69,6 +69,8 @@ function AppContent() {
           const savedUser = savedGuid ? response.users.find(u => u.guid === savedGuid) : null;
           if (savedUser) {
             setCurrentUser(savedUser);
+            // Sync the API client with the restored user
+            apiClient.setCurrentUser(savedUser.guid);
           } else if (response.users.length > 0) {
             // Default to first user (Admin)
             handleUserChange(response.users[0]);
@@ -168,18 +170,21 @@ function AppContent() {
       <HeaderContainer
         render={() => (
           <Header aria-label="My Dashboard">
-            <button
-              className="nav-toggle-button"
-              aria-label={isSideNavExpanded ? 'Close menu' : 'Open menu'}
-              onClick={() => setIsSideNavExpanded(!isSideNavExpanded)}
-              type="button"
-            >
-              {isSideNavExpanded ? <Close size={20} /> : <Menu size={20} />}
-            </button>
-            <HeaderName href="/" prefix="">
+            {/* Only show nav toggle in Design/Manage modes (View mode has no sidebar) */}
+            {currentMode !== MODES.VIEW && (
+              <button
+                className="nav-toggle-button"
+                aria-label={isSideNavExpanded ? 'Close menu' : 'Open menu'}
+                onClick={() => setIsSideNavExpanded(!isSideNavExpanded)}
+                type="button"
+              >
+                {isSideNavExpanded ? <Close size={20} /> : <Menu size={20} />}
+              </button>
+            )}
+            <HeaderName href="/" prefix="" className={currentMode === MODES.VIEW ? 'header-name--no-toggle' : ''}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem' }}>
                 <ChartMultitype size={20} />
-                <span>GiVi Dashboards (Build {buildInfo.buildNumber})</span>
+                <span>TRVE Dashboards</span>
               </div>
             </HeaderName>
             <div className="header-mode-group">
@@ -190,7 +195,7 @@ function AppContent() {
               />
             </div>
             <HeaderGlobalBar>
-              <HeaderGlobalAction aria-label="Help">
+              <HeaderGlobalAction aria-label={`Help - Build ${buildInfo.buildNumber}`} tooltipAlignment="end">
                 <Help size={20} />
               </HeaderGlobalAction>
               <HeaderGlobalAction aria-label="App Switcher">
@@ -261,7 +266,7 @@ function AppContent() {
 
           {/* View Mode Routes */}
           <Route path="/view/dashboards" element={<DashboardTileViewPage />} />
-          <Route path="/view/dashboards/:id" element={<DashboardViewerPage />} />
+          <Route path="/view/dashboards/:id" element={<DashboardViewerPage canDesign={userCapabilities.can_design} />} />
 
           {/* Manage Mode Routes */}
           <Route path="/manage" element={<Navigate to="/manage/users" replace />} />

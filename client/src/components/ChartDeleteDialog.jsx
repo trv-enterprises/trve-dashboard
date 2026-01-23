@@ -74,7 +74,12 @@ function ChartDeleteDialog({ open, chart, onClose, onDelete }) {
   // Determine dialog type
   const isDraft = versionInfo?.status === 'draft';
   const hasMultipleVersions = versionInfo?.version_count > 1;
-  const hasPreviousVersion = versionInfo?.previous_version > 0;
+  // For drafts, previous version is version - 1 (if > 0)
+  // For final versions, previous version is version - 1 (if > 1)
+  const previousVersion = isDraft
+    ? (versionInfo?.version > 0 ? versionInfo.version - 1 : 0)
+    : (versionInfo?.version > 1 ? versionInfo.version - 1 : 0);
+  const hasPreviousVersion = previousVersion > 0;
 
   // Dialog content based on type
   const getDialogContent = () => {
@@ -100,7 +105,7 @@ function ChartDeleteDialog({ open, chart, onClose, onDelete }) {
         <div className="delete-dialog-content">
           <p>
             This will discard your draft changes to <strong>"{chart?.name}"</strong> and
-            revert to the previous saved version (v{versionInfo.previous_version}).
+            revert to the previous saved version (v{previousVersion}).
           </p>
         </div>
       );
@@ -135,7 +140,7 @@ function ChartDeleteDialog({ open, chart, onClose, onDelete }) {
                 <span className="radio-label">
                   <strong>Delete this version only (v{versionInfo.version})</strong>
                   <span className="radio-description">
-                    Reverts to previous version (v{versionInfo.previous_version})
+                    Reverts to previous version (v{previousVersion})
                   </span>
                 </span>
               }
@@ -171,7 +176,7 @@ function ChartDeleteDialog({ open, chart, onClose, onDelete }) {
 
   const getHeading = () => {
     if (isDraft && hasPreviousVersion) {
-      return 'Discard draft?';
+      return `Discard draft and restore v${previousVersion}?`;
     }
     return `Delete "${chart?.name || 'Chart'}"`;
   };

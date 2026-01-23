@@ -113,7 +113,9 @@ func (ba *BucketAggregator) Stop() {
 
 // Subscribe adds a subscriber and returns a channel for receiving aggregated records
 func (ba *BucketAggregator) Subscribe() chan models.Record {
-	ch := make(chan models.Record, 10)
+	// Buffer size 100 to match raw stream subscriber buffers
+	// Prevents silent drops when frontend processing is slow
+	ch := make(chan models.Record, 100)
 
 	ba.subMu.Lock()
 	ba.subscribers[ch] = struct{}{}

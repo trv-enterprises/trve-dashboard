@@ -139,15 +139,15 @@ const Component = ({ data }) => {
 
   const option = {
     backgroundColor: 'transparent',
-    title: { text: 'Chart Title', top: 8, left: 'center', textStyle: { color: '#f4f4f4', fontSize: 16 } },
-    legend: { top: 28, left: 'center', textStyle: { color: '#c6c6c6' } },
+    title: { text: 'Chart Title', top: '1%', left: 'center', textStyle: { color: '#f4f4f4', fontSize: 16 } },
+    legend: { top: '8%', left: 'center', textStyle: { color: '#c6c6c6' } },
     tooltip: {
       trigger: 'axis',
       backgroundColor: '#262626',
       borderColor: '#393939',
       textStyle: { color: '#f4f4f4' }
     },
-    grid: { left: '3%', right: '4%', bottom: '3%', top: 60, containLabel: true },
+    grid: { left: '1.5%', right: '2%', bottom: '1.5%', top: '15%', containLabel: true },
     xAxis: {
       type: 'category',
       data: chartData.map(d => formatTimestamp(d.timestamp, 'chart_time')),
@@ -192,10 +192,10 @@ const Component = ({ data }) => {
 
   const option = {
     backgroundColor: 'transparent',
-    title: { text: 'Bar Chart', top: 8, left: 'center', textStyle: { color: '#f4f4f4', fontSize: 16 } },
-    legend: { top: 28, left: 'center', textStyle: { color: '#c6c6c6' } },
+    title: { text: 'Bar Chart', top: '1%', left: 'center', textStyle: { color: '#f4f4f4', fontSize: 16 } },
+    legend: { top: '8%', left: 'center', textStyle: { color: '#c6c6c6' } },
     tooltip: { trigger: 'axis', backgroundColor: '#262626', textStyle: { color: '#f4f4f4' } },
-    grid: { left: '3%', right: '4%', bottom: '3%', top: 60, containLabel: true },
+    grid: { left: '1.5%', right: '2%', bottom: '1.5%', top: '15%', containLabel: true },
     xAxis: {
       type: 'category',
       data: chartData.map(d => d.category || d.name),
@@ -217,35 +217,79 @@ const Component = ({ data }) => {
 };
 ` + "```" + `
 
-### Gauge Chart
+### Gauge Chart (Responsive)
 ` + "```" + `javascript
 const Component = ({ data }) => {
+  const containerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 200, height: 200 });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      // Only update if size changed by more than 1px to prevent resize loops
+      setContainerSize(prev => {
+        if (Math.abs(prev.width - width) > 1 || Math.abs(prev.height - height) > 1) {
+          return { width, height };
+        }
+        return prev;
+      });
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   // Get single value from columnar data
   const value = getValue(data, 'value') || 0;
 
+  // Calculate responsive sizes based on container - all proportional, no minimums
+  const minDim = Math.min(containerSize.width, containerSize.height);
+  const baseFontSize = Math.floor(minDim * 0.12);
+  const titleFontSize = Math.floor(minDim * 0.08);
+  const labelFontSize = Math.floor(minDim * 0.06);
+  // Arc thickness: 1-16% of minDim (default 8%). Adjust multiplier as needed.
+  const axisLineWidth = Math.floor(minDim * 0.08);
+
+  // Calculate title space as percentage of container height (for charts with title)
+  const hasTitle = true; // Set to false if no title
+  const titleHeightPercent = hasTitle ? Math.max(12, (titleFontSize / containerSize.height) * 100 + 5) : 0;
+  const gaugeCenter = ['50%', String(50 + titleHeightPercent / 2) + '%'];
+  const gaugeRadius = String(90 - titleHeightPercent) + '%';
+
   const option = {
     backgroundColor: 'transparent',
+    title: { text: 'CPU Usage', left: 'center', top: '2%', textStyle: { color: '#f4f4f4', fontSize: titleFontSize } },
     series: [{
       type: 'gauge',
-      detail: { formatter: '{value}%', color: '#f4f4f4', fontSize: 20 },
+      min: 0,
+      max: 100,
+      center: gaugeCenter,
+      radius: gaugeRadius,
+      progress: { show: false },
+      detail: { formatter: '{value}%', color: '#f4f4f4', fontSize: baseFontSize, offsetCenter: [0, '70%'] },
       data: [{ value: Number(value).toFixed(1), name: 'Usage' }],
-      title: { color: '#c6c6c6' },
+      title: { show: false },
       axisLine: {
         lineStyle: {
+          width: axisLineWidth,
           color: [
             [0.7, '#24a148'],  // green under 70%
             [0.9, '#f1c21b'],  // yellow 70-90%
             [1, '#da1e28']     // red above 90%
-          ],
-          width: 10
+          ]
         }
       },
-      axisLabel: { color: '#c6c6c6' },
+      axisLabel: { color: '#999', fontSize: labelFontSize },
+      axisTick: { show: false },
       pointer: { itemStyle: { color: '#f4f4f4' } }
     }]
   };
 
-  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />;
+  return (
+    <div ref={containerRef} style={{ height: '100%', width: '100%' }}>
+      <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
+    </div>
+  );
 };
 ` + "```" + `
 
@@ -258,12 +302,13 @@ const Component = ({ data }) => {
 
   const option = {
     backgroundColor: 'transparent',
-    title: { text: 'Distribution', top: 8, left: 'center', textStyle: { color: '#f4f4f4', fontSize: 16 } },
-    legend: { top: 28, left: 'center', textStyle: { color: '#c6c6c6' } },
+    title: { text: 'Distribution', top: '2%', left: 'center', textStyle: { color: '#f4f4f4', fontSize: 16 } },
+    legend: { top: '10%', left: 'center', textStyle: { color: '#c6c6c6' } },
     tooltip: { trigger: 'item', backgroundColor: '#262626', textStyle: { color: '#f4f4f4' } },
     series: [{
       type: 'pie',
-      radius: '60%',
+      radius: '55%',
+      center: ['50%', '58%'],
       data: chartData.map(d => ({ name: d.name || d.category, value: d.value })),
       label: { color: '#c6c6c6' },
       itemStyle: { borderColor: '#161616', borderWidth: 2 }

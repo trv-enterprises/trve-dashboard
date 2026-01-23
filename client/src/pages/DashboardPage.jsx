@@ -100,10 +100,10 @@ function DashboardPage() {
       }
     },
     grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      top: '15%',
+      left: '1.5%',
+      right: '2%',
+      bottom: '1.5%',
+      top: '7.5%',
       containLabel: true
     },
     xAxis: {

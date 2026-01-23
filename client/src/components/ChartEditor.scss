@@ -218,6 +218,12 @@
       color: #f4f4f4 !important;
       border: 1px solid #525252 !important;
       border-radius: 4px;
+
+      // Compact mode for API datasources (single line, expandable)
+      &.query-textarea--compact {
+        min-height: 40px;
+        resize: vertical;
+      }
     }
 
     .query-header-actions {
@@ -249,6 +255,12 @@
       font-size: 0.875rem;
       font-weight: 600;
       margin: 0 0 spacing.$spacing-04 0;
+    }
+
+    .mapping-hint {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      margin: 0;
     }
 
     // Grid should use full width - remove Carbon Grid padding
@@ -295,6 +307,50 @@
       font-size: 0.875rem;
       font-style: italic;
       margin: 0;
+    }
+  }
+
+  // Chart options section (gauge, pie, bar/line/area)
+  .chart-options-section {
+    margin-top: spacing.$spacing-05;
+    padding: spacing.$spacing-04;
+    background-color: var(--cds-layer-01);
+    border-radius: 4px;
+
+    h4 {
+      color: var(--cds-text-primary);
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin: 0 0 spacing.$spacing-04 0;
+    }
+
+    // Grid should use full width
+    .cds--grid {
+      padding-left: 0;
+      padding-right: 0;
+      margin-left: 0;
+      margin-right: 0;
+      max-width: none;
+
+      .cds--col,
+      [class*="cds--col-"] {
+        flex: 1 1 0;
+        max-width: none;
+      }
+    }
+
+    // NumberInput styling
+    .cds--number-input-wrapper {
+      .cds--number__input-wrapper {
+        input {
+          background-color: var(--cds-field-01);
+        }
+      }
+    }
+
+    // Toggle styling for better alignment
+    .cds--toggle {
+      margin-top: spacing.$spacing-05;
     }
   }
 
@@ -385,6 +441,19 @@
       margin-top: spacing.$spacing-04;
       padding-top: spacing.$spacing-04;
       border-top: 1px solid var(--cds-border-subtle-01);
+    }
+
+    // Compact number input for limit field
+    .compact-number-input {
+      max-width: 100px;
+
+      .cds--number__input-wrapper {
+        min-width: 60px;
+      }
+
+      input {
+        min-width: 50px;
+      }
     }
   }
 
@@ -677,6 +746,28 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: spacing.$spacing-03;
+
+    .code-switcher {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-03;
+
+      .code-switcher-label {
+        color: var(--cds-text-secondary);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .cds--content-switcher {
+        min-width: 180px;
+
+        .cds--content-switcher-btn {
+          min-width: 90px;
+        }
+      }
+    }
 
     .code-help {
       color: var(--cds-text-secondary);

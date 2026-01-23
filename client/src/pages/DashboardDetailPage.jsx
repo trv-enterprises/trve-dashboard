@@ -16,7 +16,8 @@ import {
   OverflowMenuItem,
   MenuButton,
   MenuItem,
-  Tooltip
+  Tooltip,
+  Slider
 } from '@carbon/react';
 import {
   Save,
@@ -78,6 +79,7 @@ function DashboardDetailPage() {
   const [chartsMap, setChartsMap] = useState({}); // Chart data keyed by chart_id (for rendering)
   const [theme, setTheme] = useState('dark');
   const [refreshInterval, setRefreshInterval] = useState(0);
+  const [titleScale, setTitleScale] = useState(100); // Title font scale % (50-200)
   const [isPublic, setIsPublic] = useState(false);
   const [allowExport, setAllowExport] = useState(true);
 
@@ -262,6 +264,7 @@ function DashboardDetailPage() {
       setDescription(data.description || '');
       setTheme(data.settings?.theme || 'dark');
       setRefreshInterval(data.settings?.refresh_interval || 0);
+      setTitleScale(data.settings?.title_scale || 100);
       setIsPublic(data.settings?.is_public || false);
       setAllowExport(data.settings?.allow_export !== false);
 
@@ -835,6 +838,7 @@ function DashboardDetailPage() {
         settings: {
           theme,
           refresh_interval: refreshInterval,
+          title_scale: titleScale,
           is_public: isPublic,
           allow_export: allowExport,
           layout_dimension: currentDimension // Save the dimension preset with the dashboard
@@ -916,7 +920,7 @@ function DashboardDetailPage() {
             kind="primary"
             renderIcon={Save}
             onClick={() => setShowSaveModal(true)}
-            disabled={!name}
+            disabled={!name || !hasChanges}
             size="md"
           >
             Save Dashboard
@@ -990,6 +994,20 @@ function DashboardDetailPage() {
               max={3600}
               step={5}
               helperText="Set to 0 to disable auto refresh"
+            />
+          </div>
+          <div className="form-column">
+            <Slider
+              id="title-scale"
+              labelText="Title Scale (%)"
+              value={titleScale}
+              onChange={({ value }) => {
+                setTitleScale(value);
+                setHasChanges(true);
+              }}
+              min={50}
+              max={200}
+              step={10}
             />
           </div>
         </div>
@@ -1107,6 +1125,7 @@ function DashboardDetailPage() {
               '--cell-width': `${CELL_WIDTH}px`,
               '--grid-visible-width': `${GRID_COLS * CELL_WIDTH}px`,
               '--grid-visible-height': `${GRID_ROWS * CELL_HEIGHT}px`,
+              '--title-scale': titleScale / 100,
               transform: `scale(${zoom / 100})`,
               transformOrigin: 'top left'
             }}
@@ -1144,7 +1163,7 @@ function DashboardDetailPage() {
                     }}
                     style={{ cursor: isDesignMode ? 'move' : 'default' }}
                   >
-                    <span className="panel-id">{chart?.name || panel.id}</span>
+                    <span className="panel-id">{chart?.title || chart?.name || panel.id}</span>
                     <div className="panel-header-right">
                       <span className="panel-size">{panel.w}×{panel.h}</span>
                       {isDesignMode && (
@@ -1172,6 +1191,7 @@ function DashboardDetailPage() {
                           props={{}}
                           dataMapping={chart.data_mapping}
                           datasourceId={chart.datasource_id}
+                          queryConfig={chart.query_config}
                         />
                       </div>
                     ) : isDesignMode ? (
@@ -1180,7 +1200,7 @@ function DashboardDetailPage() {
                           <div className="chart-info">
                             <div className="chart-title">
                               <ChartBar size={20} />
-                              <span className="chart-name">{chart.name}</span>
+                              <span className="chart-name">{chart.title || chart.name}</span>
                             </div>
                             <MenuButton
                               label="Edit"

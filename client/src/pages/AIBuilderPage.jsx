@@ -50,6 +50,7 @@ function AIBuilderPage() {
 
   const [input, setInput] = useState('');
   const [chartName, setChartName] = useState('');
+  const [chartNameInitialized, setChartNameInitialized] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -83,12 +84,13 @@ function AIBuilderPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, thinking]);
 
-  // Update chart name from chart data
+  // Update chart name from chart data (only initialize once)
   useEffect(() => {
-    if (chart?.name && !chartName) {
+    if (chart?.name && !chartNameInitialized) {
       setChartName(chart.name);
+      setChartNameInitialized(true);
     }
-  }, [chart?.name, chartName]);
+  }, [chart?.name, chartNameInitialized]);
 
   const handleSend = useCallback(() => {
     if (input.trim() && !sending) {
@@ -120,7 +122,24 @@ function AIBuilderPage() {
   };
 
   const handleDiscard = async () => {
+    // For existing charts being edited, we need to delete the draft
+    // Strategy: Delete draft by chart ID FIRST (catches orphaned drafts from previous sessions),
+    // THEN cancel the current session (cleans up session state in Redis)
+
+    // First, try to delete draft directly by chart ID
+    // This catches orphaned drafts from previous sessions that weren't properly cleaned up
+    if (!isNewChart && chartId) {
+      try {
+        await apiClient.deleteChartDraft(chartId);
+      } catch {
+        // 404 is expected if no draft exists - ignore silently
+      }
+    }
+
+    // Then cancel the current session (cleans up session in Redis, notifies WebSocket)
+    // Note: This may also try to delete the draft, but it will be a no-op if already deleted
     await cancelSession();
+
     navigate(returnPath);
   };
 

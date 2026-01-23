@@ -37,7 +37,7 @@ import './DashboardViewerPage.scss';
  * - panels: Array of {id, x, y, w, h, chart_id} - panel positions with chart references
  * - Charts are fetched separately by chart_id
  */
-function DashboardViewerPage() {
+function DashboardViewerPage({ canDesign = false }) {
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -291,21 +291,23 @@ function DashboardViewerPage() {
           >
             {reduceToFit ? <CenterToFit size={20} /> : <FitToScreen size={20} />}
           </IconButton>
-          <OverflowMenu
-            renderIcon={() => <Edit size={20} />}
-            flipped
-            direction="bottom"
-            iconDescription="Dashboard actions"
-          >
-            <OverflowMenuItem
-              itemText="Edit"
-              onClick={() => navigate(`/design/dashboards/${id}`, { state: { from: `/view/dashboards/${id}` } })}
-            />
-            <OverflowMenuItem
-              itemText="Save Thumbnail"
-              onClick={saveThumbnail}
-            />
-          </OverflowMenu>
+          {canDesign && (
+            <OverflowMenu
+              renderIcon={() => <Edit size={20} />}
+              flipped
+              direction="bottom"
+              iconDescription="Dashboard actions"
+            >
+              <OverflowMenuItem
+                itemText="Edit"
+                onClick={() => navigate(`/design/dashboards/${id}`, { state: { from: `/view/dashboards/${id}` } })}
+              />
+              <OverflowMenuItem
+                itemText="Save Thumbnail"
+                onClick={saveThumbnail}
+              />
+            </OverflowMenu>
+          )}
         </div>
       </div>
 
@@ -320,7 +322,8 @@ function DashboardViewerPage() {
                 : `repeat(${maxGridCol}, ${CELL_WIDTH}px)`,
               gridTemplateRows: reduceToFit
                 ? `repeat(${maxGridRow}, 1fr)`
-                : `repeat(${maxGridRow}, ${CELL_HEIGHT}px)`
+                : `repeat(${maxGridRow}, ${CELL_HEIGHT}px)`,
+              '--title-scale': (dashboard?.settings?.title_scale || 100) / 100
             }}
           >
             {dashboard.panels.map((panel) => {
@@ -343,7 +346,7 @@ function DashboardViewerPage() {
                       {/* Show header only for datatable type (no built-in title) */}
                       {chart.chart_type === 'datatable' && (
                         <div className="chart-header">
-                          <span className="chart-name">{chart.name || 'Untitled Chart'}</span>
+                          <span className="chart-name">{chart.title || chart.name || 'Untitled Chart'}</span>
                         </div>
                       )}
                       <div className={`component-wrapper ${chart.chart_type === 'datatable' ? 'with-header' : ''}`}>
@@ -352,6 +355,7 @@ function DashboardViewerPage() {
                           props={{}}
                           dataMapping={chart.data_mapping}
                           datasourceId={chart.datasource_id}
+                          queryConfig={chart.query_config}
                           dataRefreshInterval={dashboard?.settings?.refresh_interval > 0 ? dashboard.settings.refresh_interval * 1000 : null}
                         />
                       </div>

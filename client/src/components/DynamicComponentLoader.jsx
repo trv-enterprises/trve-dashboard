@@ -18,7 +18,8 @@ import {
   TableToolbar,
   TableToolbarContent,
   TableToolbarSearch,
-  Loading
+  Loading,
+  InlineNotification
 } from '@carbon/react';
 
 // Context to provide transforms to child components
@@ -74,7 +75,7 @@ function useDataWithTransforms(params) {
  * - Carbon DataTable components: DataTable, Table, TableHead, TableRow, TableHeader,
  *   TableBody, TableCell, TableContainer, TableToolbar, TableToolbarContent, TableToolbarSearch
  */
-export default function DynamicComponentLoader({ code, props = {}, dataMapping = null, datasourceId = null, dataRefreshInterval = null }) {
+export default function DynamicComponentLoader({ code, props = {}, dataMapping = null, datasourceId = null, queryConfig = null, dataRefreshInterval = null }) {
   const [error, setError] = useState(null);
   const [Component, setComponent] = useState(null);
 
@@ -105,10 +106,12 @@ export default function DynamicComponentLoader({ code, props = {}, dataMapping =
     loading: dataLoading,
     error: dataError,
     isStreaming,
-    isAggregated
+    isAggregated,
+    reconnecting,
+    disconnectedSince
   } = useDataOriginal({
     datasourceId: shouldFetchData ? effectiveDatasourceId : null,
-    query: dataMapping?.query_config || { raw: '', type: 'sql' },
+    query: queryConfig || dataMapping?.query_config || { raw: '', type: 'sql' },
     refreshInterval: dataRefreshInterval,
     useCache: true,
     timeBucket: timeBucketConfig
@@ -266,17 +269,18 @@ export default function DynamicComponentLoader({ code, props = {}, dataMapping =
     );
   }
 
-  // If we're fetching data ourselves and there's an error
+  // If we're fetching data ourselves and there's an error (and no data to show)
   if (shouldFetchData && dataError && !transformedFetchedData) {
     return (
-      <div style={{
-        padding: '20px',
-        border: '1px solid #da1e28',
-        borderRadius: '4px',
-        backgroundColor: 'rgba(218, 30, 40, 0.1)',
-        color: '#fa4d56'
-      }}>
-        <p style={{ margin: 0, fontSize: '14px' }}>Data Error: {dataError.message || 'Failed to fetch data'}</p>
+      <div style={{ padding: '8px', height: '100%', display: 'flex', alignItems: 'center' }}>
+        <InlineNotification
+          kind="error"
+          title="Data Error"
+          subtitle={dataError.message || 'Failed to fetch data'}
+          lowContrast
+          hideCloseButton
+          style={{ maxWidth: '100%', minWidth: 'auto' }}
+        />
       </div>
     );
   }
@@ -286,10 +290,55 @@ export default function DynamicComponentLoader({ code, props = {}, dataMapping =
     ? { ...props, data: transformedFetchedData }
     : props;
 
+  // Show overlay error when reconnecting but we have existing data
+  const showReconnectOverlay = shouldFetchData && dataError && transformedFetchedData && reconnecting;
+
   return (
     <TransformsContext.Provider value={transforms}>
-      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         <Component {...finalProps} />
+        {/* Overlay for connection errors when we still have data to display */}
+        {showReconnectOverlay && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(22, 22, 22, 0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10
+          }}>
+            <div style={{
+              padding: '16px 24px',
+              borderRadius: '4px',
+              backgroundColor: 'rgba(218, 30, 40, 0.15)',
+              border: '1px solid rgba(218, 30, 40, 0.5)',
+              textAlign: 'center',
+              maxWidth: '90%'
+            }}>
+              <p style={{
+                margin: 0,
+                fontSize: '14px',
+                color: '#fa4d56',
+                fontWeight: 500
+              }}>
+                {dataError.message || 'Connection lost, retrying...'}
+              </p>
+              {disconnectedSince && (
+                <p style={{
+                  margin: '8px 0 0 0',
+                  fontSize: '12px',
+                  color: '#c6c6c6'
+                }}>
+                  Disconnected since {new Date(disconnectedSince).toLocaleTimeString()}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </TransformsContext.Provider>
   );

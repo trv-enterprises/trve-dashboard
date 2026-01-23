@@ -343,10 +343,9 @@ func (s *AISessionService) CancelSession(ctx context.Context, sessionID string) 
 		return fmt.Errorf("session not found")
 	}
 
-	// Delete the draft
-	if err := s.chartRepo.DeleteVersion(ctx, session.ChartID, session.ChartVersion); err != nil {
-		return fmt.Errorf("error deleting draft: %w", err)
-	}
+	// Delete the draft - ignore errors if draft was already deleted
+	// This can happen if the frontend deleted it first via /api/charts/:id/draft
+	_ = s.chartRepo.DeleteVersion(ctx, session.ChartID, session.ChartVersion)
 
 	// Mark session as cancelled
 	if err := s.sessionRepo.UpdateStatus(ctx, sessionID, models.AISessionStatusCancelled); err != nil {

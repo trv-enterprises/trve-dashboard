@@ -15,7 +15,8 @@ import {
   InlineNotification,
   Button,
   NumberInput,
-  IconButton
+  IconButton,
+  Slider
 } from '@carbon/react';
 import { Play, Add, TrashCan, ChartBar, Code, TableSplit } from '@carbon/icons-react';
 import DynamicComponentLoader from './DynamicComponentLoader';
@@ -67,6 +68,107 @@ const AGGREGATION_TYPES = [
   { id: 'limit', label: 'Limit Rows', needsCount: true }
 ];
 
+// Chart type configuration - defines which fields are applicable for each chart type
+const CHART_TYPE_CONFIG = {
+  bar: {
+    hasXAxis: true,
+    hasYAxis: true,
+    multipleYAxis: true,
+    hasSeriesColumn: true,
+    hasAxisLabels: true,
+    hasXAxisFormat: true,
+    hasTimeBucket: true,
+    hasSortLimit: true,
+    xAxisLabel: 'X-Axis (Categories)',
+    yAxisLabel: 'Y-Axis (Values)',
+  },
+  line: {
+    hasXAxis: true,
+    hasYAxis: true,
+    multipleYAxis: true,
+    hasSeriesColumn: true,
+    hasAxisLabels: true,
+    hasXAxisFormat: true,
+    hasTimeBucket: true,
+    hasSortLimit: true,
+    xAxisLabel: 'X-Axis (Categories)',
+    yAxisLabel: 'Y-Axis (Values)',
+  },
+  area: {
+    hasXAxis: true,
+    hasYAxis: true,
+    multipleYAxis: true,
+    hasSeriesColumn: true,
+    hasAxisLabels: true,
+    hasXAxisFormat: true,
+    hasTimeBucket: true,
+    hasSortLimit: true,
+    xAxisLabel: 'X-Axis (Categories)',
+    yAxisLabel: 'Y-Axis (Values)',
+  },
+  pie: {
+    hasXAxis: true,
+    hasYAxis: true,
+    multipleYAxis: false,
+    hasSeriesColumn: false,
+    hasAxisLabels: false,
+    hasXAxisFormat: true,
+    hasTimeBucket: false,
+    hasSortLimit: true,
+    xAxisLabel: 'Category Column',
+    yAxisLabel: 'Value Column',
+  },
+  scatter: {
+    hasXAxis: true,
+    hasYAxis: true,
+    multipleYAxis: false,
+    hasSeriesColumn: false,
+    hasAxisLabels: true,
+    hasXAxisFormat: false,
+    hasTimeBucket: false,
+    hasSortLimit: true,
+    xAxisLabel: 'X-Axis (Numeric)',
+    yAxisLabel: 'Y-Axis (Numeric)',
+  },
+  gauge: {
+    hasXAxis: false,
+    hasYAxis: true,
+    multipleYAxis: false,
+    hasSeriesColumn: false,
+    hasAxisLabels: false,
+    hasXAxisFormat: false,
+    hasTimeBucket: true,
+    hasSortLimit: false,
+    xAxisLabel: '',
+    yAxisLabel: 'Value Column',
+  },
+  dataview: {
+    hasXAxis: false,
+    hasYAxis: false,
+    multipleYAxis: false,
+    hasSeriesColumn: false,
+    hasAxisLabels: false,
+    hasXAxisFormat: false,
+    hasTimeBucket: false,
+    hasSortLimit: true,
+    hasVisibleColumns: true,
+    xAxisLabel: '',
+    yAxisLabel: '',
+  },
+  custom: {
+    hasXAxis: true,
+    hasYAxis: true,
+    multipleYAxis: true,
+    hasSeriesColumn: true,
+    hasAxisLabels: true,
+    hasXAxisFormat: true,
+    hasTimeBucket: true,
+    hasSortLimit: true,
+    xAxisLabel: 'X-Axis',
+    yAxisLabel: 'Y-Axis',
+  },
+};
+
 /**
  * ChartEditor Component
  *
@@ -95,6 +197,7 @@ const ChartEditor = forwardRef(function ChartEditor({
   // Basic info
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState('');
+  const [title, setTitle] = useState(''); // Display title (defaults to name)
   const [description, setDescription] = useState('');
   const [chartType, setChartType] = useState('bar');
 
@@ -135,6 +238,11 @@ const ChartEditor = forwardRef(function ChartEditor({
   const [timeBucketValueCols, setTimeBucketValueCols] = useState([]);
   const [timeBucketTimestampCol, setTimeBucketTimestampCol] = useState('');
 
+  // TSStore query configuration
+  const [tsstoreQueryType, setTsstoreQueryType] = useState('since'); // since, newest, oldest
+  const [tsstoreLimit, setTsstoreLimit] = useState(100);
+  const [tsstoreSinceDuration, setTsstoreSinceDuration] = useState('1h'); // e.g., "30m", "2h", "7d"
+
   // Preview data
   const [previewData, setPreviewData] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -144,6 +252,23 @@ const ChartEditor = forwardRef(function ChartEditor({
   // Code editor
   const [componentCode, setComponentCode] = useState('');
   const [showCustomCode, setShowCustomCode] = useState(false);
+
+  // Chart-specific options (gauge thresholds, pie radius, etc.)
+  const [chartOptions, setChartOptions] = useState({
+    // Gauge options
+    gaugeMin: 0,
+    gaugeMax: 100,
+    gaugeWarningThreshold: 70,  // Where yellow zone starts (%)
+    gaugeDangerThreshold: 90,   // Where red zone starts (%)
+    gaugeUnit: '',              // Unit suffix (e.g., '°F', '%')
+    // Pie options
+    pieInnerRadius: 0,          // 0 = pie, >0 = donut
+    pieShowLabels: true,
+    // Bar/Line/Area options
+    chartStacked: false,
+    chartSmooth: true,
+    chartShowDataLabels: false,
+  });
 
   // Query mode: 'visual' for SQLQueryBuilder, 'raw' for TextArea
   const [queryMode, setQueryMode] = useState('raw');
@@ -155,6 +280,61 @@ const ChartEditor = forwardRef(function ChartEditor({
 
   // Ref for thumbnail capture
   const previewRef = useRef(null);
+
+  // Get current chart type configuration
+  const chartTypeConfig = useMemo(() => {
+    return CHART_TYPE_CONFIG[chartType] || CHART_TYPE_CONFIG.custom;
+  }, [chartType]);
+
+  // Clear irrelevant fields when chart type changes
+  const handleChartTypeChange = (newType) => {
+    const newConfig = CHART_TYPE_CONFIG[newType] || CHART_TYPE_CONFIG.custom;
+
+    // Clear X-axis fields if not applicable
+    if (!newConfig.hasXAxis) {
+      setXAxisColumn('');
+      setXAxisLabel('');
+      setXAxisFormat('chart');
+    }
+
+    // Clear Y-axis to single value if multiple not allowed
+    if (!newConfig.multipleYAxis && yAxisColumns.length > 1) {
+      setYAxisColumns(yAxisColumns.slice(0, 1));
+    }
+
+    // Clear series column if not applicable
+    if (!newConfig.hasSeriesColumn) {
+      setSeriesColumn('');
+    }
+
+    // Clear axis labels if not applicable
+    if (!newConfig.hasAxisLabels) {
+      setXAxisLabel('');
+      setYAxisLabel('');
+    }
+
+    // Clear time bucket if not applicable
+    if (!newConfig.hasTimeBucket) {
+      setTimeBucketEnabled(false);
+    }
+
+    // Clear sort/limit if not applicable
+    if (!newConfig.hasSortLimit) {
+      setSortBy('');
+      setSortOrder('desc');
+      setLimitRows(0);
+    }
+
+    setChartType(newType);
+  };
+
+  // Update a single chart option
+  const updateChartOption = (key, value) => {
+    setChartOptions(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
 
   // Check for duplicate chart name on blur
   const checkDuplicateChartName = async (nameToCheck) => {
@@ -189,6 +369,7 @@ const ChartEditor = forwardRef(function ChartEditor({
     if (chart) {
       // Editing existing chart
       setName(chart.name || '');
+      setTitle(chart.title || '');
       setDescription(chart.description || '');
       setChartType(chart.chart_type || 'bar');
       setSelectedDatasourceId(chart.datasource_id || '');
@@ -224,8 +405,27 @@ const ChartEditor = forwardRef(function ChartEditor({
       if (tb) {
         console.log('[ChartEditor] Loading time_bucket:', { tb, hasValidTimeBucket });
       }
+      // TSStore query config initialization
+      if (chart.query_config?.type === 'tsstore') {
+        const rawQuery = chart.query_config?.raw || 'newest';
+        if (rawQuery.startsWith('since:')) {
+          setTsstoreQueryType('since');
+          setTsstoreSinceDuration(rawQuery.substring(6)); // Extract duration after "since:"
+        } else {
+          setTsstoreQueryType(rawQuery);
+          setTsstoreSinceDuration('1h');
+        }
+        setTsstoreLimit(chart.query_config?.params?.limit || 100);
+      }
       setComponentCode(chart.component_code || '');
       setShowCustomCode(chart.use_custom_code ?? (chart.chart_type === 'custom'));
+      // Initialize chart options from saved data
+      if (chart.options) {
+        setChartOptions(prev => ({
+          ...prev,
+          ...chart.options
+        }));
+      }
       setInitialState(JSON.stringify({
         name: chart.name || '',
         description: chart.description || '',
@@ -289,6 +489,11 @@ const ChartEditor = forwardRef(function ChartEditor({
     }
   }, [selectedDatasourceId, datasources]);
 
+  // Derived datasource type flags (used in multiple places)
+  const isTSStore = selectedDatasource?.type === 'tsstore';
+  const isSocket = selectedDatasource?.type === 'socket';
+  const isAPI = selectedDatasource?.type === 'api';
+
   const handleDatasourceChange = (newDatasourceId) => {
     setSelectedDatasourceId(newDatasourceId);
 
@@ -311,6 +516,15 @@ const ChartEditor = forwardRef(function ChartEditor({
           case 'socket':
             setQueryType('stream_filter');
             setQueryMode('raw');
+            break;
+          case 'tsstore':
+            setQueryType('tsstore');
+            setQueryMode('raw');
+            // Set default query for tsstore
+            setQueryRaw('newest');
+            setTsstoreQueryType('newest');
+            setTsstoreLimit(100);
+            setTsstoreSinceDuration('1h');
             break;
         }
       }
@@ -345,6 +559,9 @@ const ChartEditor = forwardRef(function ChartEditor({
     setTimeBucketFunction('avg');
     setTimeBucketValueCols([]);
     setTimeBucketTimestampCol('');
+    setTsstoreQueryType('newest');
+    setTsstoreLimit(100);
+    setTsstoreSinceDuration('1h');
     setComponentCode('');
     setShowCustomCode(false);
     setPreviewData(null);
@@ -370,9 +587,8 @@ const ChartEditor = forwardRef(function ChartEditor({
       return;
     }
 
-    // Socket datasources don't require a query - they just capture stream data
-    const isSocket = selectedDatasource?.type === 'socket';
-    if (!isSocket && !queryRaw.trim()) {
+    // Socket, API, and TSStore datasources don't require manual query entry
+    if (!isSocket && !isAPI && !isTSStore && !queryRaw.trim()) {
       setPreviewError('Please enter a query');
       return;
     }
@@ -381,14 +597,33 @@ const ChartEditor = forwardRef(function ChartEditor({
     setPreviewError(null);
 
     try {
+      // Build query params based on datasource type
+      let queryParams = {};
+      let rawQuery = queryRaw;
+
+      if (isSocket) {
+        rawQuery = ''; // Socket doesn't need a query string
+      } else if (isTSStore) {
+        // Build TSStore query: 'newest', 'oldest', or 'since:DURATION'
+        if (tsstoreQueryType === 'since') {
+          // For 'since' queries, don't limit - fetch all data in time window
+          rawQuery = `since:${tsstoreSinceDuration}`;
+          queryParams = {};
+        } else {
+          // For 'newest' or 'oldest', use the configured limit
+          rawQuery = tsstoreQueryType;
+          queryParams = { limit: tsstoreLimit };
+        }
+      }
+
       const response = await fetch(`${API_BASE}/api/datasources/${selectedDatasourceId}/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: {
-            raw: isSocket ? '' : queryRaw, // Socket doesn't need a query string
+            raw: rawQuery,
             type: queryType,
-            params: {}
+            params: queryParams
           }
         })
       });
@@ -428,6 +663,21 @@ const ChartEditor = forwardRef(function ChartEditor({
       return getStaticChartCode(chartType);
     }
 
+    // Build queryParams based on datasource type (same logic as fetchPreview)
+    let queryParams = {};
+    let rawQuery = queryRaw;
+    if (isTSStore) {
+      if (tsstoreQueryType === 'since') {
+        // For 'since' queries, don't limit - fetch all data in time window
+        rawQuery = `since:${tsstoreSinceDuration}`;
+        queryParams = {};
+      } else {
+        // For 'newest' or 'oldest', use the configured limit
+        rawQuery = tsstoreQueryType;
+        queryParams = { limit: tsstoreLimit };
+      }
+    }
+
     const transforms = {
       filters,
       aggregation: aggregation.type ? aggregation : null,
@@ -436,11 +686,12 @@ const ChartEditor = forwardRef(function ChartEditor({
       limit: limitRows || 0,
       xAxisFormat: xAxisFormat || 'chart',
       xAxisLabel: xAxisLabel || '',
-      yAxisLabel: yAxisLabel || ''
+      yAxisLabel: yAxisLabel || '',
+      chartName: name || ''
     };
 
-    return getDataDrivenChartCode(chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, yAxisColumns, transforms);
-  }, [chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, xAxisLabel, xAxisFormat, yAxisColumns, yAxisLabel, filters, aggregation, sortBy, sortOrder, limitRows, showCustomCode, componentCode]);
+    return getDataDrivenChartCode(chartType, selectedDatasourceId, rawQuery, queryType, xAxisColumn, yAxisColumns, transforms, chartOptions, queryParams, seriesColumn);
+  }, [chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, xAxisLabel, xAxisFormat, yAxisColumns, yAxisLabel, filters, aggregation, sortBy, sortOrder, limitRows, showCustomCode, componentCode, name, chartOptions, selectedDatasource, tsstoreLimit, tsstoreQueryType, tsstoreSinceDuration, seriesColumn]);
 
   const filteredPreviewData = useMemo(() => {
     if (!previewData) return null;
@@ -536,13 +787,18 @@ const ChartEditor = forwardRef(function ChartEditor({
 
     const chartPayload = {
       name: name.trim(),
+      title: title.trim() || name.trim(), // Default to name if no title provided
       description: description.trim(),
       chart_type: chartType,
       datasource_id: selectedDatasourceId || '',
       query_config: selectedDatasourceId ? {
-        raw: queryRaw,
+        raw: selectedDatasource?.type === 'tsstore'
+          ? (tsstoreQueryType === 'since' ? `since:${tsstoreSinceDuration}` : tsstoreQueryType)
+          : queryRaw,
         type: queryType,
-        params: {}
+        params: selectedDatasource?.type === 'tsstore'
+          ? (tsstoreQueryType === 'since' ? {} : { limit: tsstoreLimit })
+          : {}
       } : null,
       data_mapping: selectedDatasourceId ? {
         x_axis: xAxisColumn,
@@ -586,6 +842,7 @@ const ChartEditor = forwardRef(function ChartEditor({
       } : null,
       component_code: showCustomCode ? componentCode : generatedCode,
       use_custom_code: showCustomCode,
+      options: chartOptions,
     };
 
     onSave(chartPayload);
@@ -661,7 +918,7 @@ const ChartEditor = forwardRef(function ChartEditor({
             labelText="Chart Type"
             value={chartType}
             onChange={(e) => {
-              setChartType(e.target.value);
+              handleChartTypeChange(e.target.value);
               setShowCustomCode(e.target.value === 'custom');
             }}
           >
@@ -670,7 +927,16 @@ const ChartEditor = forwardRef(function ChartEditor({
             ))}
           </Select>
         </div>
-        <div className="metadata-row description-row">
+        <div className="metadata-row">
+          <TextInput
+            id="chart-title"
+            labelText="Display Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder={name || 'Defaults to chart name'}
+            size="md"
+            helperText="Title shown on dashboards (defaults to chart name)"
+          />
           <TextInput
             id="chart-description"
             labelText="Description (optional)"
@@ -753,13 +1019,23 @@ const ChartEditor = forwardRef(function ChartEditor({
                         >
                           {previewLoading ? 'Capturing...' : 'Capture Sample (5s)'}
                         </Button>
+                      ) : selectedDatasource.type === 'tsstore' ? (
+                        <Button
+                          kind="tertiary"
+                          size="sm"
+                          renderIcon={Play}
+                          onClick={fetchPreviewData}
+                          disabled={previewLoading}
+                        >
+                          {previewLoading ? 'Fetching...' : 'Fetch Data'}
+                        </Button>
                       ) : queryMode === 'raw' && (
                         <Button
                           kind="tertiary"
                           size="sm"
                           renderIcon={Play}
                           onClick={fetchPreviewData}
-                          disabled={previewLoading || !queryRaw.trim()}
+                          disabled={previewLoading || (selectedDatasource?.type !== 'api' && !queryRaw.trim())}
                         >
                           {previewLoading ? 'Running...' : 'Run Query'}
                         </Button>
@@ -776,6 +1052,71 @@ const ChartEditor = forwardRef(function ChartEditor({
                         subtitle="Click 'Capture Sample' to collect 5 seconds of stream data for preview. This helps discover the data schema for mapping. Use client-side filters below to filter the captured data."
                         hideCloseButton
                         lowContrast
+                      />
+                    </div>
+                  ) : selectedDatasource.type === 'tsstore' ? (
+                    <div className="tsstore-query-section">
+                      <Grid narrow>
+                        <Column lg={6} md={4} sm={4}>
+                          <Select
+                            id="tsstore-query-type"
+                            labelText="Query Type"
+                            value={tsstoreQueryType}
+                            onChange={(e) => {
+                              setTsstoreQueryType(e.target.value);
+                              setQueryRaw(e.target.value);
+                            }}
+                          >
+                            <SelectItem value="newest" text="Newest Records" />
+                            <SelectItem value="oldest" text="Oldest Records" />
+                            <SelectItem value="since" text="Time Range (Last...)" />
+                          </Select>
+                        </Column>
+                        {tsstoreQueryType === 'since' ? (
+                          <Column lg={6} md={4} sm={4}>
+                            <Select
+                              id="tsstore-since-duration"
+                              labelText="Time Period"
+                              value={tsstoreSinceDuration}
+                              onChange={(e) => setTsstoreSinceDuration(e.target.value)}
+                            >
+                              <SelectItem value="5m" text="Last 5 minutes" />
+                              <SelectItem value="15m" text="Last 15 minutes" />
+                              <SelectItem value="30m" text="Last 30 minutes" />
+                              <SelectItem value="1h" text="Last 1 hour" />
+                              <SelectItem value="2h" text="Last 2 hours" />
+                              <SelectItem value="6h" text="Last 6 hours" />
+                              <SelectItem value="12h" text="Last 12 hours" />
+                              <SelectItem value="24h" text="Last 24 hours" />
+                              <SelectItem value="2d" text="Last 2 days" />
+                              <SelectItem value="7d" text="Last 7 days" />
+                              <SelectItem value="1w" text="Last 1 week" />
+                            </Select>
+                          </Column>
+                        ) : (
+                          <Column lg={6} md={4} sm={4}>
+                            <NumberInput
+                              id="tsstore-limit"
+                              label="Number of Records"
+                              value={tsstoreLimit}
+                              onChange={(e, { value }) => setTsstoreLimit(value)}
+                              min={1}
+                              max={10000}
+                            />
+                          </Column>
+                        )}
+                      </Grid>
+                      <InlineNotification
+                        kind="info"
+                        title="TSStore Query"
+                        subtitle={
+                          tsstoreQueryType === 'since'
+                            ? `Will fetch all records from the last ${tsstoreSinceDuration}. Schema is auto-discovered from the JSON data.`
+                            : `Will fetch the ${tsstoreLimit} ${tsstoreQueryType} records from the timeseries store. Schema is auto-discovered from the JSON data.`
+                        }
+                        hideCloseButton
+                        lowContrast
+                        style={{ marginTop: '1rem' }}
                       />
                     </div>
                   ) : selectedDatasource.type === 'sql' && queryMode === 'visual' ? (
@@ -802,8 +1143,8 @@ const ChartEditor = forwardRef(function ChartEditor({
                       value={queryRaw}
                       onChange={(e) => setQueryRaw(e.target.value)}
                       placeholder={getQueryPlaceholderForType(selectedDatasource.type)}
-                      rows={6}
-                      className="query-textarea"
+                      rows={selectedDatasource.type === 'api' ? 1 : 6}
+                      className={`query-textarea ${selectedDatasource.type === 'api' ? 'query-textarea--compact' : ''}`}
                     />
                   )}
                 </div>
@@ -820,126 +1161,334 @@ const ChartEditor = forwardRef(function ChartEditor({
 
                 <div className="mapping-section">
                   <h4>Data Mapping</h4>
-                  {availableColumns.length > 0 ? (
-                    <>
-                      <Grid narrow>
-                        <Column lg={4} md={4} sm={4}>
-                          <Select
-                            id="x-axis-column"
-                            labelText="X-Axis (Categories)"
-                            value={xAxisColumn}
-                            onChange={(e) => setXAxisColumn(e.target.value)}
-                          >
-                            <SelectItem value="" text="Select column..." />
-                            {availableColumns.map(col => (
-                              <SelectItem key={col} value={col} text={col} />
-                            ))}
-                          </Select>
-                        </Column>
-                        <Column lg={4} md={4} sm={4}>
-                          <MultiSelect
-                            id="y-axis-columns"
-                            titleText="Y-Axis (Values)"
-                            label={yAxisColumns.length > 0 ? yAxisColumns.join(', ') : 'Select Y value(s)...'}
-                            items={availableColumns.filter(c => c !== xAxisColumn).map(col => ({
-                              id: col,
-                              label: col
-                            }))}
-                            selectedItems={yAxisColumns.map(col => ({ id: col, label: col }))}
-                            onChange={({ selectedItems }) => {
-                              setYAxisColumns(selectedItems.map(item => item.id));
-                            }}
-                            itemToString={(item) => item ? item.label : ''}
-                          />
-                        </Column>
-                        {selectedDatasource?.type === 'socket' && (
-                          <Column lg={4} md={4} sm={4}>
-                            <Select
-                              id="series-column"
-                              labelText="Series (Bucket Partition)"
-                              value={seriesColumn}
-                              onChange={(e) => setSeriesColumn(e.target.value)}
-                              helperText="Separate aggregation per value"
-                            >
-                              <SelectItem value="" text="None" />
-                              {availableColumns.filter(c => c !== xAxisColumn && !yAxisColumns.includes(c)).map(col => (
-                                <SelectItem key={col} value={col} text={col} />
-                              ))}
-                            </Select>
-                          </Column>
-                        )}
-                      </Grid>
-                      <Grid narrow className="axis-labels-row">
-                        <Column lg={4} md={4} sm={4}>
-                          <TextInput
-                            id="x-axis-label"
-                            labelText="X-Axis Label (Optional)"
-                            value={xAxisLabel}
-                            onChange={(e) => setXAxisLabel(e.target.value)}
-                            placeholder="e.g., Time"
-                          />
-                        </Column>
-                        <Column lg={4} md={4} sm={4}>
-                          <TextInput
-                            id="y-axis-label"
-                            labelText="Y-Axis Label (Optional)"
-                            value={yAxisLabel}
-                            onChange={(e) => setYAxisLabel(e.target.value)}
-                            placeholder="e.g., Temperature (°F)"
-                          />
-                        </Column>
-                      </Grid>
-                    </>
-                  ) : (
-                    <div className="saved-values-display">
-                      {(xAxisColumn || yAxisColumns.length > 0 || seriesColumn) ? (
+                  {/* Show message for dataview type */}
+                  {chartType === 'dataview' && (
+                    <p className="mapping-hint">Data tables display all columns from your query. Use filters below to refine the data.</p>
+                  )}
+                  {/* Show mapping fields for applicable chart types */}
+                  {(chartTypeConfig.hasXAxis || chartTypeConfig.hasYAxis) && (
+                    availableColumns.length > 0 ? (
+                      <>
                         <Grid narrow>
-                          <Column lg={4} md={4} sm={4}>
-                            <div className="saved-value-field">
-                              <label className="cds--label">X-Axis (Categories)</label>
-                              {xAxisColumn ? (
-                                <Tag type="blue">{xAxisColumn}</Tag>
-                              ) : (
-                                <span className="no-value">Not set</span>
-                              )}
-                            </div>
-                          </Column>
-                          <Column lg={4} md={4} sm={4}>
-                            <div className="saved-value-field">
-                              <label className="cds--label">Y-Axis (Values)</label>
-                              {yAxisColumns.length > 0 ? (
-                                <div className="column-tags">
-                                  {yAxisColumns.map(col => (
-                                    <Tag key={col} type="blue">{col}</Tag>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="no-value">Not set</span>
-                              )}
-                            </div>
-                          </Column>
-                          {selectedDatasource?.type === 'socket' && (
+                          {/* X-Axis Column - shown for most chart types except gauge and dataview */}
+                          {chartTypeConfig.hasXAxis && (
                             <Column lg={4} md={4} sm={4}>
-                              <div className="saved-value-field">
-                                <label className="cds--label">Series (Bucket Partition)</label>
-                                {seriesColumn ? (
-                                  <Tag type="purple">{seriesColumn}</Tag>
-                                ) : (
-                                  <span className="no-value">None</span>
-                                )}
-                              </div>
+                              <Select
+                                id="x-axis-column"
+                                labelText={chartTypeConfig.xAxisLabel || 'X-Axis'}
+                                value={xAxisColumn}
+                                onChange={(e) => setXAxisColumn(e.target.value)}
+                              >
+                                <SelectItem value="" text="Select column..." />
+                                {availableColumns.map(col => (
+                                  <SelectItem key={col} value={col} text={col} />
+                                ))}
+                              </Select>
+                            </Column>
+                          )}
+                          {/* Y-Axis Column(s) - shown for all chart types except dataview */}
+                          {chartTypeConfig.hasYAxis && (
+                            <Column lg={4} md={4} sm={4}>
+                              {chartTypeConfig.multipleYAxis ? (
+                                <MultiSelect
+                                  id="y-axis-columns"
+                                  titleText={chartTypeConfig.yAxisLabel || 'Y-Axis'}
+                                  label={yAxisColumns.length > 0 ? yAxisColumns.join(', ') : 'Select value(s)...'}
+                                  items={availableColumns.filter(c => c !== xAxisColumn).map(col => ({
+                                    id: col,
+                                    label: col
+                                  }))}
+                                  selectedItems={yAxisColumns.map(col => ({ id: col, label: col }))}
+                                  onChange={({ selectedItems }) => {
+                                    setYAxisColumns(selectedItems.map(item => item.id));
+                                  }}
+                                  itemToString={(item) => item ? item.label : ''}
+                                />
+                              ) : (
+                                <Select
+                                  id="y-axis-column"
+                                  labelText={chartTypeConfig.yAxisLabel || 'Value Column'}
+                                  value={yAxisColumns[0] || ''}
+                                  onChange={(e) => setYAxisColumns(e.target.value ? [e.target.value] : [])}
+                                >
+                                  <SelectItem value="" text="Select column..." />
+                                  {availableColumns.filter(c => c !== xAxisColumn).map(col => (
+                                    <SelectItem key={col} value={col} text={col} />
+                                  ))}
+                                </Select>
+                              )}
+                            </Column>
+                          )}
+                          {/* Series Column - only for bar, line, area charts */}
+                          {chartTypeConfig.hasSeriesColumn && (
+                            <Column lg={4} md={4} sm={4}>
+                              <Select
+                                id="series-column"
+                                labelText="Series Column"
+                                value={seriesColumn}
+                                onChange={(e) => setSeriesColumn(e.target.value)}
+                                helperText={selectedDatasource?.type === 'socket' ? 'Partition by this value' : 'Group data into separate series'}
+                              >
+                                <SelectItem value="" text="None" />
+                                {availableColumns.filter(c => c !== xAxisColumn && !yAxisColumns.includes(c)).map(col => (
+                                  <SelectItem key={col} value={col} text={col} />
+                                ))}
+                              </Select>
                             </Column>
                           )}
                         </Grid>
-                      ) : (
-                        <p className="run-query-hint">Run query to load available columns for mapping</p>
-                      )}
-                      {(xAxisColumn || yAxisColumns.length > 0) && (
-                        <p className="run-query-hint" style={{ marginTop: '0.5rem' }}>Run query to modify column mappings</p>
-                      )}
-                    </div>
+                        {/* Axis Labels - only for charts with axes */}
+                        {chartTypeConfig.hasAxisLabels && (
+                          <Grid narrow className="axis-labels-row">
+                            {chartTypeConfig.hasXAxis && (
+                              <Column lg={4} md={4} sm={4}>
+                                <TextInput
+                                  id="x-axis-label"
+                                  labelText="X-Axis Label (Optional)"
+                                  value={xAxisLabel}
+                                  onChange={(e) => setXAxisLabel(e.target.value)}
+                                  placeholder="e.g., Time"
+                                />
+                              </Column>
+                            )}
+                            <Column lg={4} md={4} sm={4}>
+                              <TextInput
+                                id="y-axis-label"
+                                labelText="Y-Axis Label (Optional)"
+                                value={yAxisLabel}
+                                onChange={(e) => setYAxisLabel(e.target.value)}
+                                placeholder="e.g., Temperature (°F)"
+                              />
+                            </Column>
+                            {chartTypeConfig.hasXAxisFormat && (
+                              <Column lg={4} md={4} sm={4}>
+                                <Select
+                                  id="x-axis-format"
+                                  labelText="Timestamp Format"
+                                  value={xAxisFormat}
+                                  onChange={(e) => setXAxisFormat(e.target.value)}
+                                >
+                                  <SelectItem value="chart" text="Date + Time (1/15 10:30)" />
+                                  <SelectItem value="chart_time" text="Time Only (10:30 AM)" />
+                                  <SelectItem value="chart_time_seconds" text="Time + Seconds (10:30:05 AM)" />
+                                  <SelectItem value="chart_date" text="Date Only (Jan 15)" />
+                                  <SelectItem value="chart_datetime" text="Full (Jan 15, 10:30 AM)" />
+                                  <SelectItem value="chart_datetime_seconds" text="Full + Seconds (Jan 15, 10:30:05 AM)" />
+                                </Select>
+                              </Column>
+                            )}
+                          </Grid>
+                        )}
+                      </>
+                    ) : (
+                      <div className="saved-values-display">
+                        {((chartTypeConfig.hasXAxis && xAxisColumn) || (chartTypeConfig.hasYAxis && yAxisColumns.length > 0) || (chartTypeConfig.hasSeriesColumn && seriesColumn)) ? (
+                          <Grid narrow>
+                            {chartTypeConfig.hasXAxis && (
+                              <Column lg={4} md={4} sm={4}>
+                                <div className="saved-value-field">
+                                  <label className="cds--label">{chartTypeConfig.xAxisLabel || 'X-Axis'}</label>
+                                  {xAxisColumn ? (
+                                    <Tag type="blue">{xAxisColumn}</Tag>
+                                  ) : (
+                                    <span className="no-value">Not set</span>
+                                  )}
+                                </div>
+                              </Column>
+                            )}
+                            {chartTypeConfig.hasYAxis && (
+                              <Column lg={4} md={4} sm={4}>
+                                <div className="saved-value-field">
+                                  <label className="cds--label">{chartTypeConfig.yAxisLabel || 'Y-Axis'}</label>
+                                  {yAxisColumns.length > 0 ? (
+                                    <div className="column-tags">
+                                      {yAxisColumns.map(col => (
+                                        <Tag key={col} type="blue">{col}</Tag>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="no-value">Not set</span>
+                                  )}
+                                </div>
+                              </Column>
+                            )}
+                            {chartTypeConfig.hasSeriesColumn && (
+                              <Column lg={4} md={4} sm={4}>
+                                <div className="saved-value-field">
+                                  <label className="cds--label">Series Column</label>
+                                  {seriesColumn ? (
+                                    <Tag type="purple">{seriesColumn}</Tag>
+                                  ) : (
+                                    <span className="no-value">None</span>
+                                  )}
+                                </div>
+                              </Column>
+                            )}
+                          </Grid>
+                        ) : (
+                          <p className="run-query-hint">Run query to load available columns for mapping</p>
+                        )}
+                        {((chartTypeConfig.hasXAxis && xAxisColumn) || (chartTypeConfig.hasYAxis && yAxisColumns.length > 0)) && (
+                          <p className="run-query-hint" style={{ marginTop: '0.5rem' }}>Run query to modify column mappings</p>
+                        )}
+                      </div>
+                    )
                   )}
                 </div>
+
+                {/* Chart Options Section - Gauge */}
+                {chartType === 'gauge' && (
+                  <div className="chart-options-section">
+                    <h4>Gauge Options</h4>
+                    <Grid narrow>
+                      <Column lg={3} md={4} sm={2}>
+                        <NumberInput
+                          id="gauge-min"
+                          label="Min Value"
+                          value={chartOptions.gaugeMin}
+                          onChange={(e, { value }) => updateChartOption('gaugeMin', value)}
+                          min={-1000000}
+                          max={chartOptions.gaugeMax - 1}
+                          step={1}
+                          hideSteppers
+                        />
+                      </Column>
+                      <Column lg={3} md={4} sm={2}>
+                        <NumberInput
+                          id="gauge-max"
+                          label="Max Value"
+                          value={chartOptions.gaugeMax}
+                          onChange={(e, { value }) => updateChartOption('gaugeMax', value)}
+                          min={chartOptions.gaugeMin + 1}
+                          max={1000000}
+                          step={1}
+                          hideSteppers
+                        />
+                      </Column>
+                      <Column lg={3} md={4} sm={2}>
+                        <NumberInput
+                          id="gauge-warning"
+                          label="Warning Threshold (%)"
+                          value={chartOptions.gaugeWarningThreshold}
+                          onChange={(e, { value }) => updateChartOption('gaugeWarningThreshold', value)}
+                          min={0}
+                          max={chartOptions.gaugeDangerThreshold - 1}
+                          step={1}
+                          hideSteppers
+                          helperText="Yellow zone starts"
+                        />
+                      </Column>
+                      <Column lg={3} md={4} sm={2}>
+                        <NumberInput
+                          id="gauge-danger"
+                          label="Danger Threshold (%)"
+                          value={chartOptions.gaugeDangerThreshold}
+                          onChange={(e, { value }) => updateChartOption('gaugeDangerThreshold', value)}
+                          min={chartOptions.gaugeWarningThreshold + 1}
+                          max={100}
+                          step={1}
+                          hideSteppers
+                          helperText="Red zone starts"
+                        />
+                      </Column>
+                    </Grid>
+                    <Grid narrow style={{ marginTop: '1rem' }}>
+                      <Column lg={4} md={4} sm={4}>
+                        <TextInput
+                          id="gauge-unit"
+                          labelText="Unit Suffix"
+                          value={chartOptions.gaugeUnit}
+                          onChange={(e) => updateChartOption('gaugeUnit', e.target.value)}
+                          placeholder="e.g., °F, %, psi"
+                        />
+                      </Column>
+                      <Column lg={4} md={4} sm={4}>
+                        <Slider
+                          id="gauge-line-thickness"
+                          labelText="Arc Thickness (%)"
+                          value={chartOptions.gaugeLineThickness ?? 8}
+                          onChange={({ value }) => updateChartOption('gaugeLineThickness', value)}
+                          min={1}
+                          max={16}
+                          step={1}
+                        />
+                      </Column>
+                    </Grid>
+                  </div>
+                )}
+
+                {/* Chart Options Section - Pie */}
+                {chartType === 'pie' && (
+                  <div className="chart-options-section">
+                    <h4>Pie Chart Options</h4>
+                    <Grid narrow>
+                      <Column lg={4} md={4} sm={4}>
+                        <NumberInput
+                          id="pie-inner-radius"
+                          label="Inner Radius (%)"
+                          value={chartOptions.pieInnerRadius}
+                          onChange={(e, { value }) => updateChartOption('pieInnerRadius', value)}
+                          min={0}
+                          max={90}
+                          step={5}
+                          hideSteppers
+                          helperText="0 = pie, >0 = donut"
+                        />
+                      </Column>
+                      <Column lg={4} md={4} sm={4}>
+                        <Toggle
+                          id="pie-show-labels"
+                          labelText="Show Labels"
+                          labelA="Off"
+                          labelB="On"
+                          toggled={chartOptions.pieShowLabels}
+                          onToggle={(checked) => updateChartOption('pieShowLabels', checked)}
+                        />
+                      </Column>
+                    </Grid>
+                  </div>
+                )}
+
+                {/* Chart Options Section - Bar/Line/Area */}
+                {['bar', 'line', 'area'].includes(chartType) && (
+                  <div className="chart-options-section">
+                    <h4>Chart Options</h4>
+                    <Grid narrow>
+                      <Column lg={4} md={4} sm={4}>
+                        <Toggle
+                          id="chart-stacked"
+                          labelText="Stacked"
+                          labelA="Off"
+                          labelB="On"
+                          toggled={chartOptions.chartStacked}
+                          onToggle={(checked) => updateChartOption('chartStacked', checked)}
+                        />
+                      </Column>
+                      {['line', 'area'].includes(chartType) && (
+                        <Column lg={4} md={4} sm={4}>
+                          <Toggle
+                            id="chart-smooth"
+                            labelText="Smooth Curves"
+                            labelA="Off"
+                            labelB="On"
+                            toggled={chartOptions.chartSmooth}
+                            onToggle={(checked) => updateChartOption('chartSmooth', checked)}
+                          />
+                        </Column>
+                      )}
+                      <Column lg={4} md={4} sm={4}>
+                        <Toggle
+                          id="chart-data-labels"
+                          labelText="Show Data Labels"
+                          labelA="Off"
+                          labelB="On"
+                          toggled={chartOptions.chartShowDataLabels}
+                          onToggle={(checked) => updateChartOption('chartShowDataLabels', checked)}
+                        />
+                      </Column>
+                    </Grid>
+                  </div>
+                )}
 
                 {/* Filters Section */}
                 <div className="filters-section">
@@ -1126,7 +1675,7 @@ const ChartEditor = forwardRef(function ChartEditor({
                         <Column lg={4} md={4} sm={4}>
                           <NumberInput
                             id="limit-rows"
-                            label="Limit Rows"
+                            label="Limit"
                             value={limitRows}
                             onChange={(e, { value }) => setLimitRows(value)}
                             min={0}
@@ -1503,15 +2052,17 @@ const ChartEditor = forwardRef(function ChartEditor({
         {activeTab === 2 && (
           <div className="tab-content code-tab">
             <div className="code-header">
-              <Toggle
-                id="custom-code-toggle"
-                labelText="Custom Code"
-                labelA="Use Generated"
-                labelB="Custom"
-                toggled={showCustomCode}
-                onToggle={() => setShowCustomCode(!showCustomCode)}
-                size="sm"
-              />
+              <div className="code-switcher">
+                <span className="code-switcher-label">Code</span>
+                <ContentSwitcher
+                  selectedIndex={showCustomCode ? 1 : 0}
+                  onChange={(e) => setShowCustomCode(e.index === 1)}
+                  size="sm"
+                >
+                  <Switch name="generated" text="Generated" />
+                  <Switch name="custom" text="Custom" />
+                </ContentSwitcher>
+              </div>
               <p className="code-help">
                 Available: useState, useEffect, useMemo, useCallback, useRef, useData, transformData, toObjects, getValue, formatTimestamp, formatCellValue, echarts, ReactECharts
               </p>
@@ -1569,6 +2120,7 @@ function getStaticChartCode(chartType) {
   ]);
 
   const option = {
+    backgroundColor: 'transparent',
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: data.map(d => d.name) },
     yAxis: { type: 'value' },
@@ -1587,6 +2139,7 @@ function getStaticChartCode(chartType) {
   ]);
 
   const option = {
+    backgroundColor: 'transparent',
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: data.map(d => d.name) },
     yAxis: { type: 'value' },
@@ -1605,6 +2158,7 @@ function getStaticChartCode(chartType) {
   ]);
 
   const option = {
+    backgroundColor: 'transparent',
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: data.map(d => d.name), boundaryGap: false },
     yAxis: { type: 'value' },
@@ -1622,6 +2176,7 @@ function getStaticChartCode(chartType) {
   ]);
 
   const option = {
+    backgroundColor: 'transparent',
     tooltip: { trigger: 'item' },
     series: [{
       type: 'pie',
@@ -1639,6 +2194,7 @@ function getStaticChartCode(chartType) {
   ]);
 
   const option = {
+    backgroundColor: 'transparent',
     tooltip: { trigger: 'item' },
     xAxis: { type: 'value' },
     yAxis: { type: 'value' },
@@ -1648,24 +2204,55 @@ function getStaticChartCode(chartType) {
   return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
 };`,
     gauge: `const Component = () => {
+  const containerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 200, height: 200 });
   const [value] = useState(72);
 
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      // Only update if size changed by more than 1px to prevent resize loops
+      setContainerSize(prev => {
+        if (Math.abs(prev.width - width) > 1 || Math.abs(prev.height - height) > 1) {
+          return { width, height };
+        }
+        return prev;
+      });
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  // Calculate responsive sizes - all proportional, no minimums
+  const minDim = Math.min(containerSize.width, containerSize.height);
+  const baseFontSize = Math.floor(minDim * 0.12);
+  const labelFontSize = Math.floor(minDim * 0.06);
+  const axisLineWidth = Math.floor(minDim * 0.08);
+  const splitLineLength = Math.floor(minDim * 0.05);
+  const anchorSize = Math.floor(minDim * 0.08);
+
   const option = {
+    backgroundColor: 'transparent',
     series: [{
       type: 'gauge',
-      progress: { show: true, width: 18 },
-      axisLine: { lineStyle: { width: 18 } },
+      progress: { show: false },
+      axisLine: { lineStyle: { width: axisLineWidth } },
       axisTick: { show: false },
-      splitLine: { length: 15, lineStyle: { width: 2, color: '#999' } },
-      axisLabel: { distance: 25, color: '#999', fontSize: 14 },
-      anchor: { show: true, showAbove: true, size: 25, itemStyle: { borderWidth: 10 } },
+      splitLine: { length: splitLineLength, lineStyle: { width: 2, color: '#999' } },
+      axisLabel: { distance: Math.floor(minDim * 0.08), color: '#999', fontSize: labelFontSize },
+      anchor: { show: true, showAbove: true, size: anchorSize, itemStyle: { borderWidth: Math.floor(anchorSize * 0.4) } },
       title: { show: false },
-      detail: { valueAnimation: true, fontSize: 40, offsetCenter: [0, '70%'] },
+      detail: { valueAnimation: true, fontSize: baseFontSize, offsetCenter: [0, '70%'] },
       data: [{ value: value, name: 'Score' }]
     }]
   };
 
-  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+  return (
+    <div ref={containerRef} style={{ height: '100%', width: '100%' }}>
+      <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />
+    </div>
+  );
 };`,
     custom: `const Component = () => {
   // Custom chart component
@@ -1683,9 +2270,9 @@ function getStaticChartCode(chartType) {
   return templates[chartType] || templates.bar;
 }
 
-function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xAxisCol, yAxisCols, transforms = {}) {
+function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xAxisCol, yAxisCols, transforms = {}, chartOptions = {}, queryParams = {}, seriesCol = '') {
   const yAxisStr = yAxisCols.length > 0 ? yAxisCols.map(c => `'${c}'`).join(', ') : "'value'";
-  const { filters = [], aggregation = null, sortBy = '', sortOrder = 'desc', limit = 0, xAxisFormat = 'chart', xAxisLabel = '', yAxisLabel = '' } = transforms;
+  const { filters = [], aggregation = null, sortBy = '', sortOrder = 'desc', limit = 0, xAxisFormat = 'chart', xAxisLabel = '', yAxisLabel = '', chartName = '' } = transforms;
 
   const hasTransforms = filters.length > 0 || aggregation?.type || sortBy || limit > 0;
   const transformsConfig = hasTransforms ? `
@@ -1711,16 +2298,45 @@ function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xA
   // Format x-axis values (auto-detect timestamps, format: ${xAxisFormat})
   const formatXValue = (val, colName) => formatCellValue(val, colName, { timestampFormat: '${xAxisFormat}' });`;
 
-  const seriesCode = yAxisCols.length > 1
-    ? `const yColumns = [${yAxisStr}];
+  // Generate series code - if seriesCol is provided, split data by that column
+  let seriesCode;
+  if (seriesCol) {
+    // Series column provided - split data into multiple series by unique values
+    seriesCode = `// Group data by series column: ${seriesCol}
+    const cols = ${hasTransforms ? 'transformed' : 'data'}.columns;
+    const seriesColIdx = cols.indexOf('${seriesCol}');
+    const xColIdx = cols.indexOf('${xAxisCol}');
+    const yColIdx = cols.indexOf(${yAxisStr.split(',')[0]});
+
+    // Get unique series values
+    const seriesValues = [...new Set(rows.map(r => r[seriesColIdx]))].filter(v => v != null);
+
+    // Build series for each unique value
+    const series = seriesValues.map((seriesValue, idx) => {
+      const seriesRows = rows.filter(r => r[seriesColIdx] === seriesValue);
+      return {
+        name: String(seriesValue),
+        data: seriesRows.map(r => r[yColIdx]),
+        type: '${chartType === 'area' ? 'line' : chartType}',
+        ${chartType === 'area' ? 'areaStyle: {},' : ''}
+        ${chartType === 'line' || chartType === 'area' ? 'smooth: true,' : ''}
+      };
+    });
+
+    // Use x values from first series (assumes all series have same x values sorted by time)
+    const firstSeriesRows = rows.filter(r => r[seriesColIdx] === seriesValues[0]);
+    const categories = firstSeriesRows.map(r => formatXValue(r[xColIdx], '${xAxisCol}'));`;
+  } else if (yAxisCols.length > 1) {
+    seriesCode = `const yColumns = [${yAxisStr}];
     const series = yColumns.map((col, idx) => ({
       name: col,
       data: rows.map(r => r[${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(col)]),
       type: '${chartType === 'area' ? 'line' : chartType}',
       ${chartType === 'area' ? 'areaStyle: {},' : ''}
       ${chartType === 'line' || chartType === 'area' ? 'smooth: true,' : ''}
-    }));`
-    : `const yColumns = [${yAxisStr}];
+    }));`;
+  } else {
+    seriesCode = `const yColumns = [${yAxisStr}];
     const series = [{
       data: rows.map(r => r[${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(yColumns[0])]),
       type: '${chartType === 'area' ? 'line' : chartType}',
@@ -1728,6 +2344,7 @@ function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xA
       ${chartType === 'line' || chartType === 'area' ? 'smooth: true,' : ''}
       itemStyle: { color: '#0f62fe' }
     }];`;
+  }
 
   if (chartType === 'pie') {
     return `const Component = () => {
@@ -1736,7 +2353,7 @@ function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xA
     query: {
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
-      params: {}
+      params: ${JSON.stringify(queryParams)}
     },
     refreshInterval: 30000
   });
@@ -1755,10 +2372,13 @@ ${xAxisFormatCode}
   const pieData = rows.map(r => ({ name: formatXValue(r[xIdx], xCol), value: Number(r[yIdx]) }));
 
   const option = {
+    backgroundColor: 'transparent',
+    ${chartName ? `title: { text: '${chartName.replace(/'/g, "\\'")}', left: 'center', top: 16, textStyle: { color: '#f4f4f4', fontSize: 16 } },` : ''}
     tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
     series: [{
       type: 'pie',
       radius: '70%',
+      center: ['50%', ${chartName ? "'58%'" : "'50%'"}],
       data: pieData,
       emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
     }]
@@ -1769,13 +2389,41 @@ ${xAxisFormatCode}
   }
 
   if (chartType === 'gauge') {
+    // Extract gauge options with defaults
+    const gaugeMin = chartOptions?.gaugeMin ?? 0;
+    const gaugeMax = chartOptions?.gaugeMax ?? 100;
+    const warningThreshold = (chartOptions?.gaugeWarningThreshold ?? 70) / 100;
+    const dangerThreshold = (chartOptions?.gaugeDangerThreshold ?? 90) / 100;
+    const unit = chartOptions?.gaugeUnit || '';
+    const lineThickness = (chartOptions?.gaugeLineThickness ?? 8) / 100; // Convert to decimal
+    const detailFormatter = unit ? `'{value}${unit}'` : "'{value}'";
+
     return `const Component = () => {
+  const containerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 200, height: 200 });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      // Only update if size changed by more than 1px to prevent resize loops
+      setContainerSize(prev => {
+        if (Math.abs(prev.width - width) > 1 || Math.abs(prev.height - height) > 1) {
+          return { width, height };
+        }
+        return prev;
+      });
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   const { data, loading, error } = useData({
     datasourceId: '${datasourceId}',
     query: {
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
-      params: {}
+      params: ${JSON.stringify(queryParams)}
     },
     refreshInterval: 30000
   });
@@ -1789,24 +2437,73 @@ ${transformsConfig}
   const yIdx = ${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(yCol);
   const value = rows.length > 0 ? Number(rows[0][yIdx]) : 0;
 
+  // Calculate responsive sizes based on container - all proportional, no minimums
+  const minDim = Math.min(containerSize.width, containerSize.height);
+  const baseFontSize = Math.floor(minDim * 0.12);
+  const titleFontSize = Math.floor(minDim * 0.08);
+  const labelFontSize = Math.floor(minDim * 0.06);
+  const axisLineWidth = Math.floor(minDim * ${lineThickness});
+  const splitLineLength = Math.floor(minDim * 0.05);
+  const anchorSize = Math.floor(minDim * 0.08);
+
+  // Calculate all spacing as percentage of minDim for consistent scaling
+  const topMarginPercent = 2; // Top margin as percentage
+  const titleHeightPercent = ${chartName ? 'Math.max(8, (titleFontSize / containerSize.height) * 100)' : '0'};
+  const gapPercent = 2; // Gap between title and gauge
+  const totalTitleSpace = ${chartName ? 'topMarginPercent + titleHeightPercent + gapPercent' : '0'};
+  const gaugeCenter = ['50%', String(50 + totalTitleSpace / 2) + '%'];
+  const gaugeRadius = String(90 - totalTitleSpace) + '%';
+  const titleTop = String(topMarginPercent) + '%';
+
   const option = {
+    backgroundColor: 'transparent',
+    ${chartName ? `title: { text: '${chartName.replace(/'/g, "\\'")}', left: 'center', top: titleTop, textStyle: { color: '#f4f4f4', fontSize: titleFontSize } },` : ''}
     series: [{
       type: 'gauge',
-      progress: { show: true, width: 18 },
-      axisLine: { lineStyle: { width: 18 } },
+      min: ${gaugeMin},
+      max: ${gaugeMax},
+      center: gaugeCenter,
+      radius: gaugeRadius,
+      progress: { show: false },
+      axisLine: {
+        lineStyle: {
+          width: axisLineWidth,
+          color: [
+            [${warningThreshold}, '#24a148'],
+            [${dangerThreshold}, '#f1c21b'],
+            [1, '#da1e28']
+          ]
+        }
+      },
       axisTick: { show: false },
-      splitLine: { length: 15, lineStyle: { width: 2, color: '#999' } },
-      axisLabel: { distance: 25, color: '#999', fontSize: 14 },
-      anchor: { show: true, showAbove: true, size: 25, itemStyle: { borderWidth: 10 } },
+      splitLine: { length: splitLineLength, lineStyle: { width: 2, color: '#999' } },
+      axisLabel: { distance: Math.floor(minDim * 0.08), color: '#999', fontSize: labelFontSize },
+      anchor: { show: true, showAbove: true, size: anchorSize, itemStyle: { borderWidth: Math.floor(anchorSize * 0.4) } },
       title: { show: false },
-      detail: { valueAnimation: true, fontSize: 40, offsetCenter: [0, '70%'] },
+      detail: { valueAnimation: true, fontSize: baseFontSize, offsetCenter: [0, '70%'], formatter: ${detailFormatter} },
       data: [{ value: value, name: yCol }]
     }]
   };
 
-  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+  return (
+    <div ref={containerRef} style={{ height: '100%', width: '100%' }}>
+      <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />
+    </div>
+  );
 };`;
   }
+
+  // When using seriesCol, categories are generated inside seriesCode; otherwise generate them here
+  const categoriesCode = seriesCol ? '' : `
+  const xAxisCol = '${xAxisCol}';
+  const xIdx = ${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(xAxisCol);
+  const categories = rows.map(r => formatXValue(r[xIdx], xAxisCol));`;
+
+  // Show legend when using series column (multiple series by value) or multiple y columns
+  const showLegend = seriesCol || yAxisCols.length > 1;
+  const legendCode = showLegend
+    ? (seriesCol ? "legend: { data: seriesValues.map(String), bottom: 0 }," : "legend: { data: yColumns, bottom: 0 },")
+    : '';
 
   return `const Component = () => {
   const { data, loading, error } = useData({
@@ -1814,7 +2511,7 @@ ${transformsConfig}
     query: {
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
-      params: {}
+      params: ${JSON.stringify(queryParams)}
     },
     refreshInterval: 30000
   });
@@ -1824,16 +2521,16 @@ ${transformsConfig}
   if (!data?.rows?.length) return <div style={{ color: '#6f6f6f', padding: '1rem' }}>No data</div>;
 ${transformsConfig}
 ${xAxisFormatCode}
-
-  const xAxisCol = '${xAxisCol}';
-  const xIdx = ${hasTransforms ? 'transformed' : 'data'}.columns.indexOf(xAxisCol);
-  const categories = rows.map(r => formatXValue(r[xIdx], xAxisCol));
+${categoriesCode}
 
   ${seriesCode}
 
   const option = {
+    backgroundColor: 'transparent',
+    ${chartName ? `title: { text: '${chartName.replace(/'/g, "\\'")}', left: 'center', top: 8, textStyle: { color: '#f4f4f4', fontSize: 16 } },` : ''}
     tooltip: { trigger: 'axis' },
-    ${yAxisCols.length > 1 ? "legend: { data: yColumns, bottom: 0 }," : ''}
+    ${legendCode}
+    grid: { top: ${chartName ? '25' : '15'}, left: '1.5%', right: '2%', bottom: '1.5%', containLabel: true },
     xAxis: { type: 'category', data: categories${chartType === 'area' ? ', boundaryGap: false' : ''}${xAxisLabel ? `, name: '${xAxisLabel}'` : ''} },
     yAxis: { type: 'value'${yAxisLabel ? `, name: '${yAxisLabel}'` : ''} },
     series: series
@@ -1846,9 +2543,10 @@ ${xAxisFormatCode}
 function getQueryLabelForType(type) {
   switch (type) {
     case 'sql': return 'SQL Query';
-    case 'api': return 'API Endpoint Path';
+    case 'api': return 'Query Parameters (optional)';
     case 'csv': return 'Filter Expression';
     case 'socket': return 'Stream Filter';
+    case 'tsstore': return 'TSStore Query';
     default: return 'Query';
   }
 }
@@ -1856,9 +2554,10 @@ function getQueryLabelForType(type) {
 function getQueryPlaceholderForType(type) {
   switch (type) {
     case 'sql': return 'SELECT timestamp, sensor_id, value FROM sensor_readings ORDER BY timestamp DESC LIMIT 100';
-    case 'api': return '/readings/latest';
+    case 'api': return '?limit=100&format=json';
     case 'csv': return 'sensor_type = temperature';
     case 'socket': return '';
+    case 'tsstore': return 'newest';
     default: return '';
   }
 }

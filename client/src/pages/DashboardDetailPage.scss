@@ -583,7 +583,7 @@
 
             .panel-id {
               color: #78a9ff;
-              font-size: 0.75rem;
+              font-size: calc(0.75rem * var(--title-scale, 1));
               font-weight: 600;
               font-family: 'IBM Plex Mono', monospace;
             }
