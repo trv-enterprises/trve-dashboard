@@ -1,4 +1,4 @@
-# GiVi-Solution Dashboard
+# TRVE Dashboards
 
 A full-stack application for creating, managing, and viewing dynamic data visualization dashboards with AI-powered chart generation.
 
