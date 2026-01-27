@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 import { Dashboard, Edit, Settings } from '@carbon/icons-react';
 import { Button } from '@carbon/react';
 import { MODES } from '../../config/layoutConfig';

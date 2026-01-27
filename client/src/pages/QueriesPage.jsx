@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 import { useState } from 'react';
 import { Tile, Tag, DataTable, Pagination, TextInput, Select, SelectItem } from '@carbon/react';
 import { Search } from '@carbon/icons-react';

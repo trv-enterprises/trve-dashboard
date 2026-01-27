@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 /**
  * useStreamData Hook
  * React hook for streaming data from socket datasources via SSE

@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 // Use current hostname for API calls (allows Tailscale/network access)
 // Falls back to localhost for SSR or when window is not available
 const getApiBaseUrl = () => {

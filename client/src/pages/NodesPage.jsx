@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 import { Tile, Tag } from '@carbon/react';
 import { VirtualMachine, Checkmark, WarningAlt } from '@carbon/icons-react';
 import './NodesPage.scss';

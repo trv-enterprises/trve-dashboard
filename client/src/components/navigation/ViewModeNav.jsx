@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 import { useState, useEffect } from 'react';
 import { SideNavItems, Tag, Tooltip } from '@carbon/react';
 import { Dashboard } from '@carbon/icons-react';

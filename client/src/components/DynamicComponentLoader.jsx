@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 import { useState, useEffect, useMemo, useContext, createContext } from 'react';
 import * as React from 'react';
 import * as echarts from 'echarts';
