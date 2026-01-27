@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 package handlers
 
 import (
@@ -41,14 +45,14 @@ func (h *StreamHandler) StreamDatasource(c *gin.Context) {
 		return
 	}
 
-	// Check if this is a socket datasource
-	isSocket, err := h.manager.IsSocketDatasource(c.Request.Context(), datasourceID)
+	// Check if this is a streaming datasource (socket or tsstore)
+	isStreaming, err := h.manager.IsStreamingDatasource(c.Request.Context(), datasourceID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	if !isSocket {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "datasource is not a socket type"})
+	if !isStreaming {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "datasource does not support streaming (must be socket or tsstore type)"})
 		return
 	}
 
@@ -222,14 +226,14 @@ func (h *StreamHandler) StreamAggregatedDatasource(c *gin.Context) {
 		return
 	}
 
-	// Check if this is a socket datasource
-	isSocket, err := h.manager.IsSocketDatasource(c.Request.Context(), datasourceID)
+	// Check if this is a streaming datasource (socket or tsstore)
+	isStreaming, err := h.manager.IsStreamingDatasource(c.Request.Context(), datasourceID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	if !isSocket {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "datasource is not a socket type"})
+	if !isStreaming {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "datasource does not support streaming (must be socket or tsstore type)"})
 		return
 	}
 

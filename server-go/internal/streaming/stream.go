@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 package streaming
 
 import (
@@ -12,6 +16,19 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/tviviano/dashboard/internal/models"
 )
+
+// Streamer is the interface that all stream implementations must satisfy
+type Streamer interface {
+	Start(ctx context.Context) error
+	Stop()
+	Subscribe() chan models.Record
+	Unsubscribe(ch chan models.Record)
+	GetBuffer() []models.Record
+	BufferCount() int
+	SubscriberCount() int
+	IsConnected() bool
+	LastError() error
+}
 
 // Stream represents a single streaming connection to a socket datasource
 type Stream struct {
@@ -331,6 +348,11 @@ func (s *Stream) Unsubscribe(ch chan models.Record) {
 // GetBuffer returns the current buffer contents
 func (s *Stream) GetBuffer() []models.Record {
 	return s.buffer.GetAll()
+}
+
+// BufferCount returns the number of records in the buffer
+func (s *Stream) BufferCount() int {
+	return s.buffer.Count()
 }
 
 // SubscriberCount returns the number of active subscribers

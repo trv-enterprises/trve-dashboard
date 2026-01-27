@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -170,7 +174,9 @@ function DatasourceDetailPage() {
       case 'tsstore':
         return {
           tsstore: {
-            url: '',
+            protocol: 'http',
+            host: '',
+            port: 21080,
             store_name: '',
             api_key: '',
             timeout: 30
@@ -807,14 +813,38 @@ function DatasourceDetailPage() {
     const tsstoreConfig = config.tsstore || {};
     return (
       <div className="config-form">
-        <TextInput
-          id="tsstore-url"
-          labelText="TSStore URL"
-          value={tsstoreConfig.url || ''}
-          onChange={(e) => updateConfig('tsstore.url', e.target.value)}
-          placeholder="http://localhost:8080"
-          helperText="Base URL of the TSStore server"
-        />
+        <div className="form-row">
+          <Select
+            id="tsstore-protocol"
+            labelText="Protocol"
+            value={tsstoreConfig.protocol || 'http'}
+            onChange={(e) => updateConfig('tsstore.protocol', e.target.value)}
+            helperText="HTTP/WS for unencrypted, HTTPS/WSS for encrypted"
+          >
+            <SelectItem value="http" text="HTTP / WS" />
+            <SelectItem value="https" text="HTTPS / WSS" />
+          </Select>
+        </div>
+
+        <div className="form-row">
+          <TextInput
+            id="tsstore-host"
+            labelText="Host"
+            value={tsstoreConfig.host || ''}
+            onChange={(e) => updateConfig('tsstore.host', e.target.value)}
+            placeholder="localhost or 100.127.19.27"
+            helperText="Hostname or IP address of the TSStore server"
+          />
+          <NumberInput
+            id="tsstore-port"
+            label="Port"
+            value={tsstoreConfig.port || 21080}
+            onChange={(e) => updateConfig('tsstore.port', e.imaginaryTarget.value)}
+            min={1}
+            max={65535}
+            helperText="TSStore server port"
+          />
+        </div>
 
         <TextInput
           id="tsstore-store-name"

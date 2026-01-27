@@ -1,7 +1,12 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 package models
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -172,15 +177,53 @@ type APIResponseConfig struct {
 	DataPath string `json:"data_path,omitempty" bson:"data_path,omitempty"`
 }
 
+// TSStoreDataType represents the data type stored in a TSStore
+type TSStoreDataType string
+
+const (
+	TSStoreDataTypeJSON   TSStoreDataType = "json"   // Arbitrary JSON objects
+	TSStoreDataTypeSchema TSStoreDataType = "schema" // Schema-defined compact JSON
+	TSStoreDataTypeText   TSStoreDataType = "text"   // UTF-8 text
+)
+
+// TSStoreProtocol represents the protocol for TSStore connections
+type TSStoreProtocol string
+
+const (
+	TSStoreProtocolHTTP  TSStoreProtocol = "http"  // HTTP/WS (unencrypted)
+	TSStoreProtocolHTTPS TSStoreProtocol = "https" // HTTPS/WSS (encrypted)
+)
+
 // TSStoreConfig represents configuration for TSStore (timeseries store) data sources
 // TSStore stores arbitrary objects at timestamps, using a block-based storage system.
 // Data does not have a predefined schema - schema is inferred from the first N records.
 type TSStoreConfig struct {
-	URL       string            `json:"url" bson:"url" binding:"required"`                    // Base URL of TSStore API (e.g., "http://localhost:8080")
-	StoreName string            `json:"store_name" bson:"store_name" binding:"required"`      // Name of the store to query
-	APIKey    string            `json:"api_key,omitempty" bson:"api_key,omitempty"`           // Optional API key for authentication
-	Headers   map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`           // Additional HTTP headers
-	Timeout   int               `json:"timeout,omitempty" bson:"timeout,omitempty"`           // Request timeout in seconds (default: 30)
+	Protocol  TSStoreProtocol   `json:"protocol" bson:"protocol" binding:"required,oneof=http https"` // Protocol: "http" (HTTP/WS) or "https" (HTTPS/WSS)
+	Host      string            `json:"host" bson:"host" binding:"required"`                          // Hostname or IP address
+	Port      int               `json:"port" bson:"port" binding:"required"`                          // Port number
+	StoreName string            `json:"store_name" bson:"store_name" binding:"required"`              // Name of the store to query
+	DataType  TSStoreDataType   `json:"data_type,omitempty" bson:"data_type,omitempty"`               // Store data type: json, schema, text (default: json)
+	APIKey    string            `json:"api_key,omitempty" bson:"api_key,omitempty"`                   // Optional API key for authentication
+	Headers   map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`                   // Additional HTTP headers
+	Timeout   int               `json:"timeout,omitempty" bson:"timeout,omitempty"`                   // Request timeout in seconds (default: 30)
+}
+
+// BaseURL returns the HTTP base URL built from protocol, host, and port
+func (c *TSStoreConfig) BaseURL() string {
+	protocol := string(c.Protocol)
+	if protocol == "" {
+		protocol = "http"
+	}
+	return fmt.Sprintf("%s://%s:%d", protocol, c.Host, c.Port)
+}
+
+// WebSocketURL returns the WebSocket base URL built from protocol, host, and port
+func (c *TSStoreConfig) WebSocketURL() string {
+	wsProtocol := "ws"
+	if c.Protocol == TSStoreProtocolHTTPS {
+		wsProtocol = "wss"
+	}
+	return fmt.Sprintf("%s://%s:%d", wsProtocol, c.Host, c.Port)
 }
 
 // HealthInfo represents health check information

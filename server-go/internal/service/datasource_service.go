@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 package service
 
 import (
@@ -483,8 +487,11 @@ func (s *DatasourceService) validateCSVConfig(config *models.CSVConfig) error {
 
 // validateTSStoreConfig validates TSStore configuration
 func (s *DatasourceService) validateTSStoreConfig(config *models.TSStoreConfig) error {
-	if config.URL == "" {
-		return fmt.Errorf("TSStore URL is required")
+	if config.Host == "" {
+		return fmt.Errorf("host is required")
+	}
+	if config.Port == 0 {
+		return fmt.Errorf("port is required")
 	}
 	if config.StoreName == "" {
 		return fmt.Errorf("store name is required")

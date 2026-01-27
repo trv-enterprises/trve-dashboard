@@ -1,3 +1,7 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
 package streaming
 
 import (
@@ -13,7 +17,7 @@ import (
 
 // Manager orchestrates multiple streaming connections
 type Manager struct {
-	streams      map[string]*Stream
+	streams      map[string]Streamer
 	mu           sync.RWMutex
 	repo         *repository.DatasourceRepository
 	config       ManagerConfig
@@ -42,7 +46,7 @@ func NewManager(repo *repository.DatasourceRepository, config ManagerConfig) *Ma
 	ctx, cancel := context.WithCancel(context.Background())
 
 	m := &Manager{
-		streams:    make(map[string]*Stream),
+		streams:    make(map[string]Streamer),
 		repo:       repo,
 		config:     config,
 		ctx:        ctx,
@@ -78,22 +82,30 @@ func (m *Manager) SubscribeAndGetChannel(ctx context.Context, datasourceID strin
 		return nil
 	}
 
-	// Verify it's a socket datasource
-	if ds.Type != models.DatasourceTypeSocket {
-		log.Printf("[StreamManager] Datasource %s is not a socket type (got: %s)", datasourceID, ds.Type)
-		return nil
-	}
-
-	if ds.Config.Socket == nil {
-		log.Printf("[StreamManager] Datasource %s has no socket configuration", datasourceID)
-		return nil
-	}
-
-	// Create new stream
+	// Create stream based on datasource type
 	streamConfig := StreamConfig{
 		BufferSize: m.config.BufferSize,
 	}
-	stream = NewStream(datasourceID, ds.Config.Socket, streamConfig)
+
+	switch ds.Type {
+	case models.DatasourceTypeSocket:
+		if ds.Config.Socket == nil {
+			log.Printf("[StreamManager] Datasource %s has no socket configuration", datasourceID)
+			return nil
+		}
+		stream = NewStream(datasourceID, ds.Config.Socket, streamConfig)
+
+	case models.DatasourceTypeTSStore:
+		if ds.Config.TSStore == nil {
+			log.Printf("[StreamManager] Datasource %s has no TSStore configuration", datasourceID)
+			return nil
+		}
+		stream = NewTSStoreStream(datasourceID, ds.Config.TSStore, streamConfig)
+
+	default:
+		log.Printf("[StreamManager] Datasource %s is not a streaming type (got: %s)", datasourceID, ds.Type)
+		return nil
+	}
 
 	// Start the stream
 	if err := stream.Start(m.ctx); err != nil {
@@ -104,7 +116,7 @@ func (m *Manager) SubscribeAndGetChannel(ctx context.Context, datasourceID strin
 	// Store the stream
 	m.streams[datasourceID] = stream
 
-	log.Printf("[StreamManager] Created stream for datasource %s", datasourceID)
+	log.Printf("[StreamManager] Created stream for datasource %s (type: %s)", datasourceID, ds.Type)
 
 	return stream.Subscribe()
 }
@@ -129,20 +141,27 @@ func (m *Manager) Subscribe(ctx context.Context, datasourceID string) (<-chan mo
 		return nil, fmt.Errorf("datasource not found: %s", datasourceID)
 	}
 
-	// Verify it's a socket datasource
-	if ds.Type != models.DatasourceTypeSocket {
-		return nil, fmt.Errorf("datasource %s is not a socket type (got: %s)", datasourceID, ds.Type)
-	}
-
-	if ds.Config.Socket == nil {
-		return nil, fmt.Errorf("datasource %s has no socket configuration", datasourceID)
-	}
-
-	// Create new stream
+	// Create stream based on datasource type
 	streamConfig := StreamConfig{
 		BufferSize: m.config.BufferSize,
 	}
-	stream = NewStream(datasourceID, ds.Config.Socket, streamConfig)
+
+	switch ds.Type {
+	case models.DatasourceTypeSocket:
+		if ds.Config.Socket == nil {
+			return nil, fmt.Errorf("datasource %s has no socket configuration", datasourceID)
+		}
+		stream = NewStream(datasourceID, ds.Config.Socket, streamConfig)
+
+	case models.DatasourceTypeTSStore:
+		if ds.Config.TSStore == nil {
+			return nil, fmt.Errorf("datasource %s has no TSStore configuration", datasourceID)
+		}
+		stream = NewTSStoreStream(datasourceID, ds.Config.TSStore, streamConfig)
+
+	default:
+		return nil, fmt.Errorf("datasource %s is not a streaming type (got: %s)", datasourceID, ds.Type)
+	}
 
 	// Start the stream
 	if err := stream.Start(m.ctx); err != nil {
@@ -152,7 +171,7 @@ func (m *Manager) Subscribe(ctx context.Context, datasourceID string) (<-chan mo
 	// Store the stream
 	m.streams[datasourceID] = stream
 
-	log.Printf("[StreamManager] Created stream for datasource %s", datasourceID)
+	log.Printf("[StreamManager] Created stream for datasource %s (type: %s)", datasourceID, ds.Type)
 
 	return stream.Subscribe(), nil
 }
@@ -198,7 +217,7 @@ func (m *Manager) GetStreamStatus(datasourceID string) *StreamStatus {
 		DatasourceID:    datasourceID,
 		Connected:       stream.IsConnected(),
 		SubscriberCount: stream.SubscriberCount(),
-		BufferCount:     stream.buffer.Count(),
+		BufferCount:     stream.BufferCount(),
 		LastError:       stream.LastError(),
 	}
 }
@@ -279,12 +298,12 @@ func (m *Manager) Stop() {
 		stream.Stop()
 	}
 
-	m.streams = make(map[string]*Stream)
+	m.streams = make(map[string]Streamer)
 	log.Println("[StreamManager] Stopped")
 }
 
-// IsSocketDatasource checks if a datasource is a socket type
-func (m *Manager) IsSocketDatasource(ctx context.Context, datasourceID string) (bool, error) {
+// IsStreamingDatasource checks if a datasource supports streaming (socket or tsstore)
+func (m *Manager) IsStreamingDatasource(ctx context.Context, datasourceID string) (bool, error) {
 	ds, err := m.repo.FindByID(ctx, datasourceID)
 	if err != nil {
 		return false, err
@@ -292,5 +311,5 @@ func (m *Manager) IsSocketDatasource(ctx context.Context, datasourceID string) (
 	if ds == nil {
 		return false, fmt.Errorf("datasource not found")
 	}
-	return ds.Type == models.DatasourceTypeSocket, nil
+	return ds.Type == models.DatasourceTypeSocket || ds.Type == models.DatasourceTypeTSStore, nil
 }
