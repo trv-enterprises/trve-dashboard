@@ -21,17 +21,21 @@ const (
 	QueryTypeStreamFilter QueryType = "stream_filter"
 	QueryTypeAPI          QueryType = "api"
 	QueryTypeTSStore      QueryType = "tsstore"
+	QueryTypePrometheus   QueryType = "prometheus"
+	QueryTypeEdgeLake     QueryType = "edgelake"
 )
 
 // DatasourceType represents the type of data source
 type DatasourceType string
 
 const (
-	DatasourceTypeSQL     DatasourceType = "sql"
-	DatasourceTypeCSV     DatasourceType = "csv"
-	DatasourceTypeSocket  DatasourceType = "socket"
-	DatasourceTypeAPI     DatasourceType = "api"
-	DatasourceTypeTSStore DatasourceType = "tsstore"
+	DatasourceTypeSQL        DatasourceType = "sql"
+	DatasourceTypeCSV        DatasourceType = "csv"
+	DatasourceTypeSocket     DatasourceType = "socket"
+	DatasourceTypeAPI        DatasourceType = "api"
+	DatasourceTypeTSStore    DatasourceType = "tsstore"
+	DatasourceTypePrometheus DatasourceType = "prometheus"
+	DatasourceTypeEdgeLake  DatasourceType = "edgelake"
 )
 
 // HealthStatus represents the health status of a data source
@@ -77,7 +81,7 @@ type Datasource struct {
 	ID          primitive.ObjectID `json:"id" bson:"_id,omitempty"`
 	Name        string             `json:"name" bson:"name" binding:"required"`
 	Description string             `json:"description" bson:"description"`
-	Type        DatasourceType     `json:"type" bson:"type" binding:"required,oneof=sql csv socket api tsstore"`
+	Type        DatasourceType     `json:"type" bson:"type" binding:"required,oneof=sql csv socket api tsstore prometheus edgelake"`
 	Config      DatasourceConfig   `json:"config" bson:"config" binding:"required"`
 	Health      HealthInfo         `json:"health" bson:"health"`
 	Tags        []string           `json:"tags,omitempty" bson:"tags,omitempty"`
@@ -88,11 +92,13 @@ type Datasource struct {
 
 // DatasourceConfig holds type-specific configuration
 type DatasourceConfig struct {
-	SQL     *SQLConfig     `json:"sql,omitempty" bson:"sql,omitempty"`
-	CSV     *CSVConfig     `json:"csv,omitempty" bson:"csv,omitempty"`
-	Socket  *SocketConfig  `json:"socket,omitempty" bson:"socket,omitempty"`
-	API     *APIConfig     `json:"api,omitempty" bson:"api,omitempty"`
-	TSStore *TSStoreConfig `json:"tsstore,omitempty" bson:"tsstore,omitempty"`
+	SQL        *SQLConfig        `json:"sql,omitempty" bson:"sql,omitempty"`
+	CSV        *CSVConfig        `json:"csv,omitempty" bson:"csv,omitempty"`
+	Socket     *SocketConfig     `json:"socket,omitempty" bson:"socket,omitempty"`
+	API        *APIConfig        `json:"api,omitempty" bson:"api,omitempty"`
+	TSStore    *TSStoreConfig    `json:"tsstore,omitempty" bson:"tsstore,omitempty"`
+	Prometheus *PrometheusConfig `json:"prometheus,omitempty" bson:"prometheus,omitempty"`
+	EdgeLake   *EdgeLakeConfig   `json:"edgelake,omitempty" bson:"edgelake,omitempty"`
 }
 
 // SQLConfig represents configuration for SQL databases
@@ -226,6 +232,57 @@ func (c *TSStoreConfig) WebSocketURL() string {
 	return fmt.Sprintf("%s://%s:%d", wsProtocol, c.Host, c.Port)
 }
 
+// PrometheusConfig represents configuration for Prometheus data sources
+type PrometheusConfig struct {
+	URL      string `json:"url" bson:"url" binding:"required"`           // Prometheus server URL (e.g., "http://localhost:9090")
+	Username string `json:"username,omitempty" bson:"username,omitempty"` // Basic auth username (optional)
+	Password string `json:"password,omitempty" bson:"password,omitempty"` // Basic auth password (optional)
+	Timeout  int    `json:"timeout,omitempty" bson:"timeout,omitempty"`   // Query timeout in seconds (default: 30)
+}
+
+// EdgeLakeConfig represents configuration for EdgeLake data sources
+type EdgeLakeConfig struct {
+	Host                string `json:"host" bson:"host" binding:"required"`                                   // EdgeLake node IP/hostname
+	Port                int    `json:"port" bson:"port" binding:"required"`                                   // REST API port (default: 32049)
+	Timeout             int    `json:"timeout,omitempty" bson:"timeout,omitempty"`                             // Request timeout in seconds (default: 20)
+	UseDistributedQuery bool   `json:"use_distributed_query" bson:"use_distributed_query"`                     // Add "destination: network" header
+}
+
+// EdgeLakeSchemaInfo represents EdgeLake schema information
+type EdgeLakeSchemaInfo struct {
+	Databases []string              `json:"databases"`           // Available databases
+	Tables    []EdgeLakeTableInfo   `json:"tables,omitempty"`    // Tables (populated when database is selected)
+}
+
+// EdgeLakeTableInfo represents information about an EdgeLake table
+type EdgeLakeTableInfo struct {
+	Database string                `json:"database"`
+	Name     string                `json:"name"`
+	Columns  []EdgeLakeColumnInfo  `json:"columns,omitempty"`
+}
+
+// EdgeLakeColumnInfo represents a column in an EdgeLake table
+type EdgeLakeColumnInfo struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+}
+
+// PrometheusQueryType represents the type of Prometheus query
+type PrometheusQueryType string
+
+const (
+	PrometheusQueryTypeInstant PrometheusQueryType = "instant" // Single point in time
+	PrometheusQueryTypeRange   PrometheusQueryType = "range"   // Time series over a range
+)
+
+// PrometheusQueryParams holds parameters for Prometheus queries
+type PrometheusQueryParams struct {
+	QueryType PrometheusQueryType `json:"query_type"` // "instant" or "range"
+	Start     string              `json:"start"`      // Start time: RFC3339, unix timestamp, or relative ("now-1h")
+	End       string              `json:"end"`        // End time: RFC3339, unix timestamp, or relative ("now")
+	Step      string              `json:"step"`       // Query resolution step: "15s", "1m", "5m"
+}
+
 // HealthInfo represents health check information
 type HealthInfo struct {
 	Status       HealthStatus `json:"status" bson:"status"`
@@ -239,7 +296,7 @@ type HealthInfo struct {
 type CreateDatasourceRequest struct {
 	Name        string           `json:"name" binding:"required"`
 	Description string           `json:"description"`
-	Type        DatasourceType   `json:"type" binding:"required,oneof=sql csv socket api tsstore"`
+	Type        DatasourceType   `json:"type" binding:"required,oneof=sql csv socket api tsstore prometheus edgelake"`
 	Config      DatasourceConfig `json:"config" binding:"required"`
 	Tags        []string         `json:"tags,omitempty"`
 	MaskSecrets *bool            `json:"mask_secrets,omitempty"` // If true, secrets are masked in API responses (default: true)
@@ -256,7 +313,7 @@ type UpdateDatasourceRequest struct {
 
 // TestDatasourceRequest represents request to test a data source connection
 type TestDatasourceRequest struct {
-	Type   DatasourceType   `json:"type" binding:"required,oneof=sql csv socket api tsstore"`
+	Type   DatasourceType   `json:"type" binding:"required,oneof=sql csv socket api tsstore prometheus edgelake"`
 	Config DatasourceConfig `json:"config" binding:"required"`
 }
 
@@ -312,10 +369,32 @@ type ColumnInfo struct {
 
 // SchemaResponse represents the API response for schema discovery
 type SchemaResponse struct {
-	Success  bool        `json:"success"`
-	Schema   *SchemaInfo `json:"schema,omitempty"`
-	Error    string      `json:"error,omitempty"`
-	Duration int64       `json:"duration"` // milliseconds
+	Success          bool                    `json:"success"`
+	Schema           *SchemaInfo             `json:"schema,omitempty"`              // For SQL datasources
+	PrometheusSchema *PrometheusSchemaInfo   `json:"prometheus_schema,omitempty"`   // For Prometheus datasources
+	Error            string                  `json:"error,omitempty"`
+	Duration         int64                   `json:"duration"` // milliseconds
+}
+
+// PrometheusSchemaInfo represents Prometheus schema information
+type PrometheusSchemaInfo struct {
+	Metrics []PrometheusMetricInfo `json:"metrics"` // Available metrics
+	Labels  []string               `json:"labels"`  // All label names
+}
+
+// PrometheusMetricInfo represents information about a Prometheus metric
+type PrometheusMetricInfo struct {
+	Name   string   `json:"name"`             // Metric name (e.g., "http_requests_total")
+	Type   string   `json:"type,omitempty"`   // Metric type: "counter", "gauge", "histogram", "summary"
+	Help   string   `json:"help,omitempty"`   // Description from metadata
+	Labels []string `json:"labels,omitempty"` // Labels seen with this metric
+}
+
+// PrometheusSchemaProvider is an interface for Prometheus schema discovery
+type PrometheusSchemaProvider interface {
+	GetMetrics(ctx context.Context) ([]string, error)
+	GetLabels(ctx context.Context) ([]string, error)
+	GetLabelValues(ctx context.Context, labelName string) ([]string, error)
 }
 
 // SanitizeForAPI returns a copy of the datasource with sensitive fields masked.

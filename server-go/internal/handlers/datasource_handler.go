@@ -297,3 +297,141 @@ func (h *DatasourceHandler) GetDatasourceSchema(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+
+// GetPrometheusLabelValues retrieves possible values for a Prometheus label
+// @Summary Get values for a Prometheus label
+// @Description Retrieve all possible values for a specific label from a Prometheus datasource
+// @Tags datasources
+// @Produce json
+// @Param id path string true "Datasource ID"
+// @Param label path string true "Label name"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /datasources/{id}/prometheus/labels/{label}/values [get]
+func (h *DatasourceHandler) GetPrometheusLabelValues(c *gin.Context) {
+	id := c.Param("id")
+	label := c.Param("label")
+
+	values, err := h.service.GetPrometheusLabelValues(c.Request.Context(), id, label)
+	if err != nil {
+		if err.Error() == "datasource not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Datasource not found"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"label":  label,
+		"values": values,
+	})
+}
+
+// GetEdgeLakeDatabases retrieves databases from an EdgeLake data source
+// @Summary Get databases from an EdgeLake data source
+// @Description Retrieve all database names from an EdgeLake node's blockchain registry
+// @Tags datasources
+// @Produce json
+// @Param id path string true "Datasource ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /datasources/{id}/edgelake/databases [get]
+func (h *DatasourceHandler) GetEdgeLakeDatabases(c *gin.Context) {
+	id := c.Param("id")
+
+	databases, err := h.service.GetEdgeLakeDatabases(c.Request.Context(), id)
+	if err != nil {
+		if err.Error() == "datasource not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Datasource not found"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"databases": databases,
+	})
+}
+
+// GetEdgeLakeTables retrieves tables for a database from an EdgeLake data source
+// @Summary Get tables from an EdgeLake data source
+// @Description Retrieve table names for a specific database from an EdgeLake node
+// @Tags datasources
+// @Produce json
+// @Param id path string true "Datasource ID"
+// @Param database query string true "Database name"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /datasources/{id}/edgelake/tables [get]
+func (h *DatasourceHandler) GetEdgeLakeTables(c *gin.Context) {
+	id := c.Param("id")
+	database := c.Query("database")
+
+	if database == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "database query parameter is required"})
+		return
+	}
+
+	tables, err := h.service.GetEdgeLakeTables(c.Request.Context(), id, database)
+	if err != nil {
+		if err.Error() == "datasource not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Datasource not found"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"database": database,
+		"tables":   tables,
+	})
+}
+
+// GetEdgeLakeSchema retrieves column schema for a table from an EdgeLake data source
+// @Summary Get table schema from an EdgeLake data source
+// @Description Retrieve column names and types for a specific table from an EdgeLake node
+// @Tags datasources
+// @Produce json
+// @Param id path string true "Datasource ID"
+// @Param database query string true "Database name"
+// @Param table query string true "Table name"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /datasources/{id}/edgelake/schema [get]
+func (h *DatasourceHandler) GetEdgeLakeSchema(c *gin.Context) {
+	id := c.Param("id")
+	database := c.Query("database")
+	table := c.Query("table")
+
+	if database == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "database query parameter is required"})
+		return
+	}
+	if table == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "table query parameter is required"})
+		return
+	}
+
+	columns, err := h.service.GetEdgeLakeSchema(c.Request.Context(), id, database, table)
+	if err != nil {
+		if err.Error() == "datasource not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Datasource not found"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"database": database,
+		"table":    table,
+		"columns":  columns,
+	})
+}

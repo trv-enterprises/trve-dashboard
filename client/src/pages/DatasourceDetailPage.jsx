@@ -30,7 +30,7 @@ import './DatasourceDetailPage.scss';
  * DatasourceDetailPage Component
  *
  * Create/Edit datasource with type-specific configuration forms.
- * Supports 5 datasource types: SQL, CSV, Socket, API, TSStore
+ * Supports datasource types: SQL, CSV, Socket, API, TSStore, Prometheus, EdgeLake
  */
 // Constant for masked secret value - must match backend SecretMaskedValue
 const SECRET_MASKED_VALUE = '********';
@@ -180,6 +180,24 @@ function DatasourceDetailPage() {
             store_name: '',
             api_key: '',
             timeout: 30
+          }
+        };
+      case 'prometheus':
+        return {
+          prometheus: {
+            url: '',
+            username: '',
+            password: '',
+            timeout: 30
+          }
+        };
+      case 'edgelake':
+        return {
+          edgelake: {
+            host: '',
+            port: 32049,
+            timeout: 20,
+            use_distributed_query: false
           }
         };
       default:
@@ -878,6 +896,95 @@ function DatasourceDetailPage() {
     );
   };
 
+  const renderPrometheusConfig = () => {
+    const prometheusConfig = config.prometheus || {};
+    return (
+      <div className="config-form">
+        <TextInput
+          id="prometheus-url"
+          labelText="Prometheus URL"
+          value={prometheusConfig.url || ''}
+          onChange={(e) => updateConfig('prometheus.url', e.target.value)}
+          placeholder="http://localhost:9090"
+          helperText="Base URL of the Prometheus server"
+        />
+
+        <TextInput
+          id="prometheus-username"
+          labelText="Username (optional)"
+          value={prometheusConfig.username || ''}
+          onChange={(e) => updateConfig('prometheus.username', e.target.value)}
+          placeholder="Enter username for basic auth"
+          helperText="Username for basic authentication (if required)"
+        />
+
+        <TextInput
+          id="prometheus-password"
+          labelText="Password (optional)"
+          type="password"
+          value={prometheusConfig.password === SECRET_MASKED_VALUE ? '' : (prometheusConfig.password || '')}
+          onChange={(e) => updateConfig('prometheus.password', e.target.value)}
+          placeholder={prometheusConfig.password === SECRET_MASKED_VALUE ? 'Password is set (enter new value to change)' : 'Enter password'}
+          helperText="Password for basic authentication (if required)"
+        />
+
+        <NumberInput
+          id="prometheus-timeout"
+          label="Timeout (seconds)"
+          value={prometheusConfig.timeout || 30}
+          onChange={(e) => updateConfig('prometheus.timeout', e.imaginaryTarget.value)}
+          min={1}
+          max={300}
+          helperText="Query timeout in seconds"
+        />
+      </div>
+    );
+  };
+
+  const renderEdgeLakeConfig = () => {
+    const elConfig = config.edgelake || {};
+    return (
+      <div className="config-form">
+        <div className="form-row">
+          <TextInput
+            id="edgelake-host"
+            labelText="Host"
+            value={elConfig.host || ''}
+            onChange={(e) => updateConfig('edgelake.host', e.target.value)}
+            placeholder="192.168.1.100 or edgelake.example.com"
+            helperText="IP address or hostname of the EdgeLake node"
+          />
+          <NumberInput
+            id="edgelake-port"
+            label="Port"
+            value={elConfig.port || 32049}
+            onChange={(e) => updateConfig('edgelake.port', e.imaginaryTarget.value)}
+            min={1}
+            max={65535}
+            helperText="REST API port (default: 32049)"
+          />
+        </div>
+
+        <NumberInput
+          id="edgelake-timeout"
+          label="Timeout (seconds)"
+          value={elConfig.timeout || 20}
+          onChange={(e) => updateConfig('edgelake.timeout', e.imaginaryTarget.value)}
+          min={1}
+          max={300}
+          helperText="Request timeout in seconds"
+        />
+
+        <Checkbox
+          id="edgelake-distributed"
+          labelText="Enable distributed queries (send to all network nodes)"
+          checked={elConfig.use_distributed_query || false}
+          onChange={(e) => updateConfig('edgelake.use_distributed_query', e.target.checked)}
+        />
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="datasource-detail-page">
@@ -979,6 +1086,8 @@ function DatasourceDetailPage() {
             <SelectItem value="socket" text="Socket/WebSocket" />
             <SelectItem value="api" text="REST API" />
             <SelectItem value="tsstore" text="TSStore (Timeseries)" />
+            <SelectItem value="prometheus" text="Prometheus" />
+            <SelectItem value="edgelake" text="EdgeLake" />
           </Select>
         </div>
 
@@ -1001,6 +1110,8 @@ function DatasourceDetailPage() {
           {type === 'socket' && renderSocketConfig()}
           {type === 'api' && renderAPIConfig()}
           {type === 'tsstore' && renderTSStoreConfig()}
+          {type === 'prometheus' && renderPrometheusConfig()}
+          {type === 'edgelake' && renderEdgeLakeConfig()}
         </div>
       </div>
 

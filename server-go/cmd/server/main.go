@@ -227,7 +227,11 @@ func main() {
 			datasources.POST("/:id/health", datasourceHandler.CheckDatasourceHealth)
 			datasources.POST("/:id/query", datasourceHandler.QueryDatasource)
 			datasources.GET("/:id/schema", datasourceHandler.GetDatasourceSchema)
-			datasources.GET("/:id/stream", streamHandler.StreamDatasource)                       // SSE streaming
+			datasources.GET("/:id/prometheus/labels/:label/values", datasourceHandler.GetPrometheusLabelValues) // Prometheus label values
+			datasources.GET("/:id/edgelake/databases", datasourceHandler.GetEdgeLakeDatabases)                     // EdgeLake databases
+			datasources.GET("/:id/edgelake/tables", datasourceHandler.GetEdgeLakeTables)                           // EdgeLake tables
+			datasources.GET("/:id/edgelake/schema", datasourceHandler.GetEdgeLakeSchema)                           // EdgeLake table schema
+			datasources.GET("/:id/stream", streamHandler.StreamDatasource)                                      // SSE streaming
 			datasources.GET("/:id/stream/status", streamHandler.GetStreamStatus)                 // Stream status
 			datasources.POST("/:id/stream/aggregated", streamHandler.StreamAggregatedDatasource) // SSE aggregated streaming
 			datasources.GET("/aggregators", streamHandler.GetAggregatorStats)                    // Aggregator stats

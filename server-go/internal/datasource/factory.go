@@ -131,6 +131,18 @@ func (f *DataSourceFactory) CreateFromConfig(ds *models.Datasource) (models.Data
 		}
 		return NewTSStoreDataSource(ds.Config.TSStore)
 
+	case models.DatasourceTypePrometheus:
+		if ds.Config.Prometheus == nil {
+			return nil, fmt.Errorf("Prometheus configuration is required")
+		}
+		return NewPrometheusDataSource(ds.Config.Prometheus)
+
+	case models.DatasourceTypeEdgeLake:
+		if ds.Config.EdgeLake == nil {
+			return nil, fmt.Errorf("EdgeLake configuration is required")
+		}
+		return NewEdgeLakeDataSource(ds.Config.EdgeLake)
+
 	default:
 		return nil, fmt.Errorf("unsupported datasource type: %s", ds.Type)
 	}

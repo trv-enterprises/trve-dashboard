@@ -350,11 +350,17 @@ function DashboardDetailPage() {
   };
 
   // Open chart editor for creating/editing a chart
-  const openChartEditor = (panelId) => {
-    const panel = panels.find(p => p.id === panelId);
-    const chart = panel?.chart_id ? chartsMap[panel.chart_id] : null;
+  // Pass chart=null explicitly when creating a new chart to avoid stale state issues
+  const openChartEditor = (panelId, chart = undefined) => {
     setEditingPanelId(panelId);
-    setEditingChart(chart);
+    if (chart === undefined) {
+      // Look up chart from panel (for editing existing)
+      const panel = panels.find(p => p.id === panelId);
+      setEditingChart(panel?.chart_id ? chartsMap[panel.chart_id] : null);
+    } else {
+      // Use explicitly passed chart (null for new chart)
+      setEditingChart(chart);
+    }
     setChartEditorOpen(true);
   };
 
@@ -1224,9 +1230,10 @@ function DashboardDetailPage() {
                                 label="New Chart"
                                 renderIcon={Add}
                                 onClick={() => {
-                                  // Clear the chart reference first, then open editor for new chart
+                                  // Clear the chart reference and open editor for new chart
+                                  // Pass null explicitly to avoid stale state from React batching
                                   updatePanel(panel.id, { chart_id: null });
-                                  openChartEditor(panel.id);
+                                  openChartEditor(panel.id, null);
                                 }}
                               />
                               <MenuItem
@@ -1254,7 +1261,7 @@ function DashboardDetailPage() {
                             >
                               <MenuItem
                                 label="New Chart"
-                                onClick={() => openChartEditor(panel.id)}
+                                onClick={() => openChartEditor(panel.id, null)}
                               />
                               <MenuItem
                                 label="New Chart with AI"

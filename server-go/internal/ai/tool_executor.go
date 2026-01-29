@@ -37,6 +37,10 @@ type DatasourceRepository interface {
 type DatasourceService interface {
 	QueryDatasource(ctx context.Context, id string, req *models.QueryRequest) (*models.QueryResponse, error)
 	GetSchema(ctx context.Context, id string) (*models.SchemaResponse, error)
+	GetDatasource(ctx context.Context, id string) (*models.Datasource, error)
+	GetEdgeLakeDatabases(ctx context.Context, id string) ([]string, error)
+	GetEdgeLakeTables(ctx context.Context, id string, database string) ([]string, error)
+	GetEdgeLakeSchema(ctx context.Context, id string, database, table string) ([]models.EdgeLakeColumnInfo, error)
 }
 
 // NewToolExecutor creates a new tool executor
@@ -96,6 +100,10 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, chartID string, chartVer
 		return e.executeListDatasources(ctx)
 	case ToolGetDatasourceSchema:
 		return e.executeGetDatasourceSchema(ctx, input)
+	case ToolGetPrometheusSchema:
+		return e.executeGetPrometheusSchema(ctx, input)
+	case ToolGetEdgeLakeSchema:
+		return e.executeGetEdgeLakeSchema(ctx, input)
 	case ToolPreviewData:
 		return e.executePreviewData(ctx, chartID, chartVersion, input)
 	case ToolGetChartState:
@@ -701,6 +709,111 @@ func (e *ToolExecutor) executeGetDatasourceSchema(ctx context.Context, input jso
 		Success: true,
 		Message: fmt.Sprintf("Found %d table(s) in database", tableCount),
 		Data:    response.Schema,
+	}, nil
+}
+
+// executeGetEdgeLakeSchema gets databases, tables, and columns from an EdgeLake data source
+func (e *ToolExecutor) executeGetEdgeLakeSchema(ctx context.Context, input json.RawMessage) (*ToolResult, error) {
+	var params struct {
+		DatasourceID string `json:"datasource_id"`
+		Database     string `json:"database,omitempty"`
+		Table        string `json:"table,omitempty"`
+	}
+	if err := json.Unmarshal(input, &params); err != nil {
+		return &ToolResult{Success: false, Error: "invalid input: " + err.Error()}, nil
+	}
+
+	if params.DatasourceID == "" {
+		return &ToolResult{Success: false, Error: "datasource_id is required"}, nil
+	}
+
+	// Verify this is an EdgeLake data source
+	ds, err := e.datasourceSvc.GetDatasource(ctx, params.DatasourceID)
+	if err != nil {
+		return &ToolResult{Success: false, Error: "failed to get data source: " + err.Error()}, nil
+	}
+	if ds.Type != "edgelake" {
+		return &ToolResult{Success: false, Error: "This data source is not an EdgeLake data source. Use get_datasource_schema for SQL sources or get_prometheus_schema for Prometheus."}, nil
+	}
+
+	// If no database specified, return list of databases
+	if params.Database == "" {
+		databases, err := e.datasourceSvc.GetEdgeLakeDatabases(ctx, params.DatasourceID)
+		if err != nil {
+			return &ToolResult{Success: false, Error: "failed to get databases: " + err.Error()}, nil
+		}
+		return &ToolResult{
+			Success: true,
+			Message: fmt.Sprintf("Found %d database(s) in EdgeLake. Specify a database to see its tables.", len(databases)),
+			Data:    map[string]interface{}{"databases": databases},
+		}, nil
+	}
+
+	// If database specified but no table, return list of tables
+	if params.Table == "" {
+		tables, err := e.datasourceSvc.GetEdgeLakeTables(ctx, params.DatasourceID, params.Database)
+		if err != nil {
+			return &ToolResult{Success: false, Error: "failed to get tables: " + err.Error()}, nil
+		}
+		return &ToolResult{
+			Success: true,
+			Message: fmt.Sprintf("Found %d table(s) in database '%s'. Specify a table to see its columns.", len(tables), params.Database),
+			Data:    map[string]interface{}{"database": params.Database, "tables": tables},
+		}, nil
+	}
+
+	// Database and table specified, return column schema
+	columns, err := e.datasourceSvc.GetEdgeLakeSchema(ctx, params.DatasourceID, params.Database, params.Table)
+	if err != nil {
+		return &ToolResult{Success: false, Error: "failed to get table schema: " + err.Error()}, nil
+	}
+
+	return &ToolResult{
+		Success: true,
+		Message: fmt.Sprintf("Table '%s.%s' has %d column(s)", params.Database, params.Table, len(columns)),
+		Data: map[string]interface{}{
+			"database": params.Database,
+			"table":    params.Table,
+			"columns":  columns,
+		},
+	}, nil
+}
+
+// executeGetPrometheusSchema gets the schema (metrics and labels) for a Prometheus data source
+func (e *ToolExecutor) executeGetPrometheusSchema(ctx context.Context, input json.RawMessage) (*ToolResult, error) {
+	var params struct {
+		DatasourceID string `json:"datasource_id"`
+	}
+	if err := json.Unmarshal(input, &params); err != nil {
+		return &ToolResult{Success: false, Error: "invalid input: " + err.Error()}, nil
+	}
+
+	if params.DatasourceID == "" {
+		return &ToolResult{Success: false, Error: "datasource_id is required"}, nil
+	}
+
+	response, err := e.datasourceSvc.GetSchema(ctx, params.DatasourceID)
+	if err != nil {
+		return &ToolResult{Success: false, Error: "Prometheus schema discovery failed: " + err.Error()}, nil
+	}
+
+	if !response.Success {
+		return &ToolResult{Success: false, Error: response.Error}, nil
+	}
+
+	// Check if this is a Prometheus schema response
+	if response.PrometheusSchema == nil {
+		return &ToolResult{Success: false, Error: "This data source is not a Prometheus data source. Use get_datasource_schema for SQL sources."}, nil
+	}
+
+	// Format schema info for AI consumption
+	metricCount := len(response.PrometheusSchema.Metrics)
+	labelCount := len(response.PrometheusSchema.Labels)
+
+	return &ToolResult{
+		Success: true,
+		Message: fmt.Sprintf("Found %d metric(s) and %d label(s) in Prometheus", metricCount, labelCount),
+		Data:    response.PrometheusSchema,
 	}, nil
 }
 

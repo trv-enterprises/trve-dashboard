@@ -464,6 +464,8 @@ const Component = () => {
 - **AI Session API**: Start, message, save, cancel endpoints with `/api/ai/session`
 - **Custom AI Icon**: Replaced WatsonxAi with custom sparkle icon component
 - **SQL Data Source Refactor**: Removed connection_string field; connection strings now built from individual fields (host, port, database, username, password, ssl, options)
+- **Prometheus Data Source**: Full Prometheus integration with schema discovery, visual PromQL builder, and AI tool support
+- **EdgeLake Data Source**: Full EdgeLake integration with distributed query support, cascading schema discovery (database → table → columns), visual query builder, and AI tool support
 
 ### 🚧 In Progress
 - AI Builder Phase 8: Polish & Testing
@@ -475,10 +477,8 @@ const Component = () => {
 - **Data Source Testing in Editor**: Add connection test capability to data source editor UI (backend API already exists at `/api/datasources/test`)
 - **Dashboard Design Preset Sizes**: Implement solution for layout dimensions/aspect ratios for fullscreen viewing
 - **Fix `include_datasources` Aggregation**: The `ListWithDatasources` MongoDB aggregation in `dashboard_repository.go` has a bug where `panel_count` returns 0. Currently worked around by fetching dashboards, charts, and datasources separately client-side. Fix the aggregation to reduce API calls as dashboard count grows.
-- **Prometheus Data Source**: Add Prometheus as a new data source type with schema discovery, visual query builder, and AI integration. See [docs/PROMETHEUS_INTEGRATION.md](docs/PROMETHEUS_INTEGRATION.md) for full plan.
 - Manage Mode implementation
 - User authentication
-- EdgeLake integration
 - ModeContext for shared state (replace localStorage-based mode switching)
 - ErrorBoundary component for crash recovery
 - Entity-specific hooks (useDashboard, useCharts, etc.)
@@ -503,12 +503,13 @@ const Component = () => {
 - [TECH_STACK_SUMMARY.md](docs/TECH_STACK_SUMMARY.md) - Technology decisions
 - [REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md) - Refactoring roadmap
 - [PROMETHEUS_INTEGRATION.md](docs/PROMETHEUS_INTEGRATION.md) - Prometheus data source integration plan
+- [EDGELAKE_DATASOURCE_PLAN.md](docs/EDGELAKE_DATASOURCE_PLAN.md) - EdgeLake data source integration plan
 - Swagger UI: http://localhost:3001/swagger/index.html
 
 ---
 
-**Last Updated**: 2026-01-23
-**Build**: 446
+**Last Updated**: 2026-01-28
+**Build**: 459
 
 ## Simulator Services
 

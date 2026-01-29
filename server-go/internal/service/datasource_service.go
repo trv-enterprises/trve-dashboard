@@ -163,7 +163,7 @@ func (s *DatasourceService) UpdateDatasource(ctx context.Context, id string, req
 	}
 
 	// Update config if provided and validate
-	if req.Config.API != nil || req.Config.Socket != nil || req.Config.CSV != nil || req.Config.SQL != nil || req.Config.TSStore != nil {
+	if req.Config.API != nil || req.Config.Socket != nil || req.Config.CSV != nil || req.Config.SQL != nil || req.Config.TSStore != nil || req.Config.EdgeLake != nil {
 		// Preserve existing secrets if masked value is sent
 		preserveSecrets(&req.Config, &datasource.Config)
 
@@ -285,6 +285,10 @@ func (s *DatasourceService) TestDatasource(ctx context.Context, req *models.Test
 		}
 	case models.DatasourceTypeTSStore:
 		response = s.testTSStoreConnection(ctx, req.Config.TSStore)
+	case models.DatasourceTypePrometheus:
+		response = s.testPrometheusConnection(ctx, req.Config.Prometheus)
+	case models.DatasourceTypeEdgeLake:
+		response = s.testEdgeLakeConnection(ctx, req.Config.EdgeLake)
 	default:
 		return &models.TestDatasourceResponse{
 			Success: false,
@@ -329,6 +333,10 @@ func (s *DatasourceService) CheckHealth(ctx context.Context, id string) (*models
 		}
 	case models.DatasourceTypeTSStore:
 		testResponse = s.testTSStoreConnection(ctx, datasource.Config.TSStore)
+	case models.DatasourceTypePrometheus:
+		testResponse = s.testPrometheusConnection(ctx, datasource.Config.Prometheus)
+	case models.DatasourceTypeEdgeLake:
+		testResponse = s.testEdgeLakeConnection(ctx, datasource.Config.EdgeLake)
 	}
 
 	health.Status = testResponse.Status
@@ -381,6 +389,18 @@ func (s *DatasourceService) validateConfig(dsType models.DatasourceType, config 
 			return fmt.Errorf("TSStore configuration is required for TSStore datasource")
 		}
 		return s.validateTSStoreConfig(config.TSStore)
+
+	case models.DatasourceTypePrometheus:
+		if config.Prometheus == nil {
+			return fmt.Errorf("Prometheus configuration is required for Prometheus datasource")
+		}
+		return s.validatePrometheusConfig(config.Prometheus)
+
+	case models.DatasourceTypeEdgeLake:
+		if config.EdgeLake == nil {
+			return fmt.Errorf("EdgeLake configuration is required for EdgeLake datasource")
+		}
+		return s.validateEdgeLakeConfig(config.EdgeLake)
 
 	default:
 		return fmt.Errorf("unsupported datasource type: %s", dsType)
@@ -497,6 +517,25 @@ func (s *DatasourceService) validateTSStoreConfig(config *models.TSStoreConfig) 
 		return fmt.Errorf("store name is required")
 	}
 
+	return nil
+}
+
+// validatePrometheusConfig validates Prometheus configuration
+func (s *DatasourceService) validatePrometheusConfig(config *models.PrometheusConfig) error {
+	if config.URL == "" {
+		return fmt.Errorf("Prometheus URL is required")
+	}
+	return nil
+}
+
+// validateEdgeLakeConfig validates EdgeLake configuration
+func (s *DatasourceService) validateEdgeLakeConfig(config *models.EdgeLakeConfig) error {
+	if config.Host == "" {
+		return fmt.Errorf("host is required")
+	}
+	if config.Port == 0 {
+		return fmt.Errorf("port is required")
+	}
 	return nil
 }
 
@@ -708,6 +747,62 @@ func (s *DatasourceService) testTSStoreConnection(ctx context.Context, config *m
 	}
 }
 
+// testPrometheusConnection tests a Prometheus connection
+func (s *DatasourceService) testPrometheusConnection(ctx context.Context, config *models.PrometheusConfig) *models.TestDatasourceResponse {
+	promDS, err := datasource.NewPrometheusDataSource(config)
+	if err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Failed to create Prometheus datasource: %v", err),
+		}
+	}
+	defer promDS.Close()
+
+	// Test the connection
+	if err := promDS.TestConnection(ctx); err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+
+	return &models.TestDatasourceResponse{
+		Success: true,
+		Status:  models.HealthStatusHealthy,
+		Message: fmt.Sprintf("Connection successful (%s)", config.URL),
+	}
+}
+
+// testEdgeLakeConnection tests an EdgeLake connection
+func (s *DatasourceService) testEdgeLakeConnection(ctx context.Context, config *models.EdgeLakeConfig) *models.TestDatasourceResponse {
+	elDS, err := datasource.NewEdgeLakeDataSource(config)
+	if err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Failed to create EdgeLake datasource: %v", err),
+		}
+	}
+	defer elDS.Close()
+
+	// Test the connection
+	if err := elDS.TestConnection(ctx); err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+
+	return &models.TestDatasourceResponse{
+		Success: true,
+		Status:  models.HealthStatusHealthy,
+		Message: fmt.Sprintf("Connection successful (%s:%d)", config.Host, config.Port),
+	}
+}
+
 // QueryDatasource executes a query against a datasource
 func (s *DatasourceService) QueryDatasource(ctx context.Context, id string, req *models.QueryRequest) (*models.QueryResponse, error) {
 	// Get datasource configuration
@@ -762,6 +857,11 @@ func (s *DatasourceService) GetSchema(ctx context.Context, id string) (*models.S
 		return nil, fmt.Errorf("datasource not found")
 	}
 
+	// Handle Prometheus schema separately
+	if ds.Type == models.DatasourceTypePrometheus {
+		return s.getPrometheusSchema(ctx, ds)
+	}
+
 	// Only SQL datasources support schema discovery
 	if ds.Type != models.DatasourceTypeSQL {
 		return &models.SchemaResponse{
@@ -808,4 +908,172 @@ func (s *DatasourceService) GetSchema(ctx context.Context, id string) (*models.S
 		Schema:   schema,
 		Duration: duration,
 	}, nil
+}
+
+// getPrometheusSchema retrieves schema information from a Prometheus datasource
+func (s *DatasourceService) getPrometheusSchema(ctx context.Context, ds *models.Datasource) (*models.SchemaResponse, error) {
+	startTime := time.Now()
+
+	// Create Prometheus datasource
+	promDS, err := datasource.NewPrometheusDataSource(ds.Config.Prometheus)
+	if err != nil {
+		return &models.SchemaResponse{
+			Success: false,
+			Error:   fmt.Sprintf("Failed to create Prometheus datasource: %v", err),
+		}, nil
+	}
+	defer promDS.Close()
+
+	// Get metrics list
+	metrics, err := promDS.GetMetrics(ctx)
+	if err != nil {
+		return &models.SchemaResponse{
+			Success:  false,
+			Error:    fmt.Sprintf("Failed to get metrics: %v", err),
+			Duration: time.Since(startTime).Milliseconds(),
+		}, nil
+	}
+
+	// Get labels list
+	labels, err := promDS.GetLabels(ctx)
+	if err != nil {
+		return &models.SchemaResponse{
+			Success:  false,
+			Error:    fmt.Sprintf("Failed to get labels: %v", err),
+			Duration: time.Since(startTime).Milliseconds(),
+		}, nil
+	}
+
+	// Build metric info list (just names for now, metadata could be added later)
+	metricInfos := make([]models.PrometheusMetricInfo, len(metrics))
+	for i, name := range metrics {
+		metricInfos[i] = models.PrometheusMetricInfo{
+			Name: name,
+		}
+	}
+
+	return &models.SchemaResponse{
+		Success: true,
+		PrometheusSchema: &models.PrometheusSchemaInfo{
+			Metrics: metricInfos,
+			Labels:  labels,
+		},
+		Duration: time.Since(startTime).Milliseconds(),
+	}, nil
+}
+
+// GetPrometheusLabelValues retrieves all values for a specific label from a Prometheus datasource
+func (s *DatasourceService) GetPrometheusLabelValues(ctx context.Context, id string, labelName string) ([]string, error) {
+	// Get datasource configuration
+	ds, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving datasource: %w", err)
+	}
+	if ds == nil {
+		return nil, fmt.Errorf("datasource not found")
+	}
+
+	// Only Prometheus datasources support this
+	if ds.Type != models.DatasourceTypePrometheus {
+		return nil, fmt.Errorf("label values are only available for Prometheus datasources")
+	}
+
+	// Create Prometheus datasource
+	promDS, err := datasource.NewPrometheusDataSource(ds.Config.Prometheus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Prometheus datasource: %w", err)
+	}
+	defer promDS.Close()
+
+	// Get label values
+	values, err := promDS.GetLabelValues(ctx, labelName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get label values: %w", err)
+	}
+
+	return values, nil
+}
+
+// GetEdgeLakeDatabases retrieves all databases from an EdgeLake data source
+func (s *DatasourceService) GetEdgeLakeDatabases(ctx context.Context, id string) ([]string, error) {
+	ds, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving datasource: %w", err)
+	}
+	if ds == nil {
+		return nil, fmt.Errorf("datasource not found")
+	}
+
+	if ds.Type != models.DatasourceTypeEdgeLake {
+		return nil, fmt.Errorf("database listing is only available for EdgeLake datasources")
+	}
+
+	elDS, err := datasource.NewEdgeLakeDataSource(ds.Config.EdgeLake)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create EdgeLake datasource: %w", err)
+	}
+	defer elDS.Close()
+
+	databases, err := elDS.ListDatabases(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list databases: %w", err)
+	}
+
+	return databases, nil
+}
+
+// GetEdgeLakeTables retrieves tables for a specific database from an EdgeLake data source
+func (s *DatasourceService) GetEdgeLakeTables(ctx context.Context, id string, database string) ([]string, error) {
+	ds, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving datasource: %w", err)
+	}
+	if ds == nil {
+		return nil, fmt.Errorf("datasource not found")
+	}
+
+	if ds.Type != models.DatasourceTypeEdgeLake {
+		return nil, fmt.Errorf("table listing is only available for EdgeLake datasources")
+	}
+
+	elDS, err := datasource.NewEdgeLakeDataSource(ds.Config.EdgeLake)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create EdgeLake datasource: %w", err)
+	}
+	defer elDS.Close()
+
+	tables, err := elDS.ListTables(ctx, database)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tables: %w", err)
+	}
+
+	return tables, nil
+}
+
+// GetEdgeLakeSchema retrieves the column schema for a table from an EdgeLake data source
+func (s *DatasourceService) GetEdgeLakeSchema(ctx context.Context, id string, database, table string) ([]models.EdgeLakeColumnInfo, error) {
+	ds, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving datasource: %w", err)
+	}
+	if ds == nil {
+		return nil, fmt.Errorf("datasource not found")
+	}
+
+	if ds.Type != models.DatasourceTypeEdgeLake {
+		return nil, fmt.Errorf("schema discovery is only available for EdgeLake datasources")
+	}
+
+	elDS, err := datasource.NewEdgeLakeDataSource(ds.Config.EdgeLake)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create EdgeLake datasource: %w", err)
+	}
+	defer elDS.Close()
+
+	columns, err := elDS.GetTableSchema(ctx, database, table)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get table schema: %w", err)
+	}
+
+	return columns, nil
 }

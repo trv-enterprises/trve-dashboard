@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo, useContext, createContext } from 'react';
 import * as React from 'react';
 import * as echarts from 'echarts';
+import 'echarts-gl'; // Required for 3D charts (scatter3D, bar3D, surface, etc.)
 import ReactECharts from 'echarts-for-react';
 import { carbonLightTheme, carbonDarkTheme } from '../theme/carbonEchartsTheme';
 import { useData as useDataOriginal } from '../hooks/useData';
@@ -72,12 +73,16 @@ function useDataWithTransforms(params) {
  * - getValue: Get a single value from first row of data
  * - formatTimestamp: Format timestamp values for display (supports Unix seconds, ms, ISO)
  * - formatCellValue: Auto-format cell values based on column name and value type
- * - echarts: ECharts core library
+ * - echarts: ECharts core library (includes echarts-gl for 3D charts)
  * - ReactECharts: ECharts React wrapper component
  * - carbonTheme: Carbon Design System ECharts theme (light mode)
  * - carbonDarkTheme: Carbon Design System ECharts theme (dark mode)
  * - Carbon DataTable components: DataTable, Table, TableHead, TableRow, TableHeader,
  *   TableBody, TableCell, TableContainer, TableToolbar, TableToolbarContent, TableToolbarSearch
+ *
+ * 3D Chart Support (via echarts-gl):
+ * - scatter3D, bar3D, line3D, surface, map3D, globe
+ * - grid3D, xAxis3D, yAxis3D, zAxis3D
  */
 export default function DynamicComponentLoader({ code, props = {}, dataMapping = null, datasourceId = null, queryConfig = null, dataRefreshInterval = null }) {
   const [error, setError] = useState(null);

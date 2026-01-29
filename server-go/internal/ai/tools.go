@@ -45,9 +45,27 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 			Description: anthropic.String("Update the query configuration for data retrieval"),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
-					"query":            map[string]interface{}{"type": "string", "description": "The query string (SQL, API path, etc.)"},
-					"query_type":       map[string]interface{}{"type": "string", "description": "Type of query", "enum": []string{"sql", "api", "csv_filter", "stream_filter"}},
+					"query":            map[string]interface{}{"type": "string", "description": "The query string (SQL, API path, PromQL, etc.)"},
+					"query_type":       map[string]interface{}{"type": "string", "description": "Type of query", "enum": []string{"sql", "api", "csv_filter", "stream_filter", "prometheus", "edgelake"}},
 					"refresh_interval": map[string]interface{}{"type": "integer", "description": "Auto-refresh interval in milliseconds (0 for no refresh)"},
+					"prometheus_params": map[string]interface{}{
+						"type":        "object",
+						"description": "Prometheus-specific query parameters (only for prometheus query_type)",
+						"properties": map[string]interface{}{
+							"query_type": map[string]interface{}{"type": "string", "description": "Prometheus query type", "enum": []string{"instant", "range"}},
+							"start":      map[string]interface{}{"type": "string", "description": "Start time (RFC3339 or relative like 'now-1h')"},
+							"end":        map[string]interface{}{"type": "string", "description": "End time (RFC3339 or relative like 'now')"},
+							"step":       map[string]interface{}{"type": "string", "description": "Query resolution step (e.g., '15s', '1m', '5m')"},
+						},
+					},
+					"edgelake_params": map[string]interface{}{
+						"type":        "object",
+						"description": "EdgeLake-specific query parameters (only for edgelake query_type)",
+						"properties": map[string]interface{}{
+							"database": map[string]interface{}{"type": "string", "description": "Database name (REQUIRED for EdgeLake queries)"},
+						},
+						"required": []string{"database"},
+					},
 				},
 			},
 		},
@@ -163,6 +181,28 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 			},
 		},
 		{
+			Name:        "get_prometheus_schema",
+			Description: anthropic.String("Get available metrics and labels from a Prometheus data source. Use this to discover what metrics can be queried and what labels are available for filtering."),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"datasource_id": map[string]interface{}{"type": "string", "description": "ID of the Prometheus data source"},
+				},
+				Required: []string{"datasource_id"},
+			},
+		},
+		{
+			Name:        "get_edgelake_schema",
+			Description: anthropic.String("Get available databases, tables, and columns from an EdgeLake data source. Use this to discover the schema for query building. Provide datasource_id and optionally database and table to get progressively detailed schema information."),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"datasource_id": map[string]interface{}{"type": "string", "description": "ID of the EdgeLake data source"},
+					"database":      map[string]interface{}{"type": "string", "description": "Database name (optional - if omitted, returns list of databases)"},
+					"table":         map[string]interface{}{"type": "string", "description": "Table name (optional - if omitted with database, returns list of tables)"},
+				},
+				Required: []string{"datasource_id"},
+			},
+		},
+		{
 			Name:        "preview_data",
 			Description: anthropic.String("Get sample data for the current chart configuration"),
 			InputSchema: anthropic.ToolInputSchemaParam{
@@ -202,21 +242,23 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 
 // ToolName constants for easier reference
 const (
-	ToolUpdateChartConfig    = "update_chart_config"
-	ToolUpdateDataMapping    = "update_data_mapping"
-	ToolUpdateQueryConfig    = "update_query_config"
-	ToolUpdateFilters        = "update_filters"
-	ToolUpdateAggregation    = "update_aggregation"
-	ToolUpdateSlidingWindow  = "update_sliding_window"
-	ToolUpdateTimeBucket     = "update_time_bucket"
-	ToolSetCustomCode        = "set_custom_code"
-	ToolUpdateChartOptions   = "update_chart_options"
-	ToolQueryDatasource      = "query_datasource"
-	ToolListDatasources      = "list_datasources"
-	ToolGetDatasourceSchema  = "get_datasource_schema"
-	ToolPreviewData          = "preview_data"
-	ToolGetChartState        = "get_chart_state"
-	ToolSuggestMissing       = "suggest_missing_tools"
+	ToolUpdateChartConfig     = "update_chart_config"
+	ToolUpdateDataMapping     = "update_data_mapping"
+	ToolUpdateQueryConfig     = "update_query_config"
+	ToolUpdateFilters         = "update_filters"
+	ToolUpdateAggregation     = "update_aggregation"
+	ToolUpdateSlidingWindow   = "update_sliding_window"
+	ToolUpdateTimeBucket      = "update_time_bucket"
+	ToolSetCustomCode         = "set_custom_code"
+	ToolUpdateChartOptions    = "update_chart_options"
+	ToolQueryDatasource       = "query_datasource"
+	ToolListDatasources       = "list_datasources"
+	ToolGetDatasourceSchema   = "get_datasource_schema"
+	ToolGetPrometheusSchema   = "get_prometheus_schema"
+	ToolGetEdgeLakeSchema     = "get_edgelake_schema"
+	ToolPreviewData           = "preview_data"
+	ToolGetChartState         = "get_chart_state"
+	ToolSuggestMissing        = "suggest_missing_tools"
 )
 
 // IsChartUpdateTool returns true if the tool modifies the chart

@@ -251,6 +251,22 @@ class APIClient {
     });
   }
 
+  async getPrometheusLabelValues(datasourceId, labelName) {
+    return this.request(`/api/datasources/${datasourceId}/prometheus/labels/${encodeURIComponent(labelName)}/values`);
+  }
+
+  async getEdgeLakeDatabases(datasourceId) {
+    return this.request(`/api/datasources/${datasourceId}/edgelake/databases`);
+  }
+
+  async getEdgeLakeTables(datasourceId, database) {
+    return this.request(`/api/datasources/${datasourceId}/edgelake/tables?database=${encodeURIComponent(database)}`);
+  }
+
+  async getEdgeLakeSchema(datasourceId, database, table) {
+    return this.request(`/api/datasources/${datasourceId}/edgelake/schema?database=${encodeURIComponent(database)}&table=${encodeURIComponent(table)}`);
+  }
+
   // AI Session endpoints
   async createAISession(chartId = null) {
     const payload = chartId ? { chart_id: chartId } : {};

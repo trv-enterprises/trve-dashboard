@@ -213,41 +213,41 @@ When working with Prometheus data sources:
 ## Implementation Phases
 
 ### Phase 1: Backend Adapter
-- [ ] Add `DatasourceTypePrometheus` constant to `models/datasource.go`
-- [ ] Create `PrometheusConfig` struct in `models/datasource.go`
-- [ ] Implement `prometheus.go` adapter with Query() and Close()
-- [ ] Add Prometheus case to factory `CreateFromConfig()`
-- [ ] Basic health check endpoint support
+- [x] Add `DatasourceTypePrometheus` constant to `models/datasource.go`
+- [x] Create `PrometheusConfig` struct in `models/datasource.go`
+- [x] Implement `prometheus.go` adapter with Query() and Close()
+- [x] Add Prometheus case to factory `CreateFromConfig()`
+- [x] Basic health check endpoint support
 
 ### Phase 2: Schema Discovery
-- [ ] Implement `PrometheusSchemaProvider` interface
-- [ ] Add `/api/datasources/:id/prometheus-schema` endpoint
-- [ ] Fetch and cache metric metadata
-- [ ] Return structured schema for UI consumption
+- [x] Implement `PrometheusSchemaProvider` interface
+- [x] Add `/api/datasources/:id/schema` endpoint (uses existing endpoint)
+- [x] Fetch metric and label metadata
+- [x] Return structured schema for UI consumption
 
 ### Phase 3: Query Execution
-- [ ] Implement range query with time parameters
-- [ ] Implement instant query
-- [ ] Normalize matrix/vector responses to ResultSet
-- [ ] Handle error responses and timeouts
+- [x] Implement range query with time parameters
+- [x] Implement instant query
+- [x] Normalize matrix/vector responses to ResultSet
+- [x] Handle error responses and timeouts
 
 ### Phase 4: Frontend - Data Source Config
-- [ ] Add "Prometheus" option to data source type selector
-- [ ] Create Prometheus config form (URL, auth, timeout)
-- [ ] Test connection functionality
+- [x] Add "Prometheus" option to data source type selector
+- [x] Create Prometheus config form (URL, auth, timeout)
+- [x] Test connection functionality
 
 ### Phase 5: Frontend - Query Builder
-- [ ] Create `PrometheusQueryBuilder.jsx` component
-- [ ] Metric selector with search
-- [ ] Label filter builder
-- [ ] Time range and step controls
-- [ ] Aggregation and group by options
-- [ ] PromQL preview display
-- [ ] Integrate into ChartEditor
+- [x] Create `PrometheusQueryBuilder.jsx` component
+- [x] Metric selector with search
+- [x] Label filter builder
+- [x] Time range and step controls
+- [x] Aggregation and group by options
+- [x] PromQL preview display
+- [x] Integrate into ChartEditor
 
 ### Phase 6: AI Integration
-- [ ] Add `get_prometheus_schema` tool
-- [ ] Update system prompt with Prometheus guidance
+- [x] Add `get_prometheus_schema` tool
+- [x] Update system prompt with Prometheus guidance
 - [ ] Test AI interaction with Prometheus data sources
 
 ### Phase 7: Streaming (Optional/Future)
@@ -301,4 +301,5 @@ When working with Prometheus data sources:
 ---
 
 **Created**: 2025-12-15
-**Status**: Planning
+**Updated**: 2026-01-27
+**Status**: Phases 1-6 Complete, Phase 7 (Streaming) Optional/Future

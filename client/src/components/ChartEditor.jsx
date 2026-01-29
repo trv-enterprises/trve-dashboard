@@ -26,6 +26,8 @@ import { Play, Add, TrashCan, ChartBar, Code, TableSplit } from '@carbon/icons-r
 import DynamicComponentLoader from './DynamicComponentLoader';
 import { API_BASE } from '../api/client';
 import SQLQueryBuilder from './SQLQueryBuilder';
+import PrometheusQueryBuilder from './PrometheusQueryBuilder';
+import EdgeLakeQueryBuilder from './EdgeLakeQueryBuilder';
 import { transformData, formatCellValue } from '../utils/dataTransforms';
 import apiClient from '../api/client';
 import './ChartEditor.scss';
@@ -247,6 +249,9 @@ const ChartEditor = forwardRef(function ChartEditor({
   const [tsstoreLimit, setTsstoreLimit] = useState(100);
   const [tsstoreSinceDuration, setTsstoreSinceDuration] = useState('1h'); // e.g., "30m", "2h", "7d"
 
+  // EdgeLake query configuration (for raw mode database param)
+  const [edgelakeDatabase, setEdgelakeDatabase] = useState('');
+
   // Preview data
   const [previewData, setPreviewData] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -421,6 +426,10 @@ const ChartEditor = forwardRef(function ChartEditor({
         }
         setTsstoreLimit(chart.query_config?.params?.limit || 100);
       }
+      // EdgeLake query config initialization
+      if (chart.query_config?.type === 'edgelake') {
+        setEdgelakeDatabase(chart.query_config?.params?.database || '');
+      }
       setComponentCode(chart.component_code || '');
       setShowCustomCode(chart.use_custom_code ?? (chart.chart_type === 'custom'));
       // Initialize chart options from saved data
@@ -530,6 +539,14 @@ const ChartEditor = forwardRef(function ChartEditor({
             setTsstoreLimit(100);
             setTsstoreSinceDuration('1h');
             break;
+          case 'edgelake':
+            setQueryType('edgelake');
+            setQueryMode('visual');
+            break;
+          case 'prometheus':
+            setQueryType('prometheus');
+            setQueryMode('visual');
+            break;
         }
       }
     }
@@ -566,6 +583,7 @@ const ChartEditor = forwardRef(function ChartEditor({
     setTsstoreQueryType('newest');
     setTsstoreLimit(100);
     setTsstoreSinceDuration('1h');
+    setEdgelakeDatabase('');
     setComponentCode('');
     setShowCustomCode(false);
     setPreviewData(null);
@@ -618,6 +636,8 @@ const ChartEditor = forwardRef(function ChartEditor({
           rawQuery = tsstoreQueryType;
           queryParams = { limit: tsstoreLimit };
         }
+      } else if (selectedDatasource?.type === 'edgelake' && edgelakeDatabase) {
+        queryParams = { database: edgelakeDatabase };
       }
 
       const response = await fetch(`${API_BASE}/api/datasources/${selectedDatasourceId}/query`, {
@@ -680,6 +700,8 @@ const ChartEditor = forwardRef(function ChartEditor({
         rawQuery = tsstoreQueryType;
         queryParams = { limit: tsstoreLimit };
       }
+    } else if (selectedDatasource?.type === 'edgelake' && edgelakeDatabase) {
+      queryParams = { database: edgelakeDatabase };
     }
 
     const transforms = {
@@ -695,7 +717,7 @@ const ChartEditor = forwardRef(function ChartEditor({
     };
 
     return getDataDrivenChartCode(chartType, selectedDatasourceId, rawQuery, queryType, xAxisColumn, yAxisColumns, transforms, chartOptions, queryParams, seriesColumn);
-  }, [chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, xAxisLabel, xAxisFormat, yAxisColumns, yAxisLabel, filters, aggregation, sortBy, sortOrder, limitRows, showCustomCode, componentCode, name, chartOptions, selectedDatasource, tsstoreLimit, tsstoreQueryType, tsstoreSinceDuration, seriesColumn]);
+  }, [chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, xAxisLabel, xAxisFormat, yAxisColumns, yAxisLabel, filters, aggregation, sortBy, sortOrder, limitRows, showCustomCode, componentCode, name, chartOptions, selectedDatasource, tsstoreLimit, tsstoreQueryType, tsstoreSinceDuration, seriesColumn, edgelakeDatabase]);
 
   const filteredPreviewData = useMemo(() => {
     if (!previewData) return null;
@@ -802,7 +824,9 @@ const ChartEditor = forwardRef(function ChartEditor({
         type: queryType,
         params: selectedDatasource?.type === 'tsstore'
           ? (tsstoreQueryType === 'since' ? {} : { limit: tsstoreLimit })
-          : {}
+          : selectedDatasource?.type === 'edgelake' && edgelakeDatabase
+            ? { database: edgelakeDatabase }
+            : {}
       } : null,
       data_mapping: selectedDatasourceId ? {
         x_axis: xAxisColumn,
@@ -1013,6 +1037,28 @@ const ChartEditor = forwardRef(function ChartEditor({
                           <Switch name="raw" text="Raw SQL" />
                         </ContentSwitcher>
                       )}
+                      {selectedDatasource.type === 'prometheus' && (
+                        <ContentSwitcher
+                          size="sm"
+                          selectedIndex={queryMode === 'visual' ? 0 : 1}
+                          onChange={(e) => setQueryMode(e.name)}
+                          className="query-mode-switcher"
+                        >
+                          <Switch name="visual" text="Visual" />
+                          <Switch name="raw" text="PromQL" />
+                        </ContentSwitcher>
+                      )}
+                      {selectedDatasource.type === 'edgelake' && (
+                        <ContentSwitcher
+                          size="sm"
+                          selectedIndex={queryMode === 'visual' ? 0 : 1}
+                          onChange={(e) => setQueryMode(e.name)}
+                          className="query-mode-switcher"
+                        >
+                          <Switch name="visual" text="Visual" />
+                          <Switch name="raw" text="Raw SQL" />
+                        </ContentSwitcher>
+                      )}
                       {selectedDatasource.type === 'socket' ? (
                         <Button
                           kind="tertiary"
@@ -1136,6 +1182,44 @@ const ChartEditor = forwardRef(function ChartEditor({
                           setPreviewError(null);
                         } else {
                           setPreviewError(response.error);
+                        }
+                      }}
+                      initialQuery={queryRaw}
+                    />
+                  ) : selectedDatasource.type === 'prometheus' && queryMode === 'visual' ? (
+                    <PrometheusQueryBuilder
+                      datasourceId={selectedDatasourceId}
+                      onQueryChange={(query) => setQueryRaw(query)}
+                      onParamsChange={(params) => {
+                        // Store params for use in query execution
+                        // These will be passed via query_config.params
+                      }}
+                      onExecute={(response) => {
+                        if (response.success && response.result_set) {
+                          setPreviewData(response.result_set);
+                          if (response.result_set.columns) {
+                            setAvailableColumns(response.result_set.columns);
+                          }
+                          setPreviewError(null);
+                        } else {
+                          setPreviewError(response.error || 'Query failed');
+                        }
+                      }}
+                      initialQuery={queryRaw}
+                    />
+                  ) : selectedDatasource.type === 'edgelake' && queryMode === 'visual' ? (
+                    <EdgeLakeQueryBuilder
+                      datasourceId={selectedDatasourceId}
+                      onQueryChange={(query) => setQueryRaw(query)}
+                      onExecute={(response) => {
+                        if (response.success && response.result_set) {
+                          setPreviewData(response.result_set);
+                          if (response.result_set.columns) {
+                            setAvailableColumns(response.result_set.columns);
+                          }
+                          setPreviewError(null);
+                        } else {
+                          setPreviewError(response.error || 'Query failed');
                         }
                       }}
                       initialQuery={queryRaw}
@@ -2551,6 +2635,8 @@ function getQueryLabelForType(type) {
     case 'csv': return 'Filter Expression';
     case 'socket': return 'Stream Filter';
     case 'tsstore': return 'TSStore Query';
+    case 'prometheus': return 'PromQL Query';
+    case 'edgelake': return 'EdgeLake SQL Query';
     default: return 'Query';
   }
 }
@@ -2562,6 +2648,8 @@ function getQueryPlaceholderForType(type) {
     case 'csv': return 'sensor_type = temperature';
     case 'socket': return '';
     case 'tsstore': return 'newest';
+    case 'prometheus': return 'up{job="prometheus"}';
+    case 'edgelake': return 'SELECT * FROM sensor_data WHERE timestamp > NOW() - 1 hour LIMIT 100';
     default: return '';
   }
 }
