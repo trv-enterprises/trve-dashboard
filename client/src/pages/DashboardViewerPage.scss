@@ -148,7 +148,7 @@
     flex: 1 1 0; // Grow, shrink, and use 0 as basis for proper flex overflow
     min-height: 0; // Required for flex overflow to work
     height: 0; // Force flex to control height, not content
-    padding: 0;
+    padding: spacing.$spacing-03; // Match grid gap for consistent outer spacing
     overflow: auto; // THIS is the only scrolling element
     background-color: var(--cds-background);
 
@@ -163,6 +163,7 @@
         min-width: 0; // Allow grid to shrink below content size
         width: auto;
         height: auto;
+        gap: spacing.$spacing-02; // Match outer padding in reduce-to-fit mode
 
         .panel-container {
           min-height: 0; // Allow panels to shrink
@@ -215,7 +216,7 @@
 
         .component-wrapper {
           flex: 1;
-          padding: spacing.$spacing-04;
+          padding: spacing.$spacing-03;
           overflow: hidden;
           min-height: 0;
           height: 100%;
@@ -232,7 +233,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            padding: spacing.$spacing-04;
+            padding: spacing.$spacing-03;
           }
 
           // ECharts needs explicit dimensions

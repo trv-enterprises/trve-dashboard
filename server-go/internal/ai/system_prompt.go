@@ -222,24 +222,29 @@ const Component = ({ data }) => {
 
   const option = {
     backgroundColor: 'transparent',
-    title: { text: 'Chart Title', top: '1%', left: 'center', textStyle: { color: '#f4f4f4', fontSize: 16 } },
-    legend: { top: '8%', left: 'center', textStyle: { color: '#c6c6c6' } },
+    title: { text: 'Chart Title', top: 8, left: 'center', textStyle: { color: '#f4f4f4', fontSize: 16 } },
+    legend: { top: 38, left: 'center', textStyle: { color: '#c6c6c6' } },
     tooltip: {
       trigger: 'axis',
       backgroundColor: '#262626',
       borderColor: '#393939',
       textStyle: { color: '#f4f4f4' }
     },
-    grid: { left: '1.5%', right: '2%', bottom: '1.5%', top: '15%', containLabel: true },
+    grid: { left: 55, right: '2%', bottom: '1.5%', top: 68, containLabel: true },
     xAxis: {
       type: 'category',
       data: chartData.map(d => formatTimestamp(d.timestamp, 'chart_time')),
+      name: 'X Axis Label',
+      nameLocation: 'middle',
+      nameGap: 30,
       axisLine: { lineStyle: { color: '#525252' } },
       axisLabel: { color: '#c6c6c6' }
     },
     yAxis: {
       type: 'value',
       name: 'Y Axis Label',
+      nameLocation: 'middle',
+      nameGap: 40,
       nameTextStyle: { color: '#c6c6c6' },
       axisLine: { lineStyle: { color: '#525252' } },
       axisLabel: { color: '#c6c6c6' },
@@ -275,17 +280,23 @@ const Component = ({ data }) => {
 
   const option = {
     backgroundColor: 'transparent',
-    title: { text: 'Bar Chart', top: '1%', left: 'center', textStyle: { color: '#f4f4f4', fontSize: 16 } },
-    legend: { top: '8%', left: 'center', textStyle: { color: '#c6c6c6' } },
+    title: { text: 'Bar Chart', top: 8, left: 'center', textStyle: { color: '#f4f4f4', fontSize: 16 } },
+    legend: { top: 38, left: 'center', textStyle: { color: '#c6c6c6' } },
     tooltip: { trigger: 'axis', backgroundColor: '#262626', textStyle: { color: '#f4f4f4' } },
-    grid: { left: '1.5%', right: '2%', bottom: '1.5%', top: '15%', containLabel: true },
+    grid: { left: 55, right: '2%', bottom: '1.5%', top: 68, containLabel: true },
     xAxis: {
       type: 'category',
       data: chartData.map(d => d.category || d.name),
+      name: 'X Axis Label',
+      nameLocation: 'middle',
+      nameGap: 30,
       axisLabel: { color: '#c6c6c6' }
     },
     yAxis: {
       type: 'value',
+      name: 'Y Axis Label',
+      nameLocation: 'middle',
+      nameGap: 40,
       axisLabel: { color: '#c6c6c6' },
       splitLine: { lineStyle: { color: '#393939' } }
     },

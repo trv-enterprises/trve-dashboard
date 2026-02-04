@@ -244,7 +244,7 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
 ### Backend (Go)
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| Go | 1.23.x | Primary Language |
+| Go | 1.25.x | Primary Language |
 | Gin | 1.x | HTTP Framework |
 | MongoDB | 7.x | Primary Database |
 | Redis | 7.x | Caching |
@@ -362,7 +362,7 @@ dashboard/
 ## Development Setup
 
 ### Prerequisites
-- Go 1.23+ (via Homebrew on macOS)
+- Go 1.25+ (via Homebrew on macOS)
 - Node.js 18+
 - Docker & Docker Compose
 - MongoDB 7.x
@@ -376,7 +376,7 @@ docker compose up -d mongodb redis
 
 # Start Go backend (Terminal 1)
 cd server-go
-export PATH="/opt/homebrew/opt/go@1.23/bin:$PATH"
+# Go 1.25 is now the default, no PATH override needed
 go build -o bin/server cmd/server/main.go && ./bin/server
 
 # Start React frontend (Terminal 2)

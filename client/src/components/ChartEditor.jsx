@@ -2535,12 +2535,12 @@ ${transformsConfig}
   const anchorSize = Math.floor(minDim * 0.08);
 
   // Calculate all spacing as percentage of minDim for consistent scaling
-  const topMarginPercent = 2; // Top margin as percentage
+  const topMarginPercent = 0; // Top margin as percentage
   const titleHeightPercent = ${chartName ? 'Math.max(8, (titleFontSize / containerSize.height) * 100)' : '0'};
-  const gapPercent = 2; // Gap between title and gauge
+  const gapPercent = 1; // Gap between title and gauge
   const totalTitleSpace = ${chartName ? 'topMarginPercent + titleHeightPercent + gapPercent' : '0'};
-  const gaugeCenter = ['50%', String(50 + totalTitleSpace / 2) + '%'];
-  const gaugeRadius = String(90 - totalTitleSpace) + '%';
+  const gaugeCenter = ['50%', String(55 + totalTitleSpace / 2) + '%'];
+  const gaugeRadius = String(95 - totalTitleSpace) + '%';
   const titleTop = String(topMarginPercent) + '%';
 
   const option = {
@@ -2568,7 +2568,7 @@ ${transformsConfig}
       axisLabel: { distance: Math.floor(minDim * 0.08), color: '#999', fontSize: labelFontSize },
       anchor: { show: true, showAbove: true, size: anchorSize, itemStyle: { borderWidth: Math.floor(anchorSize * 0.4) } },
       title: { show: false },
-      detail: { valueAnimation: true, fontSize: baseFontSize, offsetCenter: [0, '70%'], formatter: ${detailFormatter} },
+      detail: { valueAnimation: true, fontSize: baseFontSize, offsetCenter: [0, '75%'], formatter: ${detailFormatter} },
       data: [{ value: value, name: yCol }]
     }]
   };
@@ -2589,8 +2589,10 @@ ${transformsConfig}
 
   // Show legend when using series column (multiple series by value) or multiple y columns
   const showLegend = seriesCol || yAxisCols.length > 1;
+  // Position legend at top, below title if present (title at 8px, legend needs more gap below title)
+  const legendTop = chartName ? 28 : 8;
   const legendCode = showLegend
-    ? (seriesCol ? "legend: { data: seriesValues.map(String), bottom: 0 }," : "legend: { data: yColumns, bottom: 0 },")
+    ? (seriesCol ? `legend: { data: seriesValues.map(String), top: ${legendTop} },` : `legend: { data: yColumns, top: ${legendTop} },`)
     : '';
 
   return `const Component = () => {
@@ -2615,12 +2617,12 @@ ${categoriesCode}
 
   const option = {
     backgroundColor: 'transparent',
-    ${chartName ? `title: { text: '${chartName.replace(/'/g, "\\'")}', left: 'center', top: 8, textStyle: { color: '#f4f4f4', fontSize: 16 } },` : ''}
+    ${chartName ? `title: { text: '${chartName.replace(/'/g, "\\'")}', left: 'center', top: 0, textStyle: { color: '#f4f4f4', fontSize: 16 } },` : ''}
     tooltip: { trigger: 'axis' },
     ${legendCode}
-    grid: { top: ${chartName ? '25' : '15'}, left: '1.5%', right: '2%', bottom: '1.5%', containLabel: true },
-    xAxis: { type: 'category', data: categories${chartType === 'area' ? ', boundaryGap: false' : ''}${xAxisLabel ? `, name: '${xAxisLabel}'` : ''} },
-    yAxis: { type: 'value'${yAxisLabel ? `, name: '${yAxisLabel}'` : ''} },
+    grid: { top: ${showLegend ? (chartName ? 55 : 35) : (chartName ? 30 : 10)}, left: ${yAxisLabel ? 55 : "'1.5%'"}, right: '2%', bottom: '1.5%', containLabel: true },
+    xAxis: { type: 'category', data: categories${chartType === 'area' ? ', boundaryGap: false' : ''}${xAxisLabel ? `, name: '${xAxisLabel}', nameLocation: 'middle', nameGap: 30` : ''} },
+    yAxis: { type: 'value'${yAxisLabel ? `, name: '${yAxisLabel}', nameLocation: 'middle', nameGap: 40` : ''} },
     series: series
   };
 
