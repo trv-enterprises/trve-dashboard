@@ -5,42 +5,58 @@
 package streaming
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/tviviano/dashboard/internal/models"
 )
 
-// TSStoreStream represents a streaming connection to a TSStore datasource
-// Implements the Streamer interface
+// TSStoreStream represents a streaming connection from a TSStore datasource
+// In ts-store v0.2.2+, streaming works via outbound push:
+// 1. Dashboard calls ts-store API to create a push connection
+// 2. ts-store dials out to dashboard's inbound WebSocket endpoint
+// 3. Dashboard receives data on the inbound endpoint
 type TSStoreStream struct {
 	datasourceID string
 	config       *models.TSStoreConfig
-	wsConn       *websocket.Conn
 	subscribers  map[chan models.Record]struct{}
 	buffer       *RingBuffer
 	mu           sync.RWMutex
 	cancelFunc   context.CancelFunc
 	connected    bool
 	lastError    error
-	reconnecting bool
+	connectionID string        // ts-store push connection ID
+	inboundChan  chan models.Record // channel to receive from inbound handler
 }
 
-// tsStoreWSMessage represents a WebSocket message from TSStore
-type tsStoreWSMessage struct {
-	Type      string          `json:"type"`                // "data", "caught_up", "error"
-	Timestamp int64           `json:"timestamp,omitempty"` // For data messages (nanoseconds)
-	BlockNum  uint32          `json:"block_num,omitempty"` // For data messages
-	Size      uint32          `json:"size,omitempty"`      // For data messages
-	Data      json.RawMessage `json:"data,omitempty"`      // For data messages
-	Message   string          `json:"message,omitempty"`   // For error messages
+// tsStorePushConnectionRequest is the request body for creating a push connection
+type tsStorePushConnectionRequest struct {
+	Mode             string `json:"mode"`                         // "push"
+	URL              string `json:"url"`                          // WebSocket URL of dashboard's inbound endpoint
+	From             int64  `json:"from"`                         // Starting timestamp (nanoseconds)
+	Format           string `json:"format,omitempty"`             // "full" or "compact"
+	Filter           string `json:"filter,omitempty"`             // Optional substring filter
+	FilterIgnoreCase bool   `json:"filter_ignore_case,omitempty"` // Case-insensitive filter
+	AggWindow        string `json:"agg_window,omitempty"`         // Aggregation window (e.g., "1m")
+	AggFields        string `json:"agg_fields,omitempty"`         // Per-field aggregation
+	AggDefault       string `json:"agg_default,omitempty"`        // Default aggregation function
+}
+
+// tsStorePushConnectionResponse is the response from creating a push connection
+type tsStorePushConnectionResponse struct {
+	ID        string `json:"id"`
+	Mode      string `json:"mode"`
+	URL       string `json:"url"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
+	Error     string `json:"error,omitempty"`
 }
 
 // NewTSStoreStream creates a new stream for a TSStore datasource
@@ -63,207 +79,186 @@ func (ts *TSStoreStream) Start(ctx context.Context) error {
 	streamCtx, cancel := context.WithCancel(ctx)
 	ts.cancelFunc = cancel
 
-	if err := ts.connect(); err != nil {
-		return fmt.Errorf("failed to connect to TSStore: %w", err)
+	// Subscribe to inbound handler to receive data from ts-store
+	inboundHandler := GetInboundHandler()
+	ts.inboundChan = inboundHandler.Subscribe(ts.datasourceID)
+
+	// Create push connection with ts-store
+	if err := ts.createPushConnection(streamCtx); err != nil {
+		inboundHandler.Unsubscribe(ts.datasourceID, ts.inboundChan)
+		return fmt.Errorf("failed to create push connection: %w", err)
 	}
 
-	// Start reading goroutine
-	go ts.readLoop(streamCtx)
-
-	return nil
-}
-
-// connect establishes the WebSocket connection to TSStore
-func (ts *TSStoreStream) connect() error {
 	ts.mu.Lock()
-	defer ts.mu.Unlock()
-
-	wsURL := ts.buildWebSocketURL()
-
-	dialer := websocket.Dialer{
-		HandshakeTimeout: 10 * time.Second,
-	}
-
-	// Add custom headers
-	headers := http.Header{}
-	for k, v := range ts.config.Headers {
-		headers.Set(k, v)
-	}
-
-	conn, _, err := dialer.Dial(wsURL, headers)
-	if err != nil {
-		ts.lastError = err
-		ts.connected = false
-		return fmt.Errorf("failed to connect to TSStore WebSocket: %w", err)
-	}
-
-	ts.wsConn = conn
 	ts.connected = true
-	ts.lastError = nil
-	log.Printf("[TSStoreStream %s] Connected to %s", ts.datasourceID, wsURL)
+	ts.mu.Unlock()
+
+	// Start goroutine to receive from inbound handler and broadcast to subscribers
+	go ts.receiveLoop(streamCtx)
 
 	return nil
 }
 
-// buildWebSocketURL constructs the WebSocket URL for TSStore streaming
-func (ts *TSStoreStream) buildWebSocketURL() string {
-	// Get WebSocket base URL from config
-	baseURL := ts.config.WebSocketURL()
+// createPushConnection calls ts-store API to create a push connection
+func (ts *TSStoreStream) createPushConnection(ctx context.Context) error {
+	// Build the inbound URL that ts-store will connect to
+	// Use the configured dashboard host or default to localhost
+	dashboardHost := ts.getDashboardHost()
+	inboundURL := GetInboundURL(dashboardHost, ts.datasourceID)
 
-	// Build query parameters
-	params := url.Values{}
+	// Build request
+	pushConfig := ts.config.Push
+	req := tsStorePushConnectionRequest{
+		Mode: "push",
+		URL:  inboundURL,
+		From: -1, // Default to current time (realtime only)
+	}
 
-	// API key for authentication
+	if pushConfig != nil {
+		req.From = pushConfig.From
+		req.Format = pushConfig.Format
+		req.Filter = pushConfig.Filter
+		req.FilterIgnoreCase = pushConfig.FilterIgnoreCase
+		req.AggWindow = pushConfig.AggWindow
+		req.AggFields = pushConfig.AggFields
+		req.AggDefault = pushConfig.AggDefault
+	}
+
+	// Use "full" format by default
+	if req.Format == "" {
+		req.Format = "full"
+	}
+
+	reqBody, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	// Build API URL
+	apiURL := fmt.Sprintf("%s/api/stores/%s/ws/connections", ts.config.BaseURL(), ts.config.StoreName)
+
+	log.Printf("[TSStoreStream %s] Creating push connection to %s, inbound URL: %s", ts.datasourceID, apiURL, inboundURL)
+
+	// Create HTTP request
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
 	if ts.config.APIKey != "" {
-		params.Set("api_key", ts.config.APIKey)
+		httpReq.Header.Set("X-API-Key", ts.config.APIKey)
+	}
+	for k, v := range ts.config.Headers {
+		httpReq.Header.Set(k, v)
 	}
 
-	// Start from "now" for real-time streaming
-	params.Set("from", "now")
-
-	// For schema stores, request compact format
-	if ts.config.DataType == models.TSStoreDataTypeSchema {
-		params.Set("format", "compact")
+	// Execute request
+	client := &http.Client{
+		Timeout: time.Duration(ts.getTimeout()) * time.Second,
 	}
 
-	return fmt.Sprintf("%s/api/stores/%s/ws/read?%s", baseURL, ts.config.StoreName, params.Encode())
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("failed to call ts-store API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("ts-store API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var pushResp tsStorePushConnectionResponse
+	if err := json.Unmarshal(body, &pushResp); err != nil {
+		return fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if pushResp.Error != "" {
+		return fmt.Errorf("ts-store error: %s", pushResp.Error)
+	}
+
+	ts.connectionID = pushResp.ID
+	log.Printf("[TSStoreStream %s] Push connection created: ID=%s, status=%s", ts.datasourceID, pushResp.ID, pushResp.Status)
+
+	return nil
 }
 
-// readLoop continuously reads from the WebSocket and broadcasts to subscribers
-func (ts *TSStoreStream) readLoop(ctx context.Context) {
-	reconnectDelay := time.Second
+// deletePushConnection removes the push connection from ts-store
+func (ts *TSStoreStream) deletePushConnection(ctx context.Context) error {
+	if ts.connectionID == "" {
+		return nil
+	}
 
+	apiURL := fmt.Sprintf("%s/api/stores/%s/ws/connections/%s", ts.config.BaseURL(), ts.config.StoreName, ts.connectionID)
+
+	httpReq, err := http.NewRequestWithContext(ctx, "DELETE", apiURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if ts.config.APIKey != "" {
+		httpReq.Header.Set("X-API-Key", ts.config.APIKey)
+	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("failed to delete push connection: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete push connection (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	log.Printf("[TSStoreStream %s] Push connection deleted: ID=%s", ts.datasourceID, ts.connectionID)
+	ts.connectionID = ""
+
+	return nil
+}
+
+// getDashboardHost returns the dashboard host address for the inbound WebSocket URL
+// This should be configured based on how ts-store can reach the dashboard
+func (ts *TSStoreStream) getDashboardHost() string {
+	// TODO: Make this configurable via environment variable or system config
+	// For now, use localhost:3001 which works for local development
+	return "localhost:3001"
+}
+
+// getTimeout returns the configured timeout or default
+func (ts *TSStoreStream) getTimeout() int {
+	if ts.config.Timeout > 0 {
+		return ts.config.Timeout
+	}
+	return 30
+}
+
+// receiveLoop receives records from the inbound handler and broadcasts to subscribers
+func (ts *TSStoreStream) receiveLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			ts.cleanup()
+			ts.cleanup(ctx)
 			return
-		default:
-			ts.mu.RLock()
-			conn := ts.wsConn
-			ts.mu.RUnlock()
-
-			if conn == nil {
-				time.Sleep(reconnectDelay)
-				continue
-			}
-
-			// Set read deadline to allow checking context periodically
-			conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				// Check if it's a timeout (expected, allows context check)
-				if netErr, ok := err.(interface{ Timeout() bool }); ok && netErr.Timeout() {
-					continue
-				}
-
-				log.Printf("[TSStoreStream %s] Read error: %v", ts.datasourceID, err)
-
+		case record, ok := <-ts.inboundChan:
+			if !ok {
+				// Channel closed
 				ts.mu.Lock()
 				ts.connected = false
-				ts.lastError = err
 				ts.mu.Unlock()
-
-				// Always try to reconnect for TSStore
-				ts.reconnect(ctx, &reconnectDelay)
-				continue
+				return
 			}
 
-			// Reset reconnect delay on successful read
-			reconnectDelay = time.Second
-
-			// Parse and broadcast the message
-			ts.processMessage(message)
+			// Broadcast to subscribers
+			ts.broadcast([]models.Record{record})
 		}
-	}
-}
-
-// processMessage parses a TSStore WebSocket message and broadcasts it
-func (ts *TSStoreStream) processMessage(message []byte) {
-	var msg tsStoreWSMessage
-	if err := json.Unmarshal(message, &msg); err != nil {
-		log.Printf("[TSStoreStream %s] Failed to parse message: %v", ts.datasourceID, err)
-		return
-	}
-
-	switch msg.Type {
-	case "data":
-		record := ts.wsMessageToRecord(&msg)
-		ts.broadcast([]models.Record{record})
-
-	case "caught_up":
-		// Optional: could send a special record to indicate caught up
-		log.Printf("[TSStoreStream %s] Caught up to real-time", ts.datasourceID)
-
-	case "error":
-		log.Printf("[TSStoreStream %s] Error from TSStore: %s", ts.datasourceID, msg.Message)
-	}
-}
-
-// wsMessageToRecord converts a TSStore WebSocket data message to a Record
-func (ts *TSStoreStream) wsMessageToRecord(msg *tsStoreWSMessage) models.Record {
-	record := models.Record{
-		"timestamp": msg.Timestamp / 1e9, // nanoseconds -> seconds
-	}
-
-	// Parse the data based on store type
-	switch ts.config.DataType {
-	case models.TSStoreDataTypeText:
-		var text string
-		if err := json.Unmarshal(msg.Data, &text); err != nil {
-			text = string(msg.Data)
-		}
-		record["data"] = text
-
-	default: // JSON or Schema
-		var data map[string]interface{}
-		if err := json.Unmarshal(msg.Data, &data); err != nil {
-			record["data"] = string(msg.Data)
-		} else {
-			// Merge data fields into record
-			for k, v := range data {
-				record[k] = v
-			}
-		}
-	}
-
-	return record
-}
-
-// reconnect attempts to reconnect with exponential backoff
-func (ts *TSStoreStream) reconnect(ctx context.Context, delay *time.Duration) {
-	ts.mu.Lock()
-	if ts.reconnecting {
-		ts.mu.Unlock()
-		return
-	}
-	ts.reconnecting = true
-	ts.mu.Unlock()
-
-	defer func() {
-		ts.mu.Lock()
-		ts.reconnecting = false
-		ts.mu.Unlock()
-	}()
-
-	log.Printf("[TSStoreStream %s] Reconnecting in %v...", ts.datasourceID, *delay)
-
-	select {
-	case <-ctx.Done():
-		return
-	case <-time.After(*delay):
-	}
-
-	if err := ts.connect(); err != nil {
-		log.Printf("[TSStoreStream %s] Reconnect failed: %v", ts.datasourceID, err)
-		// Exponential backoff
-		*delay = *delay * 2
-		if *delay > 30*time.Second {
-			*delay = 30 * time.Second
-		}
-	} else {
-		*delay = time.Second
 	}
 }
 
@@ -358,16 +353,24 @@ func (ts *TSStoreStream) Stop() {
 	}
 }
 
-// cleanup closes the WebSocket connection
-func (ts *TSStoreStream) cleanup() {
+// cleanup removes the push connection and cleans up resources
+func (ts *TSStoreStream) cleanup(ctx context.Context) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
-	if ts.wsConn != nil {
-		ts.wsConn.Close()
-		ts.wsConn = nil
+	// Delete the push connection from ts-store
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := ts.deletePushConnection(cleanupCtx); err != nil {
+		log.Printf("[TSStoreStream %s] Error deleting push connection: %v", ts.datasourceID, err)
 	}
-	ts.connected = false
 
+	// Unsubscribe from inbound handler
+	if ts.inboundChan != nil {
+		GetInboundHandler().Unsubscribe(ts.datasourceID, ts.inboundChan)
+		ts.inboundChan = nil
+	}
+
+	ts.connected = false
 	log.Printf("[TSStoreStream %s] Cleaned up", ts.datasourceID)
 }

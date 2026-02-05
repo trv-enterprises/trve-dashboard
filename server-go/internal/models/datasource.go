@@ -212,6 +212,42 @@ type TSStoreConfig struct {
 	APIKey    string            `json:"api_key,omitempty" bson:"api_key,omitempty"`                   // Optional API key for authentication
 	Headers   map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`                   // Additional HTTP headers
 	Timeout   int               `json:"timeout,omitempty" bson:"timeout,omitempty"`                   // Request timeout in seconds (default: 30)
+
+	// Push connection configuration for streaming (ts-store v0.2.2+)
+	// When streaming is enabled, dashboard calls ts-store API to create a push connection
+	// and ts-store dials out to dashboard's inbound WebSocket endpoint
+	Push *TSStorePushConfig `json:"push,omitempty" bson:"push,omitempty"`
+}
+
+// TSStorePushConfig configures the outbound WebSocket push from ts-store to dashboard
+// See ts-store docs: /docs/outbound-data-ws.md
+type TSStorePushConfig struct {
+	// From is the starting timestamp in nanoseconds (0 = oldest data, -1 = current time/realtime only)
+	From int64 `json:"from" bson:"from"`
+
+	// Format specifies the message format: "full" (default) or "compact" (for schema stores)
+	Format string `json:"format,omitempty" bson:"format,omitempty"`
+
+	// Filter is an optional substring filter - only send matching records
+	Filter string `json:"filter,omitempty" bson:"filter,omitempty"`
+
+	// FilterIgnoreCase enables case-insensitive filter matching
+	FilterIgnoreCase bool `json:"filter_ignore_case,omitempty" bson:"filter_ignore_case,omitempty"`
+
+	// AggWindow is the aggregation window duration (e.g., "1m", "5m", "1h")
+	// When set, records are aggregated over this time window before sending
+	AggWindow string `json:"agg_window,omitempty" bson:"agg_window,omitempty"`
+
+	// AggFields specifies per-field aggregation functions (e.g., "temp:avg,count:sum")
+	AggFields string `json:"agg_fields,omitempty" bson:"agg_fields,omitempty"`
+
+	// AggDefault is the default aggregation function for fields not in AggFields
+	// Options: avg, sum, min, max, first, last, count
+	AggDefault string `json:"agg_default,omitempty" bson:"agg_default,omitempty"`
+
+	// ConnectionID stores the active push connection ID returned by ts-store
+	// This is set when the push connection is created and used to manage/delete it
+	ConnectionID string `json:"connection_id,omitempty" bson:"connection_id,omitempty"`
 }
 
 // BaseURL returns the HTTP base URL built from protocol, host, and port

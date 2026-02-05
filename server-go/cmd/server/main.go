@@ -160,6 +160,11 @@ func main() {
 	streamManager := streaming.NewManager(datasourceRepo, streaming.DefaultManagerConfig())
 	fmt.Println("✓ StreamManager initialized for socket datasource streaming")
 
+	// Initialize inbound WebSocket handler for ts-store push connections
+	inboundHandler := streaming.GetInboundHandler()
+	_ = inboundHandler // Used in routes below
+	fmt.Println("✓ InboundHandler initialized for ts-store push connections")
+
 	// Initialize AI agent (optional - requires ANTHROPIC_API_KEY)
 	toolExecutor := ai.NewToolExecutor(chartRepo, datasourceRepo, datasourceService, chartHub)
 	var aiAgent *ai.Agent
@@ -299,6 +304,10 @@ func main() {
 	// MCP routes (outside /api group)
 	mcpHandler.SetupRoutes(router.Group(""))
 
+	// Inbound WebSocket endpoint for ts-store push connections (outside /api group, no auth required)
+	// ts-store dials out to this endpoint to push data
+	router.GET("/api/streams/inbound/:datasourceId", inboundHandler.HandleInboundWebSocket)
+
 	// Swagger documentation
 	if cfg.Swagger.Enabled {
 		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -307,6 +316,7 @@ func main() {
 
 	fmt.Println("✓ MCP SSE endpoint enabled at http://localhost:3001/mcp/sse")
 	fmt.Println("✓ AI Debug WebSocket enabled at ws://localhost:3001/api/ai/debug")
+	fmt.Println("✓ TSStore inbound WebSocket at ws://localhost:3001/api/streams/inbound/:datasourceId")
 
 	// Static file serving for SPA (production mode)
 	if cfg.StaticFiles.Enabled {
