@@ -1,12 +1,12 @@
-# Build stage
-FROM node:20-alpine AS builder
+# Build stage - use build platform for faster builds (JS is platform-independent)
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --legacy-peer-deps
 COPY . .
 RUN npm run build
 
-# Runtime stage - Caddy for serving + auto HTTPS
+# Runtime stage - Caddy for serving + auto HTTPS (uses target platform)
 FROM caddy:2-alpine
 COPY --from=builder /app/dist /srv
 COPY Caddyfile /etc/caddy/Caddyfile
