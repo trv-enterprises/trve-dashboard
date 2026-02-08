@@ -66,7 +66,7 @@ cd ..
 # Build client
 log "Building client..."
 cd client
-npm ci
+npm ci --legacy-peer-deps
 npm run build
 cd ..
 
