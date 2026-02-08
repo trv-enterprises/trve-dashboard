@@ -86,10 +86,18 @@ cd ..
 # Build multi-arch Docker images
 log "Building multi-arch Docker images (amd64 + arm64)..."
 
-# Ensure buildx builder exists
+# Ensure buildx builder exists with insecure registry support
 if ! docker buildx inspect multiarch-builder >/dev/null 2>&1; then
-    log "Creating buildx builder..."
-    docker buildx create --name multiarch-builder --use
+    log "Creating buildx builder with insecure registry support..."
+    cat > /tmp/buildkitd.toml <<EOF
+[registry."$REGISTRY"]
+  http = true
+  insecure = true
+EOF
+    docker buildx create --name multiarch-builder \
+        --driver docker-container \
+        --driver-opt "network=host" \
+        --buildkitd-config /tmp/buildkitd.toml
 fi
 docker buildx use multiarch-builder
 
