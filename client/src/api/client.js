@@ -251,6 +251,13 @@ class APIClient {
     });
   }
 
+  // Check health of an existing datasource (uses stored credentials)
+  async checkDatasourceHealth(id) {
+    return this.request(`/api/datasources/${id}/health`, {
+      method: 'POST',
+    });
+  }
+
   async getPrometheusLabelValues(datasourceId, labelName) {
     return this.request(`/api/datasources/${datasourceId}/prometheus/labels/${encodeURIComponent(labelName)}/values`);
   }

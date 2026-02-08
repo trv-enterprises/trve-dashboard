@@ -28,6 +28,7 @@ import (
 	"github.com/tviviano/dashboard/internal/repository"
 	"github.com/tviviano/dashboard/internal/service"
 	"github.com/tviviano/dashboard/internal/streaming"
+	"github.com/tviviano/dashboard/internal/version"
 
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -92,6 +93,11 @@ func main() {
 
 	// Health check endpoint
 	router.GET("/health", healthCheck(mongodb, redisClient))
+
+	// Version endpoint
+	router.GET("/version", func(c *gin.Context) {
+		c.JSON(http.StatusOK, version.Info())
+	})
 
 	// Initialize repositories
 	datasourceRepo := repository.NewDatasourceRepository(mongodb.Database)

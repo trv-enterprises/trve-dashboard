@@ -1,0 +1,42 @@
+{$DOMAIN:localhost} {
+    # Serve static files
+    root * /srv
+    file_server
+
+    # API proxy to Go backend
+    handle /api/* {
+        reverse_proxy server:3001
+    }
+
+    # Health check proxy
+    handle /health {
+        reverse_proxy server:3001
+    }
+
+    # Swagger proxy
+    handle /swagger/* {
+        reverse_proxy server:3001
+    }
+
+    # MCP/SSE proxy (disable buffering for streaming)
+    handle /mcp/* {
+        reverse_proxy server:3001 {
+            flush_interval -1
+        }
+    }
+
+    # WebSocket support for streaming endpoints
+    handle /api/streams/* {
+        reverse_proxy server:3001
+    }
+
+    # SPA fallback - serve index.html for client-side routing
+    try_files {path} /index.html
+
+    # Cache static assets with hashed filenames
+    @assets path /assets/*
+    header @assets Cache-Control "public, max-age=31536000, immutable"
+
+    # Enable compression
+    encode gzip
+}

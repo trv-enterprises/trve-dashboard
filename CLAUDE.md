@@ -18,6 +18,15 @@ This file provides context and guidance for AI assistants working on this projec
 - Don't mention "datasource" (single word) in code or documentation
 - Use "data source" (two words) or "source system" instead
 
+### 4. Full-Stack Awareness
+- **Always consider frontend impact**: When making backend changes (API endpoints, models, response formats), identify and implement the corresponding frontend changes (API client, components, forms, types).
+- Backend model changes typically require updates to:
+  - `client/src/api/client.js` - API client methods
+  - Form components that create/edit the entity
+  - Display components that show the entity
+  - Any TypeScript types or PropTypes if used
+- Don't leave the frontend out of sync with backend changes.
+
 ---
 
 ## React Architecture Rules
@@ -473,6 +482,7 @@ const Component = () => {
 - Performance optimization
 
 ### 📋 Planned
+- **Fix AI Chart Builder 429 Rate Limit Error**: Hitting Anthropic's 30k input tokens/minute limit after just a few messages. Options: implement retry-with-backoff on 429 errors, trim conversation history to last N messages, or summarize older context to reduce token usage.
 - **Tabbed Panel Layout**: Allow panels to contain multiple charts with tabs to switch between
 - **Data Source Testing in Editor**: Add connection test capability to data source editor UI (backend API already exists at `/api/datasources/test`)
 - **Dashboard Design Preset Sizes**: Implement solution for layout dimensions/aspect ratios for fullscreen viewing

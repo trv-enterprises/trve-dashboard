@@ -1,0 +1,28 @@
+# Git
+.git
+.gitignore
+
+# Binaries
+bin/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test files
+*_test.go
+coverage.out
+
+# Documentation (built separately)
+docs/swagger.json
+docs/swagger.yaml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local config overrides
+config.local.yaml
+*.local.yaml

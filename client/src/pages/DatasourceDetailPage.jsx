@@ -20,7 +20,8 @@ import {
   TabPanels,
   TabPanel,
   InlineNotification,
-  Tag
+  Tag,
+  Toggle
 } from '@carbon/react';
 import { Save, Close, TrashCan, Play, ConnectionSignal, Checkmark, ErrorFilled, ArrowLeft } from '@carbon/icons-react';
 import apiClient, { API_BASE } from '../api/client';
@@ -214,7 +215,8 @@ function DatasourceDetailPage() {
 
   const updateConfig = (path, value) => {
     setConfig((prev) => {
-      const newConfig = { ...prev };
+      // Deep clone to avoid mutation issues with nested objects
+      const newConfig = JSON.parse(JSON.stringify(prev));
       const keys = path.split('.');
       let current = newConfig;
 
@@ -311,7 +313,21 @@ function DatasourceDetailPage() {
     setTestSchema(null);
 
     try {
-      const result = await apiClient.testDatasource(type, config);
+      let result;
+      if (isCreateMode) {
+        // For new datasources, test with the provided config
+        result = await apiClient.testDatasource(type, config);
+      } else {
+        // For existing datasources, use health check which fetches credentials from DB
+        const healthResult = await apiClient.checkDatasourceHealth(id);
+        // Convert health response to test response format
+        result = {
+          success: healthResult.status === 'healthy',
+          status: healthResult.status,
+          message: healthResult.error_message || (healthResult.status === 'healthy' ? 'Connection successful' : 'Connection failed'),
+          response_time: healthResult.response_time
+        };
+      }
       setTestResult(result);
 
       // For SQL datasources, schema is included in the test response data
@@ -892,6 +908,210 @@ function DatasourceDetailPage() {
           max={300}
           helperText="Request timeout in seconds"
         />
+
+        {/* Streaming/Push Configuration */}
+        <h4 style={{ marginTop: '1.5rem', marginBottom: '0.5rem', color: 'var(--cds-text-secondary)' }}>
+          Streaming Configuration (Optional)
+        </h4>
+        <p style={{ fontSize: '0.875rem', color: 'var(--cds-text-helper)', marginBottom: '1rem' }}>
+          Configure how data is pushed from ts-store to the dashboard. These settings affect all charts using this data source.
+        </p>
+
+        <TextInput
+          id="tsstore-filter"
+          labelText="Filter"
+          value={tsstoreConfig.push?.filter || ''}
+          onChange={(e) => updateConfig('tsstore.push.filter', e.target.value)}
+          placeholder="temperature"
+          helperText="Substring filter - only records containing this text are sent"
+        />
+
+        <Toggle
+          id="tsstore-filter-ignore-case"
+          labelText="Case-insensitive filter"
+          labelA="Off"
+          labelB="On"
+          toggled={tsstoreConfig.push?.filter_ignore_case || false}
+          onToggle={(checked) => updateConfig('tsstore.push.filter_ignore_case', checked)}
+        />
+
+        {/* Aggregation Section */}
+        <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: 'var(--cds-layer-01)', borderRadius: '4px' }}>
+          <Toggle
+            id="tsstore-enable-aggregation"
+            labelText="Enable time-window aggregation"
+            labelA="Off"
+            labelB="On"
+            toggled={!!tsstoreConfig.push?.agg_window}
+            onToggle={(checked) => {
+              if (!checked) {
+                // Clear all aggregation settings
+                updateConfig('tsstore.push.agg_window', '');
+                updateConfig('tsstore.push.agg_default', '');
+                updateConfig('tsstore.push.agg_fields', '');
+              } else {
+                // Set a default window
+                updateConfig('tsstore.push.agg_window', '1m');
+              }
+            }}
+          />
+
+          {tsstoreConfig.push?.agg_window && (
+            <div style={{ marginTop: '1rem' }}>
+              {/* Time Window */}
+              <div className="form-row" style={{ marginBottom: '1rem' }}>
+                <NumberInput
+                  id="tsstore-agg-window-value"
+                  label="Time Window"
+                  value={parseInt(tsstoreConfig.push?.agg_window) || 1}
+                  onChange={(e) => {
+                    const unit = tsstoreConfig.push?.agg_window?.replace(/[0-9]/g, '') || 'm';
+                    updateConfig('tsstore.push.agg_window', `${e.imaginaryTarget.value}${unit}`);
+                  }}
+                  min={1}
+                  max={60}
+                  helperText="Records are accumulated over this time period"
+                />
+                <Select
+                  id="tsstore-agg-window-unit"
+                  labelText="Unit"
+                  value={tsstoreConfig.push?.agg_window?.replace(/[0-9]/g, '') || 'm'}
+                  onChange={(e) => {
+                    const value = parseInt(tsstoreConfig.push?.agg_window) || 1;
+                    updateConfig('tsstore.push.agg_window', `${value}${e.target.value}`);
+                  }}
+                >
+                  <SelectItem value="s" text="Seconds" />
+                  <SelectItem value="m" text="Minutes" />
+                  <SelectItem value="h" text="Hours" />
+                </Select>
+              </div>
+
+              {/* Default Aggregations for Numeric Fields */}
+              <fieldset style={{ border: '1px solid var(--cds-border-subtle-01)', padding: '1rem', borderRadius: '4px', marginBottom: '1rem' }}>
+                <legend style={{ padding: '0 0.5rem', color: 'var(--cds-text-secondary)', fontSize: '0.875rem' }}>
+                  Default Aggregations for Numeric Fields
+                </legend>
+                <p style={{ fontSize: '0.75rem', color: 'var(--cds-text-helper)', marginBottom: '0.75rem' }}>
+                  Select which calculations to apply to all numeric fields (can select multiple):
+                </p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                  {['avg', 'sum', 'min', 'max', 'count', 'last'].map((func) => {
+                    const currentDefaults = (tsstoreConfig.push?.agg_default || '').split(',').filter(Boolean);
+                    const isChecked = currentDefaults.includes(func);
+                    return (
+                      <Checkbox
+                        key={func}
+                        id={`tsstore-agg-default-${func}`}
+                        labelText={func === 'avg' ? 'Average' : func === 'sum' ? 'Sum' : func === 'min' ? 'Minimum' : func === 'max' ? 'Maximum' : func === 'count' ? 'Count' : 'Last'}
+                        checked={isChecked}
+                        onChange={(_, { checked }) => {
+                          let newDefaults = currentDefaults.filter(f => f !== func);
+                          if (checked) {
+                            newDefaults.push(func);
+                          }
+                          updateConfig('tsstore.push.agg_default', newDefaults.join(','));
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              {/* Field-Specific Overrides */}
+              <fieldset style={{ border: '1px solid var(--cds-border-subtle-01)', padding: '1rem', borderRadius: '4px' }}>
+                <legend style={{ padding: '0 0.5rem', color: 'var(--cds-text-secondary)', fontSize: '0.875rem' }}>
+                  Field Overrides (Optional)
+                </legend>
+                <p style={{ fontSize: '0.75rem', color: 'var(--cds-text-helper)', marginBottom: '0.75rem' }}>
+                  Override default aggregations for specific fields. Use Test Connection to discover available fields.
+                </p>
+
+                {/* Parse and display existing field overrides */}
+                {(() => {
+                  const aggFieldsStr = tsstoreConfig.push?.agg_fields || '';
+                  const fieldOverrides = aggFieldsStr ? aggFieldsStr.split(',').map(part => {
+                    const [field, funcs] = part.split(':');
+                    return { field: field?.trim(), functions: (funcs || '').split('+').map(f => f.trim()).filter(Boolean) };
+                  }).filter(f => f.field) : [];
+
+                  return (
+                    <>
+                      {fieldOverrides.map((override, index) => (
+                        <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.75rem', padding: '0.75rem', backgroundColor: 'var(--cds-layer-02)', borderRadius: '4px' }}>
+                          <TextInput
+                            id={`tsstore-field-override-name-${index}`}
+                            labelText="Field"
+                            size="sm"
+                            value={override.field}
+                            onChange={(e) => {
+                              const newOverrides = [...fieldOverrides];
+                              newOverrides[index].field = e.target.value;
+                              const newStr = newOverrides.map(o => `${o.field}:${o.functions.join('+')}`).join(',');
+                              updateConfig('tsstore.push.agg_fields', newStr);
+                            }}
+                            style={{ width: '150px' }}
+                          />
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)', display: 'block', marginBottom: '0.25rem' }}>Aggregations</label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              {['avg', 'sum', 'min', 'max', 'count', 'last'].map((func) => (
+                                <Checkbox
+                                  key={func}
+                                  id={`tsstore-field-${index}-${func}`}
+                                  labelText={func}
+                                  checked={override.functions.includes(func)}
+                                  onChange={(_, { checked }) => {
+                                    const newOverrides = [...fieldOverrides];
+                                    if (checked) {
+                                      newOverrides[index].functions.push(func);
+                                    } else {
+                                      newOverrides[index].functions = newOverrides[index].functions.filter(f => f !== func);
+                                    }
+                                    const newStr = newOverrides.map(o => `${o.field}:${o.functions.join('+')}`).join(',');
+                                    updateConfig('tsstore.push.agg_fields', newStr);
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <Button
+                            kind="ghost"
+                            size="sm"
+                            hasIconOnly
+                            renderIcon={TrashCan}
+                            iconDescription="Remove override"
+                            onClick={() => {
+                              const newOverrides = fieldOverrides.filter((_, i) => i !== index);
+                              const newStr = newOverrides.map(o => `${o.field}:${o.functions.join('+')}`).join(',');
+                              updateConfig('tsstore.push.agg_fields', newStr);
+                            }}
+                            style={{ marginTop: '1rem' }}
+                          />
+                        </div>
+                      ))}
+                      <Button
+                        kind="tertiary"
+                        size="sm"
+                        onClick={() => {
+                          const newOverrides = [...fieldOverrides, { field: '', functions: ['avg'] }];
+                          const newStr = newOverrides.map(o => `${o.field}:${o.functions.join('+')}`).join(',');
+                          updateConfig('tsstore.push.agg_fields', newStr);
+                        }}
+                      >
+                        + Add field override
+                      </Button>
+                    </>
+                  );
+                })()}
+              </fieldset>
+
+              <p style={{ fontSize: '0.75rem', color: 'var(--cds-text-helper)', marginTop: '1rem', fontStyle: 'italic' }}>
+                Non-numeric fields always use "last value" only.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     );
   };

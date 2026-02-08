@@ -1,4 +1,13 @@
-.PHONY: help install run dev build test clean docker-up docker-down swagger
+.PHONY: help install run dev build test clean docker-up docker-down swagger release-build
+
+# Version info (can be overridden)
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BUILD_NUM ?= $(shell cat ../client/build.json 2>/dev/null | grep buildNumber | awk '{print $$2}' | tr -d ',' || echo "0")
+GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+LDFLAGS = -ldflags "-s -w \
+	-X github.com/tviviano/dashboard/internal/version.Version=$(VERSION) \
+	-X github.com/tviviano/dashboard/internal/version.BuildNum=$(BUILD_NUM) \
+	-X github.com/tviviano/dashboard/internal/version.GitCommit=$(GIT_COMMIT)"
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -65,5 +74,14 @@ vet: ## Run go vet
 	@echo "✓ Vet passed"
 
 all: install swagger build ## Install, generate swagger, and build
+
+release-build: ## Build release binaries with version info
+	@echo "Building version $(VERSION)+$(BUILD_NUM) (commit: $(GIT_COMMIT))"
+	mkdir -p dist
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/server-linux-amd64 cmd/server/main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o dist/server-linux-arm64 cmd/server/main.go
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/server-darwin-arm64 cmd/server/main.go
+	@echo "✓ Release binaries built in ./dist/"
+	@ls -la dist/
 
 .DEFAULT_GOAL := help
