@@ -108,7 +108,7 @@ release: ## Full release: build, tarballs, commit, tag, push (use with VERSION=v
 		echo "Error: Tag $(VERSION) already exists"; \
 		exit 1; \
 	fi
-	@if [ -n "$$(git status --porcelain)" ]; then \
+	@if [ -n "$$(git status --porcelain | grep -v '^??')" ]; then \
 		echo "Error: You have uncommitted changes. Commit or stash them first."; \
 		git status --short; \
 		exit 1; \
