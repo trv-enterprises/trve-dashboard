@@ -28,3 +28,10 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+
+# Go binaries
+server-go/bin/
+
+# Release artifacts
+dist/
+server-go/dist/
