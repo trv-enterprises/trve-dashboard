@@ -279,9 +279,11 @@ func (a *Agent) buildMessages(history []models.AIMessage, newUserContent string)
 			if len(msg.ToolCalls) > 0 {
 				toolResults := make([]anthropic.ContentBlockParamUnion, 0, len(msg.ToolCalls))
 				for _, tc := range msg.ToolCalls {
+					// Summarize read-only tool results to save tokens in history
+					output := summarizeToolResultForHistory(tc.Name, tc.Output)
 					toolResults = append(toolResults, anthropic.NewToolResultBlock(
 						tc.ID,
-						tc.Output,
+						output,
 						false, // not an error
 					))
 				}
@@ -296,6 +298,64 @@ func (a *Agent) buildMessages(history []models.AIMessage, newUserContent string)
 	))
 
 	return messages
+}
+
+// summarizeToolResultForHistory compresses verbose tool results in message history
+// to reduce token usage on subsequent API calls. The full result is preserved in
+// storage for debugging - this only affects what's sent to the LLM.
+func summarizeToolResultForHistory(toolName, output string) string {
+	// Tools whose results should be summarized (read-only discovery tools)
+	summarizableTools := map[string]bool{
+		ToolListDatasources:     true,
+		ToolGetSchema:           true,
+		ToolGetDatasourceSchema: true,
+		ToolGetPrometheusSchema: true,
+		ToolGetEdgeLakeSchema:   true,
+		ToolQueryDatasource:     true,
+		ToolPreviewData:         true,
+		ToolGetChartState:       true,
+	}
+
+	if !summarizableTools[toolName] {
+		return output
+	}
+
+	// Parse the result
+	var result ToolResult
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		return output // Can't parse, return as-is
+	}
+
+	// If it failed, keep the error message
+	if !result.Success {
+		return output
+	}
+
+	// Create a summary based on the tool type
+	summary := ToolResult{
+		Success: true,
+		Message: result.Message,
+	}
+
+	// For tools with data arrays, just note the count
+	switch toolName {
+	case ToolListDatasources:
+		if data, ok := result.Data.([]interface{}); ok {
+			summary.Message = fmt.Sprintf("Returned %d datasource(s) - use get_schema to explore", len(data))
+		}
+	case ToolGetSchema, ToolGetDatasourceSchema, ToolGetPrometheusSchema, ToolGetEdgeLakeSchema:
+		summary.Message = result.Message + " (schema already retrieved)"
+	case ToolQueryDatasource, ToolPreviewData:
+		summary.Message = result.Message + " (data already retrieved)"
+	case ToolGetChartState:
+		summary.Message = "Chart state retrieved (see previous response)"
+	}
+
+	summaryJSON, err := json.Marshal(summary)
+	if err != nil {
+		return output
+	}
+	return string(summaryJSON)
 }
 
 // GenerateToolCallID generates a unique ID for tool calls

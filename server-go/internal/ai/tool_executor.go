@@ -98,6 +98,8 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, chartID string, chartVer
 		return e.executeQueryDatasource(ctx, input)
 	case ToolListDatasources:
 		return e.executeListDatasources(ctx)
+	case ToolGetSchema:
+		return e.executeGetSchema(ctx, input)
 	case ToolGetDatasourceSchema:
 		return e.executeGetDatasourceSchema(ctx, input)
 	case ToolGetPrometheusSchema:
@@ -108,6 +110,8 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, chartID string, chartVer
 		return e.executePreviewData(ctx, chartID, chartVersion, input)
 	case ToolGetChartState:
 		return e.executeGetChartState(ctx, chartID, chartVersion)
+	case ToolGetChartTemplate:
+		return e.executeGetChartTemplate(input)
 	case ToolSuggestMissing:
 		return e.executeSuggestMissing(input)
 	default:
@@ -912,4 +916,503 @@ func (e *ToolExecutor) executeSuggestMissing(input json.RawMessage) (*ToolResult
 			"suggestion": params.Suggestion,
 		},
 	}, nil
+}
+
+// executeGetSchema returns unified schema information for any datasource type
+func (e *ToolExecutor) executeGetSchema(ctx context.Context, input json.RawMessage) (*ToolResult, error) {
+	var params struct {
+		DatasourceID string `json:"datasource_id"`
+		Database     string `json:"database,omitempty"`
+		Table        string `json:"table,omitempty"`
+	}
+	if err := json.Unmarshal(input, &params); err != nil {
+		return &ToolResult{Success: false, Error: "invalid input: " + err.Error()}, nil
+	}
+
+	if params.DatasourceID == "" {
+		return &ToolResult{Success: false, Error: "datasource_id is required"}, nil
+	}
+
+	// Get the datasource
+	ds, err := e.datasourceRepo.FindByID(ctx, params.DatasourceID)
+	if err != nil {
+		return &ToolResult{Success: false, Error: "failed to get data source: " + err.Error()}, nil
+	}
+	if ds == nil {
+		return &ToolResult{Success: false, Error: "data source not found: " + params.DatasourceID}, nil
+	}
+
+	sourceInfo := models.UnifiedSchemaSourceInfo{
+		ID:   ds.ID.Hex(),
+		Name: ds.Name,
+		Type: string(ds.Type),
+	}
+
+	var schema models.UnifiedSchema
+
+	switch ds.Type {
+	case models.DatasourceTypeSQL:
+		schema, err = e.getSQLUnifiedSchema(ctx, params.DatasourceID, params.Table)
+	case models.DatasourceTypePrometheus:
+		schema, err = e.getPrometheusUnifiedSchema(ctx, params.DatasourceID)
+	case models.DatasourceTypeEdgeLake:
+		schema, err = e.getEdgeLakeUnifiedSchema(ctx, params.DatasourceID, params.Database, params.Table)
+	case models.DatasourceTypeAPI, models.DatasourceTypeCSV, models.DatasourceTypeSocket, models.DatasourceTypeTSStore:
+		schema, err = e.inferSchemaFromData(ctx, params.DatasourceID)
+	default:
+		return &ToolResult{Success: false, Error: fmt.Sprintf("unsupported datasource type: %s", ds.Type)}, nil
+	}
+
+	if err != nil {
+		return &ToolResult{Success: false, Error: "schema discovery failed: " + err.Error()}, nil
+	}
+
+	response := models.UnifiedSchemaResponse{
+		Datasource: sourceInfo,
+		Schema:     schema,
+	}
+
+	// Generate summary message
+	var message string
+	if len(schema.Tables) > 0 {
+		message = fmt.Sprintf("Found %d table(s)", len(schema.Tables))
+	} else if len(schema.Columns) > 0 {
+		message = fmt.Sprintf("Found %d column(s)", len(schema.Columns))
+	} else if len(schema.Metrics) > 0 {
+		message = fmt.Sprintf("Found %d metric(s) and %d label(s)", len(schema.Metrics), len(schema.Labels))
+	} else {
+		message = "Schema retrieved successfully"
+	}
+
+	return &ToolResult{
+		Success: true,
+		Message: message,
+		Data:    response,
+	}, nil
+}
+
+// getSQLUnifiedSchema gets schema from SQL datasource in unified format
+func (e *ToolExecutor) getSQLUnifiedSchema(ctx context.Context, datasourceID, tableName string) (models.UnifiedSchema, error) {
+	response, err := e.datasourceSvc.GetSchema(ctx, datasourceID)
+	if err != nil {
+		return models.UnifiedSchema{}, err
+	}
+	if !response.Success || response.Schema == nil {
+		return models.UnifiedSchema{}, fmt.Errorf("schema discovery failed: %s", response.Error)
+	}
+
+	schema := models.UnifiedSchema{
+		Tables: make([]models.UnifiedSchemaTable, 0),
+	}
+
+	for _, table := range response.Schema.Tables {
+		// If tableName specified, only include that table
+		if tableName != "" && table.Name != tableName {
+			continue
+		}
+
+		unifiedTable := models.UnifiedSchemaTable{
+			Name:    table.Name,
+			Columns: make([]models.UnifiedSchemaColumn, len(table.Columns)),
+		}
+
+		for i, col := range table.Columns {
+			unifiedTable.Columns[i] = models.UnifiedSchemaColumn{
+				Name: col.Name,
+				Type: normalizeColumnType(col.Type),
+			}
+		}
+
+		schema.Tables = append(schema.Tables, unifiedTable)
+	}
+
+	return schema, nil
+}
+
+// getPrometheusUnifiedSchema gets schema from Prometheus datasource in unified format
+func (e *ToolExecutor) getPrometheusUnifiedSchema(ctx context.Context, datasourceID string) (models.UnifiedSchema, error) {
+	response, err := e.datasourceSvc.GetSchema(ctx, datasourceID)
+	if err != nil {
+		return models.UnifiedSchema{}, err
+	}
+	if !response.Success || response.PrometheusSchema == nil {
+		return models.UnifiedSchema{}, fmt.Errorf("Prometheus schema discovery failed: %s", response.Error)
+	}
+
+	metrics := make([]string, len(response.PrometheusSchema.Metrics))
+	for i, m := range response.PrometheusSchema.Metrics {
+		metrics[i] = m.Name
+	}
+
+	return models.UnifiedSchema{
+		Metrics: metrics,
+		Labels:  response.PrometheusSchema.Labels,
+	}, nil
+}
+
+// getEdgeLakeUnifiedSchema gets schema from EdgeLake datasource in unified format
+func (e *ToolExecutor) getEdgeLakeUnifiedSchema(ctx context.Context, datasourceID, database, table string) (models.UnifiedSchema, error) {
+	schema := models.UnifiedSchema{}
+
+	// If no database specified, return list of databases
+	if database == "" {
+		databases, err := e.datasourceSvc.GetEdgeLakeDatabases(ctx, datasourceID)
+		if err != nil {
+			return schema, err
+		}
+		// Return as empty tables list with a note - caller should specify database
+		// Using tables structure to hold database names as table names
+		schema.Tables = make([]models.UnifiedSchemaTable, len(databases))
+		for i, db := range databases {
+			schema.Tables[i] = models.UnifiedSchemaTable{Name: db}
+		}
+		return schema, nil
+	}
+
+	// If database but no table, return list of tables
+	if table == "" {
+		tables, err := e.datasourceSvc.GetEdgeLakeTables(ctx, datasourceID, database)
+		if err != nil {
+			return schema, err
+		}
+		schema.Tables = make([]models.UnifiedSchemaTable, len(tables))
+		for i, t := range tables {
+			schema.Tables[i] = models.UnifiedSchemaTable{Name: t}
+		}
+		return schema, nil
+	}
+
+	// Database and table specified, return columns
+	columns, err := e.datasourceSvc.GetEdgeLakeSchema(ctx, datasourceID, database, table)
+	if err != nil {
+		return schema, err
+	}
+
+	unifiedTable := models.UnifiedSchemaTable{
+		Name:    table,
+		Columns: make([]models.UnifiedSchemaColumn, len(columns)),
+	}
+	for i, col := range columns {
+		unifiedTable.Columns[i] = models.UnifiedSchemaColumn{
+			Name: col.Name,
+			Type: normalizeColumnType(col.Type),
+		}
+	}
+	schema.Tables = []models.UnifiedSchemaTable{unifiedTable}
+
+	return schema, nil
+}
+
+// inferSchemaFromData infers schema by querying sample data
+func (e *ToolExecutor) inferSchemaFromData(ctx context.Context, datasourceID string) (models.UnifiedSchema, error) {
+	// Query sample data (limit to 100 rows for inference)
+	req := &models.QueryRequest{
+		Query: models.Query{
+			Raw: "",
+			Params: map[string]interface{}{
+				"limit": 100,
+			},
+		},
+	}
+
+	response, err := e.datasourceSvc.QueryDatasource(ctx, datasourceID, req)
+	if err != nil {
+		return models.UnifiedSchema{}, fmt.Errorf("failed to query sample data: %w", err)
+	}
+
+	if response.ResultSet == nil || len(response.ResultSet.Columns) == 0 {
+		return models.UnifiedSchema{}, fmt.Errorf("no data available for schema inference")
+	}
+
+	schema := models.UnifiedSchema{
+		Columns:  make([]models.UnifiedSchemaColumn, len(response.ResultSet.Columns)),
+		RowCount: len(response.ResultSet.Rows),
+	}
+
+	for i, colName := range response.ResultSet.Columns {
+		// Collect all values for this column
+		values := make([]interface{}, 0, len(response.ResultSet.Rows))
+		for _, row := range response.ResultSet.Rows {
+			if i < len(row) {
+				values = append(values, row[i])
+			}
+		}
+
+		col := inferColumnSchema(colName, values)
+		schema.Columns[i] = col
+	}
+
+	return schema, nil
+}
+
+// inferColumnSchema infers the schema for a single column from its values
+func inferColumnSchema(colName string, values []interface{}) models.UnifiedSchemaColumn {
+	col := models.UnifiedSchemaColumn{
+		Name: colName,
+		Type: "mixed",
+	}
+
+	if len(values) == 0 {
+		return col
+	}
+
+	// Track types seen
+	var hasInt, hasFloat, hasBool, hasString bool
+	var firstNonNil interface{}
+	uniqueStrings := make(map[string]bool)
+	var minNum, maxNum float64
+	var hasNumeric bool
+
+	for _, v := range values {
+		if v == nil {
+			continue
+		}
+
+		if firstNonNil == nil {
+			firstNonNil = v
+		}
+
+		switch val := v.(type) {
+		case bool:
+			hasBool = true
+		case int, int8, int16, int32, int64:
+			hasInt = true
+			num := toFloat64(v)
+			if !hasNumeric {
+				minNum, maxNum = num, num
+				hasNumeric = true
+			} else {
+				if num < minNum {
+					minNum = num
+				}
+				if num > maxNum {
+					maxNum = num
+				}
+			}
+		case uint, uint8, uint16, uint32, uint64:
+			hasInt = true
+			num := toFloat64(v)
+			if !hasNumeric {
+				minNum, maxNum = num, num
+				hasNumeric = true
+			} else {
+				if num < minNum {
+					minNum = num
+				}
+				if num > maxNum {
+					maxNum = num
+				}
+			}
+		case float32, float64:
+			hasFloat = true
+			num := toFloat64(v)
+			if !hasNumeric {
+				minNum, maxNum = num, num
+				hasNumeric = true
+			} else {
+				if num < minNum {
+					minNum = num
+				}
+				if num > maxNum {
+					maxNum = num
+				}
+			}
+		case json.Number:
+			// Try to parse as int first, then float
+			if _, err := val.Int64(); err == nil {
+				hasInt = true
+			} else {
+				hasFloat = true
+			}
+			num, _ := val.Float64()
+			if !hasNumeric {
+				minNum, maxNum = num, num
+				hasNumeric = true
+			} else {
+				if num < minNum {
+					minNum = num
+				}
+				if num > maxNum {
+					maxNum = num
+				}
+			}
+		case string:
+			hasString = true
+			uniqueStrings[val] = true
+		default:
+			// Check if it's a numeric type via reflection
+			num := toFloat64(v)
+			if num != 0 || fmt.Sprintf("%v", v) == "0" {
+				hasFloat = true
+				if !hasNumeric {
+					minNum, maxNum = num, num
+					hasNumeric = true
+				} else {
+					if num < minNum {
+						minNum = num
+					}
+					if num > maxNum {
+						maxNum = num
+					}
+				}
+			} else {
+				hasString = true
+				uniqueStrings[fmt.Sprintf("%v", v)] = true
+			}
+		}
+	}
+
+	col.Sample = firstNonNil
+
+	// Determine type
+	typeCount := 0
+	if hasBool {
+		typeCount++
+	}
+	if hasInt || hasFloat {
+		typeCount++
+	}
+	if hasString {
+		typeCount++
+	}
+
+	if typeCount > 1 {
+		col.Type = "mixed"
+	} else if hasBool {
+		col.Type = "boolean"
+	} else if hasInt && !hasFloat {
+		// Check if this looks like a timestamp
+		if isTimestampColumn(colName, minNum, maxNum) {
+			col.Type = "timestamp"
+		} else {
+			col.Type = "integer"
+			col.Min = int64(minNum)
+			col.Max = int64(maxNum)
+		}
+	} else if hasFloat || hasInt {
+		col.Type = "float"
+		col.Min = minNum
+		col.Max = maxNum
+	} else if hasString {
+		col.Type = "string"
+		// Include unique values if ≤20
+		if len(uniqueStrings) <= 20 {
+			col.UniqueValues = make([]interface{}, 0, len(uniqueStrings))
+			for s := range uniqueStrings {
+				col.UniqueValues = append(col.UniqueValues, s)
+			}
+		}
+		col.UniqueCount = len(uniqueStrings)
+	}
+
+	return col
+}
+
+// isTimestampColumn checks if a numeric column is likely a timestamp
+func isTimestampColumn(colName string, min, max float64) bool {
+	// Check column name hints
+	nameLower := string(colName)
+	if contains(nameLower, "time") || contains(nameLower, "date") || contains(nameLower, "timestamp") || contains(nameLower, "created") || contains(nameLower, "updated") {
+		return true
+	}
+
+	// Check if values are in Unix timestamp range (seconds: 1970-2100)
+	// Seconds: 0 to ~4102444800 (year 2100)
+	// Milliseconds: > 1000000000000
+	if min >= 1000000000 && max <= 4102444800000 {
+		return true
+	}
+
+	return false
+}
+
+// contains checks if a string contains a substring (case insensitive)
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > 0 && containsLower(toLower(s), toLower(substr))))
+}
+
+func containsLower(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func toLower(s string) string {
+	result := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			result[i] = c + 32
+		} else {
+			result[i] = c
+		}
+	}
+	return string(result)
+}
+
+// toFloat64 converts a numeric value to float64
+func toFloat64(v interface{}) float64 {
+	switch val := v.(type) {
+	case int:
+		return float64(val)
+	case int8:
+		return float64(val)
+	case int16:
+		return float64(val)
+	case int32:
+		return float64(val)
+	case int64:
+		return float64(val)
+	case uint:
+		return float64(val)
+	case uint8:
+		return float64(val)
+	case uint16:
+		return float64(val)
+	case uint32:
+		return float64(val)
+	case uint64:
+		return float64(val)
+	case float32:
+		return float64(val)
+	case float64:
+		return val
+	case json.Number:
+		f, _ := val.Float64()
+		return f
+	default:
+		return 0
+	}
+}
+
+// normalizeColumnType normalizes database column types to unified types
+func normalizeColumnType(dbType string) string {
+	lower := toLower(dbType)
+
+	// Timestamp types
+	if contains(lower, "timestamp") || contains(lower, "datetime") || contains(lower, "date") || contains(lower, "time") {
+		return "timestamp"
+	}
+
+	// Integer types
+	if contains(lower, "int") || contains(lower, "serial") || lower == "bigint" || lower == "smallint" || lower == "tinyint" {
+		return "integer"
+	}
+
+	// Float types
+	if contains(lower, "float") || contains(lower, "double") || contains(lower, "decimal") || contains(lower, "numeric") || contains(lower, "real") {
+		return "float"
+	}
+
+	// Boolean
+	if contains(lower, "bool") {
+		return "boolean"
+	}
+
+	// Default to string for text, varchar, char, etc.
+	return "string"
 }

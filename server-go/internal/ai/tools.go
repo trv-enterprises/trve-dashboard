@@ -171,8 +171,33 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 			},
 		},
 		{
+			Name: "get_schema",
+			Description: anthropic.String(`Get the schema for a data source including column names, types, and unique values.
+Works for all data source types (SQL, Prometheus, EdgeLake, API, CSV, Socket, TSStore).
+
+Returns:
+- Column names and inferred types (timestamp, integer, float, string, boolean)
+- Unique values for categorical string columns (if ≤20 distinct values)
+- Min/max for numeric columns
+- Row count when available
+
+For SQL and EdgeLake: Returns tables with columns
+For Prometheus: Returns metrics and labels
+For API/CSV/Socket/TSStore: Infers schema from sample data
+
+Use this BEFORE configuring chart data mapping to understand the data structure.`),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"datasource_id": map[string]interface{}{"type": "string", "description": "ID of the data source"},
+					"table":         map[string]interface{}{"type": "string", "description": "Table name (optional, for SQL/EdgeLake when you want columns for a specific table)"},
+					"database":      map[string]interface{}{"type": "string", "description": "Database name (optional, for EdgeLake)"},
+				},
+				Required: []string{"datasource_id"},
+			},
+		},
+		{
 			Name:        "get_datasource_schema",
-			Description: anthropic.String("Get the schema (tables and columns) for a SQL database data source. Use this to discover what tables and columns are available before writing queries."),
+			Description: anthropic.String("DEPRECATED: Use get_schema instead. Get the schema (tables and columns) for a SQL database data source."),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
 					"datasource_id": map[string]interface{}{"type": "string", "description": "ID of the SQL data source"},
@@ -182,7 +207,7 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 		},
 		{
 			Name:        "get_prometheus_schema",
-			Description: anthropic.String("Get available metrics and labels from a Prometheus data source. Use this to discover what metrics can be queried and what labels are available for filtering."),
+			Description: anthropic.String("DEPRECATED: Use get_schema instead. Get available metrics and labels from a Prometheus data source."),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
 					"datasource_id": map[string]interface{}{"type": "string", "description": "ID of the Prometheus data source"},
@@ -192,7 +217,7 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 		},
 		{
 			Name:        "get_edgelake_schema",
-			Description: anthropic.String("Get available databases, tables, and columns from an EdgeLake data source. Use this to discover the schema for query building. Provide datasource_id and optionally database and table to get progressively detailed schema information."),
+			Description: anthropic.String("DEPRECATED: Use get_schema instead. Get available databases, tables, and columns from an EdgeLake data source."),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
 					"datasource_id": map[string]interface{}{"type": "string", "description": "ID of the EdgeLake data source"},
@@ -219,8 +244,25 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 			},
 		},
 		{
+			Name: "get_chart_template",
+			Description: anthropic.String(`Get a React component template for a chart type.
+Call AFTER setting chart_type with update_chart_config.
+Returns Carbon g100 dark theme styled code to customize with your column names.
+For non-standard charts, use "custom" to get general formatting guidelines and color tokens.`),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"chart_type": map[string]interface{}{
+						"type":        "string",
+						"description": "Chart type to get template for",
+						"enum":        []string{"line", "bar", "area", "pie", "scatter", "gauge", "heatmap", "radar", "funnel", "dataview", "custom"},
+					},
+				},
+				Required: []string{"chart_type"},
+			},
+		},
+		{
 			Name:        "suggest_missing_tools",
-			Description: anthropic.String("When user requests an ECharts feature not supported by current tools, explain what would be needed"),
+			Description: anthropic.String("DEPRECATED: Use set_custom_code to implement custom visualizations instead."),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
 					"feature":    map[string]interface{}{"type": "string", "description": "The ECharts feature being requested"},
@@ -253,12 +295,14 @@ const (
 	ToolUpdateChartOptions    = "update_chart_options"
 	ToolQueryDatasource       = "query_datasource"
 	ToolListDatasources       = "list_datasources"
-	ToolGetDatasourceSchema   = "get_datasource_schema"
-	ToolGetPrometheusSchema   = "get_prometheus_schema"
-	ToolGetEdgeLakeSchema     = "get_edgelake_schema"
+	ToolGetSchema             = "get_schema"
+	ToolGetDatasourceSchema   = "get_datasource_schema"   // Deprecated
+	ToolGetPrometheusSchema   = "get_prometheus_schema"   // Deprecated
+	ToolGetEdgeLakeSchema     = "get_edgelake_schema"     // Deprecated
 	ToolPreviewData           = "preview_data"
 	ToolGetChartState         = "get_chart_state"
-	ToolSuggestMissing        = "suggest_missing_tools"
+	ToolGetChartTemplate      = "get_chart_template"
+	ToolSuggestMissing        = "suggest_missing_tools" // Deprecated
 )
 
 // IsChartUpdateTool returns true if the tool modifies the chart

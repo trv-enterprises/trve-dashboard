@@ -433,6 +433,59 @@ type PrometheusSchemaProvider interface {
 	GetLabelValues(ctx context.Context, labelName string) ([]string, error)
 }
 
+// UnifiedSchemaResponse is the response format for the get_schema tool
+// It provides a consistent schema format for all datasource types
+type UnifiedSchemaResponse struct {
+	Datasource UnifiedSchemaSourceInfo `json:"datasource"`
+	Schema     UnifiedSchema           `json:"schema"`
+}
+
+// UnifiedSchemaSourceInfo contains basic info about the datasource
+type UnifiedSchemaSourceInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// UnifiedSchema represents schema information in a unified format
+type UnifiedSchema struct {
+	// For datasources without tables (API, CSV, Socket, TSStore)
+	Columns []UnifiedSchemaColumn `json:"columns,omitempty"`
+
+	// For datasources with tables (SQL, EdgeLake)
+	Tables []UnifiedSchemaTable `json:"tables,omitempty"`
+
+	// For Prometheus - metrics and labels
+	Metrics []string `json:"metrics,omitempty"`
+	Labels  []string `json:"labels,omitempty"`
+
+	// Row count (when available from sample data)
+	RowCount int `json:"row_count,omitempty"`
+}
+
+// UnifiedSchemaTable represents a table with its columns
+type UnifiedSchemaTable struct {
+	Name    string                `json:"name"`
+	Columns []UnifiedSchemaColumn `json:"columns"`
+}
+
+// UnifiedSchemaColumn represents a column with inferred type and metadata
+type UnifiedSchemaColumn struct {
+	Name string `json:"name"`
+	Type string `json:"type"` // timestamp, integer, float, string, boolean, mixed
+
+	// For string columns with limited unique values (≤20)
+	UniqueValues []interface{} `json:"unique_values,omitempty"`
+	UniqueCount  int           `json:"unique_count,omitempty"`
+
+	// For numeric columns
+	Min interface{} `json:"min,omitempty"`
+	Max interface{} `json:"max,omitempty"`
+
+	// Sample value (first non-null value seen)
+	Sample interface{} `json:"sample,omitempty"`
+}
+
 // SanitizeForAPI returns a copy of the datasource with sensitive fields masked.
 // This should be called before returning datasource data via API responses.
 // Sensitive fields are replaced with SecretMaskedValue ("********") if they have a value.

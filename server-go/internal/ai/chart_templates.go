@@ -1,0 +1,486 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
+package ai
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+// chartTemplates contains React component templates for each chart type
+var chartTemplates = map[string]string{
+	"line": `const Component = ({ data }) => {
+  const chartData = toObjects(data);
+  if (!chartData.length) return <div style={{color: '#f4f4f4', padding: '20px'}}>No data available</div>;
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#262626',
+      borderColor: '#393939',
+      textStyle: { color: '#f4f4f4' },
+      formatter: function(params) {
+        if (!params || !params.length) return '';
+        const axisVal = params[0].axisValue;
+        let header = (typeof axisVal === 'number' && axisVal > 1000000000000)
+          ? formatTimestamp(axisVal / 1000, 'chart_datetime')
+          : (params[0].axisValueLabel || params[0].name || '');
+        let result = header;
+        params.forEach(function(p) {
+          const val = Array.isArray(p.value) ? p.value[1] : p.value;
+          result += '<br/>' + p.marker + ' ' + p.seriesName + ': ' + (val != null ? val : '-');
+        });
+        return result;
+      }
+    },
+    grid: { left: 55, right: '2%', bottom: '1.5%', top: 40, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: chartData.map(d => formatTimestamp(d.timestamp, 'chart_time')),
+      axisLine: { lineStyle: { color: '#525252' } },
+      axisLabel: { color: '#c6c6c6' }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { lineStyle: { color: '#525252' } },
+      axisLabel: { color: '#c6c6c6' },
+      splitLine: { lineStyle: { color: '#393939' } }
+    },
+    series: [{
+      data: chartData.map(d => d.value),
+      type: 'line',
+      smooth: true,
+      itemStyle: { color: '#0f62fe' }
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />;
+};`,
+
+	"bar": `const Component = ({ data }) => {
+  const chartData = toObjects(data);
+  if (!chartData.length) return <div style={{color: '#f4f4f4', padding: '20px'}}>No data available</div>;
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'axis', backgroundColor: '#262626', borderColor: '#393939', textStyle: { color: '#f4f4f4' } },
+    grid: { left: 55, right: '2%', bottom: '1.5%', top: 40, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: chartData.map(d => d.category || d.name || d.label),
+      axisLabel: { color: '#c6c6c6' }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#c6c6c6' },
+      splitLine: { lineStyle: { color: '#393939' } }
+    },
+    series: [{
+      data: chartData.map(d => d.value),
+      type: 'bar',
+      itemStyle: { color: '#0f62fe' }
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />;
+};`,
+
+	"area": `const Component = ({ data }) => {
+  const chartData = toObjects(data);
+  if (!chartData.length) return <div style={{color: '#f4f4f4', padding: '20px'}}>No data available</div>;
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#262626',
+      borderColor: '#393939',
+      textStyle: { color: '#f4f4f4' }
+    },
+    grid: { left: 55, right: '2%', bottom: '1.5%', top: 40, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: chartData.map(d => formatTimestamp(d.timestamp, 'chart_time')),
+      axisLine: { lineStyle: { color: '#525252' } },
+      axisLabel: { color: '#c6c6c6' }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#c6c6c6' },
+      splitLine: { lineStyle: { color: '#393939' } }
+    },
+    series: [{
+      data: chartData.map(d => d.value),
+      type: 'line',
+      smooth: true,
+      itemStyle: { color: '#0f62fe' },
+      areaStyle: {
+        color: {
+          type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(15, 98, 254, 0.3)' },
+            { offset: 1, color: 'rgba(15, 98, 254, 0)' }
+          ]
+        }
+      }
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />;
+};`,
+
+	"pie": `const Component = ({ data }) => {
+  const chartData = toObjects(data);
+  if (!chartData.length) return <div style={{color: '#f4f4f4', padding: '20px'}}>No data available</div>;
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'item', backgroundColor: '#262626', borderColor: '#393939', textStyle: { color: '#f4f4f4' } },
+    legend: { top: '5%', left: 'center', textStyle: { color: '#c6c6c6' } },
+    series: [{
+      type: 'pie',
+      radius: '60%',
+      center: ['50%', '55%'],
+      data: chartData.map(d => ({ name: d.name || d.category || d.label, value: d.value })),
+      label: { color: '#c6c6c6' },
+      itemStyle: { borderColor: '#161616', borderWidth: 2 }
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />;
+};`,
+
+	"scatter": `const Component = ({ data }) => {
+  const chartData = toObjects(data);
+  if (!chartData.length) return <div style={{color: '#f4f4f4', padding: '20px'}}>No data available</div>;
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'item', backgroundColor: '#262626', borderColor: '#393939', textStyle: { color: '#f4f4f4' } },
+    grid: { left: 55, right: '2%', bottom: '1.5%', top: 40, containLabel: true },
+    xAxis: {
+      type: 'value',
+      axisLabel: { color: '#c6c6c6' },
+      splitLine: { lineStyle: { color: '#393939' } }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#c6c6c6' },
+      splitLine: { lineStyle: { color: '#393939' } }
+    },
+    series: [{
+      type: 'scatter',
+      data: chartData.map(d => [d.x, d.y]),
+      itemStyle: { color: '#0f62fe' }
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />;
+};`,
+
+	"gauge": `const Component = ({ data }) => {
+  const containerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 200, height: 200 });
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setContainerSize(prev => {
+        if (Math.abs(prev.width - width) > 1 || Math.abs(prev.height - height) > 1) {
+          return { width, height };
+        }
+        return prev;
+      });
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const value = getValue(data, 'value') || 0;
+  const minDim = Math.min(containerSize.width, containerSize.height);
+  const baseFontSize = Math.floor(minDim * 0.12);
+  const labelFontSize = Math.floor(minDim * 0.06);
+  const axisLineWidth = Math.floor(minDim * 0.08);
+
+  const option = {
+    backgroundColor: 'transparent',
+    series: [{
+      type: 'gauge',
+      min: 0,
+      max: 100,
+      center: ['50%', '55%'],
+      radius: '85%',
+      progress: { show: false },
+      detail: { formatter: '{value}%', color: '#f4f4f4', fontSize: baseFontSize, offsetCenter: [0, '70%'] },
+      data: [{ value: Number(value).toFixed(1) }],
+      title: { show: false },
+      axisLine: {
+        lineStyle: {
+          width: axisLineWidth,
+          color: [[0.7, '#24a148'], [0.9, '#f1c21b'], [1, '#da1e28']]
+        }
+      },
+      axisLabel: { color: '#999', fontSize: labelFontSize },
+      axisTick: { show: false },
+      pointer: { itemStyle: { color: '#f4f4f4' } }
+    }]
+  };
+
+  return (
+    <div ref={containerRef} style={{ height: '100%', width: '100%' }}>
+      <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />
+    </div>
+  );
+};`,
+
+	"heatmap": `const Component = ({ data }) => {
+  const chartData = toObjects(data);
+  if (!chartData.length) return <div style={{color: '#f4f4f4', padding: '20px'}}>No data available</div>;
+
+  // Extract unique x and y values
+  const xLabels = [...new Set(chartData.map(d => d.x))];
+  const yLabels = [...new Set(chartData.map(d => d.y))];
+  const heatmapData = chartData.map(d => [xLabels.indexOf(d.x), yLabels.indexOf(d.y), d.value]);
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: { backgroundColor: '#262626', borderColor: '#393939', textStyle: { color: '#f4f4f4' } },
+    grid: { left: 80, right: 80, bottom: 40, top: 40 },
+    xAxis: { type: 'category', data: xLabels, axisLabel: { color: '#c6c6c6' } },
+    yAxis: { type: 'category', data: yLabels, axisLabel: { color: '#c6c6c6' } },
+    visualMap: {
+      min: Math.min(...chartData.map(d => d.value)),
+      max: Math.max(...chartData.map(d => d.value)),
+      calculable: true,
+      orient: 'vertical',
+      right: 10,
+      top: 'center',
+      textStyle: { color: '#c6c6c6' },
+      inRange: { color: ['#161616', '#0f62fe'] }
+    },
+    series: [{
+      type: 'heatmap',
+      data: heatmapData,
+      label: { show: true, color: '#f4f4f4' }
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />;
+};`,
+
+	"radar": `const Component = ({ data }) => {
+  const chartData = toObjects(data);
+  if (!chartData.length) return <div style={{color: '#f4f4f4', padding: '20px'}}>No data available</div>;
+
+  // Expect data with 'indicator' and 'value' columns, or multiple value columns
+  const indicators = chartData.map(d => ({ name: d.name || d.indicator, max: 100 }));
+  const values = chartData.map(d => d.value);
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: { backgroundColor: '#262626', borderColor: '#393939', textStyle: { color: '#f4f4f4' } },
+    radar: {
+      indicator: indicators,
+      axisName: { color: '#c6c6c6' },
+      splitLine: { lineStyle: { color: '#393939' } },
+      splitArea: { areaStyle: { color: ['transparent', 'rgba(57, 57, 57, 0.2)'] } }
+    },
+    series: [{
+      type: 'radar',
+      data: [{ value: values, name: 'Values' }],
+      itemStyle: { color: '#0f62fe' },
+      areaStyle: { color: 'rgba(15, 98, 254, 0.3)' }
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />;
+};`,
+
+	"funnel": `const Component = ({ data }) => {
+  const chartData = toObjects(data);
+  if (!chartData.length) return <div style={{color: '#f4f4f4', padding: '20px'}}>No data available</div>;
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: { trigger: 'item', backgroundColor: '#262626', borderColor: '#393939', textStyle: { color: '#f4f4f4' } },
+    legend: { top: '5%', left: 'center', textStyle: { color: '#c6c6c6' } },
+    series: [{
+      type: 'funnel',
+      left: '10%',
+      width: '80%',
+      top: 60,
+      bottom: 20,
+      data: chartData.map(d => ({ name: d.name || d.stage, value: d.value })),
+      label: { color: '#f4f4f4' },
+      itemStyle: { borderColor: '#161616', borderWidth: 2 }
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />;
+};`,
+
+	"dataview": `const Component = ({ data }) => {
+  const chartData = toObjects(data);
+
+  if (!chartData.length) return <div style={{color: '#f4f4f4', padding: '20px'}}>No data available</div>;
+
+  const columns = Object.keys(chartData[0] || {});
+
+  const headers = columns.map(col => ({
+    key: col,
+    header: col.charAt(0).toUpperCase() + col.slice(1).replace(/_/g, ' ')
+  }));
+
+  const rows = chartData.map((row, idx) => ({ id: String(idx), ...row }));
+
+  return (
+    <div style={{ height: '100%', width: '100%', overflow: 'auto' }}>
+      <DataTable rows={rows} headers={headers} size="sm">
+        {({ rows, headers, getTableProps, getHeaderProps, getRowProps }) => (
+          <Table {...getTableProps()}>
+            <TableHead>
+              <TableRow>
+                {headers.map(header => (
+                  <TableHeader {...getHeaderProps({ header })} key={header.key}>
+                    {header.header}
+                  </TableHeader>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map(row => (
+                <TableRow {...getRowProps({ row })} key={row.id}>
+                  {row.cells.map(cell => (
+                    <TableCell key={cell.id}>{formatCellValue(cell.value, cell.info.header)}</TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </DataTable>
+    </div>
+  );
+};`,
+
+	"custom": `// Custom Chart Template
+// Use this as a starting point for any ECharts visualization
+
+const Component = ({ data }) => {
+  const chartData = toObjects(data);
+
+  if (!chartData.length) {
+    return <div style={{color: '#f4f4f4', padding: '20px'}}>No data available</div>;
+  }
+
+  const option = {
+    backgroundColor: 'transparent',
+
+    // Tooltip with dark theme
+    tooltip: {
+      trigger: 'axis', // or 'item' for pie/scatter
+      backgroundColor: '#262626',
+      borderColor: '#393939',
+      textStyle: { color: '#f4f4f4' }
+    },
+
+    // Grid positioning
+    grid: { left: 55, right: '2%', bottom: '1.5%', top: 40, containLabel: true },
+
+    // Axis styling
+    xAxis: {
+      type: 'category', // or 'value', 'time'
+      axisLine: { lineStyle: { color: '#525252' } },
+      axisLabel: { color: '#c6c6c6' }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: '#c6c6c6' },
+      splitLine: { lineStyle: { color: '#393939' } }
+    },
+
+    // Your series configuration
+    series: [{
+      type: 'line', // bar, pie, scatter, gauge, etc.
+      data: chartData.map(d => d.value),
+      itemStyle: { color: '#0f62fe' }
+    }]
+  };
+
+  return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />;
+};
+
+/*
+Carbon g100 Color Reference:
+- Background: transparent (container provides #161616)
+- Layer 01: #262626 (tooltips, cards)
+- Layer 02: #393939 (borders, grid lines)
+- Text primary: #f4f4f4
+- Text secondary: #c6c6c6
+- Primary blue: #0f62fe
+- Success green: #24a148
+- Warning yellow: #f1c21b
+- Error red: #da1e28
+- Info cyan: #1192e8
+
+Available utilities:
+- toObjects(data) - Convert columnar data to array of objects
+- getValue(data, 'column') - Get single value from first row
+- formatTimestamp(ts, 'chart_time') - Format timestamps
+- formatCellValue(value, columnName) - Auto-format values
+
+For time-based charts with xAxis type 'time', add this tooltip formatter:
+formatter: function(params) {
+  if (!params || !params.length) return '';
+  const axisVal = params[0].axisValue;
+  let header = (typeof axisVal === 'number' && axisVal > 1000000000000)
+    ? formatTimestamp(axisVal / 1000, 'chart_datetime')
+    : (params[0].axisValueLabel || params[0].name || '');
+  let result = header;
+  params.forEach(function(p) {
+    const val = Array.isArray(p.value) ? p.value[1] : p.value;
+    result += '<br/>' + p.marker + ' ' + p.seriesName + ': ' + (val != null ? val : '-');
+  });
+  return result;
+}
+*/`,
+}
+
+// executeGetChartTemplate returns the template for a specific chart type
+func (e *ToolExecutor) executeGetChartTemplate(input json.RawMessage) (*ToolResult, error) {
+	var params struct {
+		ChartType string `json:"chart_type"`
+	}
+	if err := json.Unmarshal(input, &params); err != nil {
+		return &ToolResult{Success: false, Error: "invalid input: " + err.Error()}, nil
+	}
+
+	if params.ChartType == "" {
+		return &ToolResult{Success: false, Error: "chart_type is required"}, nil
+	}
+
+	template, exists := chartTemplates[params.ChartType]
+	if !exists {
+		return &ToolResult{
+			Success: false,
+			Error:   fmt.Sprintf("No template for chart type '%s'. Use 'custom' for general guidelines.", params.ChartType),
+		}, nil
+	}
+
+	message := fmt.Sprintf("Template for %s chart. Replace column names (timestamp, value, etc.) with actual columns from get_schema.", params.ChartType)
+	if params.ChartType == "custom" {
+		message = "Custom chart template with Carbon g100 colors and formatting guidelines."
+	}
+
+	return &ToolResult{
+		Success: true,
+		Message: message,
+		Data: map[string]string{
+			"template": template,
+		},
+	}, nil
+}
