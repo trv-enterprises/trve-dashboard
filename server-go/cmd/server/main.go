@@ -422,6 +422,7 @@ func healthCheck(mongodb *database.MongoDB, redis *database.Redis) gin.HandlerFu
 		status := gin.H{
 			"status":    "ok",
 			"timestamp": time.Now().Format(time.RFC3339),
+			"version":   version.Full(),
 			"services":  gin.H{},
 		}
 
