@@ -1,39 +1,6 @@
 basePath: /api
 definitions:
-  handlers.SaveSessionRequest:
-    properties:
-      name:
-        type: string
-    type: object
-  mcp.JSONRPCError:
-    properties:
-      code:
-        type: integer
-      data: {}
-      message:
-        type: string
-    type: object
-  mcp.JSONRPCRequest:
-    properties:
-      id: {}
-      jsonrpc:
-        type: string
-      method:
-        type: string
-      params:
-        additionalProperties: true
-        type: object
-    type: object
-  mcp.JSONRPCResponse:
-    properties:
-      error:
-        $ref: '#/definitions/mcp.JSONRPCError'
-      id: {}
-      jsonrpc:
-        type: string
-      result: {}
-    type: object
-  models.AIMessage:
+  github_com_tviviano_dashboard_internal_models.AIMessage:
     description: A message in the AI conversation
     properties:
       content:
@@ -47,10 +14,10 @@ definitions:
         type: string
       tool_calls:
         items:
-          $ref: '#/definitions/models.ToolCall'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ToolCall'
         type: array
     type: object
-  models.AISession:
+  github_com_tviviano_dashboard_internal_models.AISession:
     description: AI session for chart creation/editing
     properties:
       chart_id:
@@ -67,7 +34,7 @@ definitions:
       messages:
         description: Conversation history
         items:
-          $ref: '#/definitions/models.AIMessage'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.AIMessage'
         type: array
       status:
         description: '"active" | "completed" | "cancelled"'
@@ -75,17 +42,17 @@ definitions:
       updated:
         type: string
     type: object
-  models.AISessionResponse:
+  github_com_tviviano_dashboard_internal_models.AISessionResponse:
     description: Response containing AI session state
     properties:
       chart:
         allOf:
-        - $ref: '#/definitions/models.Chart'
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Chart'
         description: Current chart state (draft)
       session:
-        $ref: '#/definitions/models.AISession'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.AISession'
     type: object
-  models.APIConfig:
+  github_com_tviviano_dashboard_internal_models.APIConfig:
     properties:
       auth_credentials:
         additionalProperties:
@@ -95,25 +62,25 @@ definitions:
         description: none, bearer, basic, api-key
         type: string
       body:
+        description: Request body template
         type: string
       headers:
         additionalProperties:
           type: string
+        description: Request headers
         type: object
       method:
-        enum:
-        - GET
-        - POST
-        - PUT
-        - DELETE
-        - PATCH
+        description: HTTP method (GET, POST, etc.)
         type: string
       query_params:
         additionalProperties:
           type: string
+        description: Query parameters
         type: object
       response_config:
-        $ref: '#/definitions/models.APIResponseConfig'
+        allOf:
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.APIResponseConfig'
+        description: Response parsing config
       retry_count:
         type: integer
       retry_delay:
@@ -123,12 +90,12 @@ definitions:
         description: seconds
         type: integer
       url:
+        description: Full API endpoint URL
         type: string
     required:
-    - method
     - url
     type: object
-  models.APIResponseConfig:
+  github_com_tviviano_dashboard_internal_models.APIResponseConfig:
     properties:
       data_path:
         description: |-
@@ -136,7 +103,7 @@ definitions:
           If empty, assumes response is already an array or will be parsed as key-value pairs
         type: string
     type: object
-  models.CSVConfig:
+  github_com_tviviano_dashboard_internal_models.CSVConfig:
     properties:
       columns:
         description: explicit column names
@@ -159,7 +126,17 @@ definitions:
     required:
     - path
     type: object
-  models.Chart:
+  github_com_tviviano_dashboard_internal_models.Capability:
+    enum:
+    - view
+    - design
+    - manage
+    type: string
+    x-enum-varnames:
+    - CapabilityView
+    - CapabilityDesign
+    - CapabilityManage
+  github_com_tviviano_dashboard_internal_models.Chart:
     description: Chart with data source binding, query config, and visualization settings
     properties:
       ai_session_id:
@@ -175,7 +152,7 @@ definitions:
         type: string
       data_mapping:
         allOf:
-        - $ref: '#/definitions/models.ChartDataMapping'
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ChartDataMapping'
         description: How to map data to chart
       datasource_id:
         description: Reference to data source
@@ -186,6 +163,7 @@ definitions:
         description: UUID - same across versions
         type: string
       name:
+        description: Unique identifier
         type: string
       options:
         additionalProperties: true
@@ -193,7 +171,7 @@ definitions:
         type: object
       query_config:
         allOf:
-        - $ref: '#/definitions/models.ChartQueryConfig'
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ChartQueryConfig'
         description: How to query data
       status:
         description: '"draft" | "final"'
@@ -206,6 +184,9 @@ definitions:
       thumbnail:
         description: Base64 preview image for card display
         type: string
+      title:
+        description: Display title (defaults to Name if empty)
+        type: string
       updated:
         type: string
       use_custom_code:
@@ -217,20 +198,20 @@ definitions:
     required:
     - name
     type: object
-  models.ChartDataMapping:
+  github_com_tviviano_dashboard_internal_models.ChartDataMapping:
     description: Mapping configuration from data columns to chart axes/series
     properties:
       aggregation:
         allOf:
-        - $ref: '#/definitions/models.DataAggregation'
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DataAggregation'
         description: Aggregation to apply (first, last, avg, etc.)
       filters:
         description: Client-side filters applied after data fetch
         items:
-          $ref: '#/definitions/models.DataFilter'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DataFilter'
         type: array
       group_by:
-        description: Column to group/split series by
+        description: Column to group/split series by (client-side grouping)
         type: string
       label_col:
         description: Column for labels
@@ -238,12 +219,24 @@ definitions:
       limit:
         description: Max rows to return
         type: integer
+      series:
+        description: Column that identifies each series (e.g., "location") - used
+          for time bucket partitioning
+        type: string
+      sliding_window:
+        allOf:
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.SlidingWindow'
+        description: Time-based sliding window (e.g., last 5 minutes)
       sort_by:
         description: Column to sort by
         type: string
       sort_order:
         description: asc or desc
         type: string
+      time_bucket:
+        allOf:
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.TimeBucket'
+        description: Time-bucketed aggregation for streaming data
       x_axis:
         description: Column for X axis (categories)
         type: string
@@ -263,12 +256,12 @@ definitions:
         description: Label for Y axis (e.g., "Temperature (°F)", "Count")
         type: string
     type: object
-  models.ChartListResponse:
+  github_com_tviviano_dashboard_internal_models.ChartListResponse:
     description: Response containing a list of charts with pagination
     properties:
       charts:
         items:
-          $ref: '#/definitions/models.Chart'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Chart'
         type: array
       page:
         type: integer
@@ -277,7 +270,7 @@ definitions:
       total:
         type: integer
     type: object
-  models.ChartQueryConfig:
+  github_com_tviviano_dashboard_internal_models.ChartQueryConfig:
     description: Query configuration for fetching chart data
     properties:
       params:
@@ -291,7 +284,7 @@ definitions:
         description: sql, csv_filter, stream_filter, api
         type: string
     type: object
-  models.ChartSummary:
+  github_com_tviviano_dashboard_internal_models.ChartSummary:
     description: Minimal chart info for selection cards and lists
     properties:
       chart_type:
@@ -315,7 +308,7 @@ definitions:
       version:
         type: integer
     type: object
-  models.ChartVersionInfo:
+  github_com_tviviano_dashboard_internal_models.ChartVersionInfo:
     description: Version info for a chart
     properties:
       has_draft:
@@ -331,7 +324,7 @@ definitions:
         description: Total versions for this chart id
         type: integer
     type: object
-  models.ColumnInfo:
+  github_com_tviviano_dashboard_internal_models.ColumnInfo:
     properties:
       default:
         description: Default value if any
@@ -349,7 +342,28 @@ definitions:
         description: Data type (e.g., "varchar", "integer")
         type: string
     type: object
-  models.CreateAISessionRequest:
+  github_com_tviviano_dashboard_internal_models.ConfigItem:
+    properties:
+      category:
+        description: Grouping category (e.g., "layout")
+        type: string
+      created:
+        type: string
+      description:
+        description: Human-readable description
+        type: string
+      id:
+        description: Unique key (e.g., "layout_dimensions")
+        type: string
+      key:
+        description: Same as ID, for clarity
+        type: string
+      updated:
+        type: string
+      value:
+        description: The setting value
+    type: object
+  github_com_tviviano_dashboard_internal_models.CreateAISessionRequest:
     description: Request body for creating a new AI session
     properties:
       chart_id:
@@ -359,7 +373,7 @@ definitions:
         description: First user message (optional)
         type: string
     type: object
-  models.CreateChartRequest:
+  github_com_tviviano_dashboard_internal_models.CreateChartRequest:
     description: Request body for creating a new chart
     properties:
       chart_type:
@@ -367,7 +381,7 @@ definitions:
       component_code:
         type: string
       data_mapping:
-        $ref: '#/definitions/models.ChartDataMapping'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ChartDataMapping'
       datasource_id:
         type: string
       description:
@@ -378,19 +392,21 @@ definitions:
         additionalProperties: true
         type: object
       query_config:
-        $ref: '#/definitions/models.ChartQueryConfig'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ChartQueryConfig'
       tags:
         items:
           type: string
         type: array
       thumbnail:
         type: string
+      title:
+        type: string
       use_custom_code:
         type: boolean
     required:
     - name
     type: object
-  models.CreateDashboardRequest:
+  github_com_tviviano_dashboard_internal_models.CreateDashboardRequest:
     description: Request body for creating a new dashboard
     properties:
       description:
@@ -403,19 +419,22 @@ definitions:
       panels:
         description: Panels with optional chart_id
         items:
-          $ref: '#/definitions/models.DashboardPanel'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DashboardPanel'
         type: array
       settings:
-        $ref: '#/definitions/models.DashboardSettings'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSettings'
     required:
     - name
     type: object
-  models.CreateDatasourceRequest:
+  github_com_tviviano_dashboard_internal_models.CreateDatasourceRequest:
     properties:
       config:
-        $ref: '#/definitions/models.DatasourceConfig'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig'
       description:
         type: string
+      mask_secrets:
+        description: 'If true, secrets are masked in API responses (default: true)'
+        type: boolean
       name:
         type: string
       tags:
@@ -424,18 +443,35 @@ definitions:
         type: array
       type:
         allOf:
-        - $ref: '#/definitions/models.DatasourceType'
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceType'
         enum:
         - sql
         - csv
         - socket
         - api
+        - tsstore
+        - prometheus
+        - edgelake
     required:
     - config
     - name
     - type
     type: object
-  models.Dashboard:
+  github_com_tviviano_dashboard_internal_models.CreateUserRequest:
+    description: Request body for creating a new user
+    properties:
+      capabilities:
+        items:
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Capability'
+        type: array
+      email:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  github_com_tviviano_dashboard_internal_models.Dashboard:
     description: Dashboard with panels that reference standalone charts
     properties:
       created:
@@ -452,10 +488,10 @@ definitions:
       panels:
         description: Panels with chart_id references
         items:
-          $ref: '#/definitions/models.DashboardPanel'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DashboardPanel'
         type: array
       settings:
-        $ref: '#/definitions/models.DashboardSettings'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSettings'
       thumbnail:
         description: Base64 encoded thumbnail image
         type: string
@@ -464,12 +500,12 @@ definitions:
     required:
     - name
     type: object
-  models.DashboardListResponse:
+  github_com_tviviano_dashboard_internal_models.DashboardListResponse:
     description: Response containing a list of dashboards with pagination
     properties:
       dashboards:
         items:
-          $ref: '#/definitions/models.Dashboard'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard'
         type: array
       page:
         type: integer
@@ -478,7 +514,7 @@ definitions:
       total:
         type: integer
     type: object
-  models.DashboardPanel:
+  github_com_tviviano_dashboard_internal_models.DashboardPanel:
     description: Panel position and size in the grid with optional chart reference
     properties:
       chart_id:
@@ -495,7 +531,7 @@ definitions:
       "y":
         type: integer
     type: object
-  models.DashboardSettings:
+  github_com_tviviano_dashboard_internal_models.DashboardSettings:
     description: Dashboard settings and preferences
     properties:
       allow_export:
@@ -512,8 +548,11 @@ definitions:
         type: string
       timezone:
         type: string
+      title_scale:
+        description: Title font scale % (default 100, range 50-200)
+        type: integer
     type: object
-  models.DashboardSummary:
+  github_com_tviviano_dashboard_internal_models.DashboardSummary:
     description: Dashboard info with optional data source names for display in tiles
     properties:
       created:
@@ -532,19 +571,19 @@ definitions:
       panel_count:
         type: integer
       settings:
-        $ref: '#/definitions/models.DashboardSettings'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSettings'
       thumbnail:
         type: string
       updated:
         type: string
     type: object
-  models.DashboardSummaryListResponse:
+  github_com_tviviano_dashboard_internal_models.DashboardSummaryListResponse:
     description: Response containing dashboard summaries with optional data source
       info
     properties:
       dashboards:
         items:
-          $ref: '#/definitions/models.DashboardSummary'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSummary'
         type: array
       page:
         type: integer
@@ -553,7 +592,7 @@ definitions:
       total:
         type: integer
     type: object
-  models.DataAggregation:
+  github_com_tviviano_dashboard_internal_models.DataAggregation:
     description: Aggregation configuration for data transformation
     properties:
       count:
@@ -569,7 +608,7 @@ definitions:
         description: first, last, min, max, avg, sum, count, limit
         type: string
     type: object
-  models.DataFilter:
+  github_com_tviviano_dashboard_internal_models.DataFilter:
     description: Filter condition for data transformation
     properties:
       field:
@@ -582,18 +621,21 @@ definitions:
       value:
         description: Value to compare against (can be array for 'in' operator)
     type: object
-  models.Datasource:
+  github_com_tviviano_dashboard_internal_models.Datasource:
     properties:
       config:
-        $ref: '#/definitions/models.DatasourceConfig'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig'
       created_at:
         type: string
       description:
         type: string
       health:
-        $ref: '#/definitions/models.HealthInfo'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.HealthInfo'
       id:
         type: string
+      mask_secrets:
+        description: If true, secrets are masked in API responses
+        type: boolean
       name:
         type: string
       tags:
@@ -602,12 +644,15 @@ definitions:
         type: array
       type:
         allOf:
-        - $ref: '#/definitions/models.DatasourceType'
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceType'
         enum:
         - sql
         - csv
         - socket
         - api
+        - tsstore
+        - prometheus
+        - edgelake
       updated_at:
         type: string
     required:
@@ -615,30 +660,60 @@ definitions:
     - name
     - type
     type: object
-  models.DatasourceConfig:
+  github_com_tviviano_dashboard_internal_models.DatasourceConfig:
     properties:
       api:
-        $ref: '#/definitions/models.APIConfig'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.APIConfig'
       csv:
-        $ref: '#/definitions/models.CSVConfig'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.CSVConfig'
+      edgelake:
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.EdgeLakeConfig'
+      prometheus:
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.PrometheusConfig'
       socket:
-        $ref: '#/definitions/models.SocketConfig'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.SocketConfig'
       sql:
-        $ref: '#/definitions/models.SQLConfig'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.SQLConfig'
+      tsstore:
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.TSStoreConfig'
     type: object
-  models.DatasourceType:
+  github_com_tviviano_dashboard_internal_models.DatasourceType:
     enum:
     - sql
     - csv
     - socket
     - api
+    - tsstore
+    - prometheus
+    - edgelake
     type: string
     x-enum-varnames:
     - DatasourceTypeSQL
     - DatasourceTypeCSV
     - DatasourceTypeSocket
     - DatasourceTypeAPI
-  models.HealthInfo:
+    - DatasourceTypeTSStore
+    - DatasourceTypePrometheus
+    - DatasourceTypeEdgeLake
+  github_com_tviviano_dashboard_internal_models.EdgeLakeConfig:
+    properties:
+      host:
+        description: EdgeLake node IP/hostname
+        type: string
+      port:
+        description: 'REST API port (default: 32049)'
+        type: integer
+      timeout:
+        description: 'Request timeout in seconds (default: 20)'
+        type: integer
+      use_distributed_query:
+        description: 'Add "destination: network" header'
+        type: boolean
+    required:
+    - host
+    - port
+    type: object
+  github_com_tviviano_dashboard_internal_models.HealthInfo:
     properties:
       error_message:
         type: string
@@ -650,9 +725,9 @@ definitions:
         description: milliseconds
         type: integer
       status:
-        $ref: '#/definitions/models.HealthStatus'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.HealthStatus'
     type: object
-  models.HealthStatus:
+  github_com_tviviano_dashboard_internal_models.HealthStatus:
     enum:
     - unknown
     - healthy
@@ -664,7 +739,7 @@ definitions:
     - HealthStatusHealthy
     - HealthStatusUnhealthy
     - HealthStatusDegraded
-  models.LayoutDimensionDTO:
+  github_com_tviviano_dashboard_internal_models.LayoutDimensionDTO:
     properties:
       max_height:
         type: integer
@@ -673,7 +748,54 @@ definitions:
       name:
         type: string
     type: object
-  models.Query:
+  github_com_tviviano_dashboard_internal_models.PrometheusConfig:
+    properties:
+      password:
+        description: Basic auth password (optional)
+        type: string
+      timeout:
+        description: 'Query timeout in seconds (default: 30)'
+        type: integer
+      url:
+        description: Prometheus server URL (e.g., "http://localhost:9090")
+        type: string
+      username:
+        description: Basic auth username (optional)
+        type: string
+    required:
+    - url
+    type: object
+  github_com_tviviano_dashboard_internal_models.PrometheusMetricInfo:
+    properties:
+      help:
+        description: Description from metadata
+        type: string
+      labels:
+        description: Labels seen with this metric
+        items:
+          type: string
+        type: array
+      name:
+        description: Metric name (e.g., "http_requests_total")
+        type: string
+      type:
+        description: 'Metric type: "counter", "gauge", "histogram", "summary"'
+        type: string
+    type: object
+  github_com_tviviano_dashboard_internal_models.PrometheusSchemaInfo:
+    properties:
+      labels:
+        description: All label names
+        items:
+          type: string
+        type: array
+      metrics:
+        description: Available metrics
+        items:
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.PrometheusMetricInfo'
+        type: array
+    type: object
+  github_com_tviviano_dashboard_internal_models.Query:
     properties:
       params:
         additionalProperties: true
@@ -684,17 +806,17 @@ definitions:
         type: string
       type:
         allOf:
-        - $ref: '#/definitions/models.QueryType'
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.QueryType'
         description: Query type
     type: object
-  models.QueryRequest:
+  github_com_tviviano_dashboard_internal_models.QueryRequest:
     properties:
       query:
-        $ref: '#/definitions/models.Query'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Query'
     required:
     - query
     type: object
-  models.QueryResponse:
+  github_com_tviviano_dashboard_internal_models.QueryResponse:
     properties:
       duration:
         description: milliseconds
@@ -702,23 +824,29 @@ definitions:
       error:
         type: string
       result_set:
-        $ref: '#/definitions/models.ResultSet'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ResultSet'
       success:
         type: boolean
     type: object
-  models.QueryType:
+  github_com_tviviano_dashboard_internal_models.QueryType:
     enum:
     - sql
     - csv_filter
     - stream_filter
     - api
+    - tsstore
+    - prometheus
+    - edgelake
     type: string
     x-enum-varnames:
     - QueryTypeSQL
     - QueryTypeCSVFilter
     - QueryTypeStreamFilter
     - QueryTypeAPI
-  models.ResultSet:
+    - QueryTypeTSStore
+    - QueryTypePrometheus
+    - QueryTypeEdgeLake
+  github_com_tviviano_dashboard_internal_models.ResultSet:
     properties:
       columns:
         description: Column names
@@ -736,10 +864,8 @@ definitions:
           type: array
         type: array
     type: object
-  models.SQLConfig:
+  github_com_tviviano_dashboard_internal_models.SQLConfig:
     properties:
-      connection_string:
-        type: string
       database:
         type: string
       driver:
@@ -755,9 +881,8 @@ definitions:
       max_connections:
         type: integer
       options:
-        additionalProperties:
-          type: string
-        type: object
+        description: Optional connection parameters (e.g., "sslmode=require&connect_timeout=10")
+        type: string
       password:
         type: string
       port:
@@ -770,10 +895,9 @@ definitions:
       username:
         type: string
     required:
-    - connection_string
     - driver
     type: object
-  models.SchemaInfo:
+  github_com_tviviano_dashboard_internal_models.SchemaInfo:
     properties:
       database:
         description: Current database name
@@ -781,22 +905,28 @@ definitions:
       tables:
         description: Tables in the database
         items:
-          $ref: '#/definitions/models.TableInfo'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.TableInfo'
         type: array
     type: object
-  models.SchemaResponse:
+  github_com_tviviano_dashboard_internal_models.SchemaResponse:
     properties:
       duration:
         description: milliseconds
         type: integer
       error:
         type: string
+      prometheus_schema:
+        allOf:
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.PrometheusSchemaInfo'
+        description: For Prometheus datasources
       schema:
-        $ref: '#/definitions/models.SchemaInfo'
+        allOf:
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.SchemaInfo'
+        description: For SQL datasources
       success:
         type: boolean
     type: object
-  models.SendMessageRequest:
+  github_com_tviviano_dashboard_internal_models.SendMessageRequest:
     description: Request body for sending a user message
     properties:
       content:
@@ -805,7 +935,24 @@ definitions:
     required:
     - content
     type: object
-  models.SocketConfig:
+  github_com_tviviano_dashboard_internal_models.SettingsListResponse:
+    properties:
+      settings:
+        items:
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ConfigItem'
+        type: array
+    type: object
+  github_com_tviviano_dashboard_internal_models.SlidingWindow:
+    description: Time window configuration for limiting data to recent entries
+    properties:
+      duration:
+        description: Window duration in seconds (e.g., 300 = last 5 minutes)
+        type: integer
+      timestamp_col:
+        description: Column containing timestamps
+        type: string
+    type: object
+  github_com_tviviano_dashboard_internal_models.SocketConfig:
     properties:
       buffer_size:
         description: number of messages to buffer
@@ -819,7 +966,7 @@ definitions:
         type: string
       parser:
         allOf:
-        - $ref: '#/definitions/models.SocketParserConfig'
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.SocketParserConfig'
         description: parser configuration
       ping_interval:
         description: seconds
@@ -841,7 +988,7 @@ definitions:
     - protocol
     - url
     type: object
-  models.SocketParserConfig:
+  github_com_tviviano_dashboard_internal_models.SocketParserConfig:
     properties:
       data_path:
         description: |-
@@ -875,7 +1022,7 @@ definitions:
           Common formats: "2006-01-02T15:04:05Z07:00" (RFC3339), "2006-01-02 15:04:05", unix timestamp
         type: string
     type: object
-  models.SystemConfigResponse:
+  github_com_tviviano_dashboard_internal_models.SystemConfigResponse:
     properties:
       config_refresh_interval:
         description: seconds - how often frontend should refresh dashboard/chart config
@@ -884,18 +1031,124 @@ definitions:
         type: string
       layout_dimensions:
         additionalProperties:
-          $ref: '#/definitions/models.LayoutDimensionDTO'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.LayoutDimensionDTO'
         type: object
       settings:
         additionalProperties: true
         type: object
     type: object
-  models.TableInfo:
+  github_com_tviviano_dashboard_internal_models.TSStoreConfig:
+    properties:
+      api_key:
+        description: Optional API key for authentication
+        type: string
+      data_type:
+        allOf:
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.TSStoreDataType'
+        description: 'Store data type: json, schema, text (default: json)'
+      headers:
+        additionalProperties:
+          type: string
+        description: Additional HTTP headers
+        type: object
+      host:
+        description: Hostname or IP address
+        type: string
+      port:
+        description: Port number
+        type: integer
+      protocol:
+        allOf:
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.TSStoreProtocol'
+        description: 'Protocol: "http" (HTTP/WS) or "https" (HTTPS/WSS)'
+        enum:
+        - http
+        - https
+      push:
+        allOf:
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.TSStorePushConfig'
+        description: |-
+          Push connection configuration for streaming (ts-store v0.2.2+)
+          When streaming is enabled, dashboard calls ts-store API to create a push connection
+          and ts-store dials out to dashboard's inbound WebSocket endpoint
+      store_name:
+        description: Name of the store to query
+        type: string
+      timeout:
+        description: 'Request timeout in seconds (default: 30)'
+        type: integer
+    required:
+    - host
+    - port
+    - protocol
+    - store_name
+    type: object
+  github_com_tviviano_dashboard_internal_models.TSStoreDataType:
+    enum:
+    - json
+    - schema
+    - text
+    type: string
+    x-enum-comments:
+      TSStoreDataTypeJSON: Arbitrary JSON objects
+      TSStoreDataTypeSchema: Schema-defined compact JSON
+      TSStoreDataTypeText: UTF-8 text
+    x-enum-varnames:
+    - TSStoreDataTypeJSON
+    - TSStoreDataTypeSchema
+    - TSStoreDataTypeText
+  github_com_tviviano_dashboard_internal_models.TSStoreProtocol:
+    enum:
+    - http
+    - https
+    type: string
+    x-enum-comments:
+      TSStoreProtocolHTTP: HTTP/WS (unencrypted)
+      TSStoreProtocolHTTPS: HTTPS/WSS (encrypted)
+    x-enum-varnames:
+    - TSStoreProtocolHTTP
+    - TSStoreProtocolHTTPS
+  github_com_tviviano_dashboard_internal_models.TSStorePushConfig:
+    properties:
+      agg_default:
+        description: |-
+          AggDefault is the default aggregation function for fields not in AggFields
+          Options: avg, sum, min, max, first, last, count
+        type: string
+      agg_fields:
+        description: AggFields specifies per-field aggregation functions (e.g., "temp:avg,count:sum")
+        type: string
+      agg_window:
+        description: |-
+          AggWindow is the aggregation window duration (e.g., "1m", "5m", "1h")
+          When set, records are aggregated over this time window before sending
+        type: string
+      connection_id:
+        description: |-
+          ConnectionID stores the active push connection ID returned by ts-store
+          This is set when the push connection is created and used to manage/delete it
+        type: string
+      filter:
+        description: Filter is an optional substring filter - only send matching records
+        type: string
+      filter_ignore_case:
+        description: FilterIgnoreCase enables case-insensitive filter matching
+        type: boolean
+      format:
+        description: 'Format specifies the message format: "full" (default) or "compact"
+          (for schema stores)'
+        type: string
+      from:
+        description: From is the starting timestamp in nanoseconds (0 = oldest data,
+          -1 = current time/realtime only)
+        type: integer
+    type: object
+  github_com_tviviano_dashboard_internal_models.TableInfo:
     properties:
       columns:
         description: Columns in the table
         items:
-          $ref: '#/definitions/models.ColumnInfo'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ColumnInfo'
         type: array
       name:
         description: Table name
@@ -904,23 +1157,26 @@ definitions:
         description: Schema/namespace (e.g., "public" for PostgreSQL)
         type: string
     type: object
-  models.TestDatasourceRequest:
+  github_com_tviviano_dashboard_internal_models.TestDatasourceRequest:
     properties:
       config:
-        $ref: '#/definitions/models.DatasourceConfig'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig'
       type:
         allOf:
-        - $ref: '#/definitions/models.DatasourceType'
+        - $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceType'
         enum:
         - sql
         - csv
         - socket
         - api
+        - tsstore
+        - prometheus
+        - edgelake
     required:
     - config
     - type
     type: object
-  models.TestDatasourceResponse:
+  github_com_tviviano_dashboard_internal_models.TestDatasourceResponse:
     properties:
       data: {}
       message:
@@ -929,11 +1185,29 @@ definitions:
         description: milliseconds
         type: integer
       status:
-        $ref: '#/definitions/models.HealthStatus'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.HealthStatus'
       success:
         type: boolean
     type: object
-  models.ToolCall:
+  github_com_tviviano_dashboard_internal_models.TimeBucket:
+    description: Time bucket configuration for aggregating streaming data into intervals
+    properties:
+      function:
+        description: 'Aggregation function: avg, min, max, sum, count'
+        type: string
+      interval:
+        description: Bucket interval in seconds (e.g., 60 = 1 minute, 3600 = 1 hour)
+        type: integer
+      timestamp_col:
+        description: Column containing timestamps for bucket alignment
+        type: string
+      value_cols:
+        description: Columns to aggregate (numeric values)
+        items:
+          type: string
+        type: array
+    type: object
+  github_com_tviviano_dashboard_internal_models.ToolCall:
     description: A tool call made by the AI
     properties:
       id:
@@ -947,7 +1221,7 @@ definitions:
         description: JSON string of tool output
         type: string
     type: object
-  models.UpdateChartRequest:
+  github_com_tviviano_dashboard_internal_models.UpdateChartRequest:
     description: Request body for updating an existing chart
     properties:
       chart_type:
@@ -955,7 +1229,7 @@ definitions:
       component_code:
         type: string
       data_mapping:
-        $ref: '#/definitions/models.ChartDataMapping'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ChartDataMapping'
       datasource_id:
         type: string
       description:
@@ -966,17 +1240,19 @@ definitions:
         additionalProperties: true
         type: object
       query_config:
-        $ref: '#/definitions/models.ChartQueryConfig'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ChartQueryConfig'
       tags:
         items:
           type: string
         type: array
       thumbnail:
         type: string
+      title:
+        type: string
       use_custom_code:
         type: boolean
     type: object
-  models.UpdateConfigRequest:
+  github_com_tviviano_dashboard_internal_models.UpdateConfigRequest:
     properties:
       settings:
         additionalProperties: true
@@ -984,7 +1260,7 @@ definitions:
     required:
     - settings
     type: object
-  models.UpdateDashboardRequest:
+  github_com_tviviano_dashboard_internal_models.UpdateDashboardRequest:
     description: Request body for updating an existing dashboard
     properties:
       description:
@@ -997,19 +1273,22 @@ definitions:
       panels:
         description: Panels with optional chart_id
         items:
-          $ref: '#/definitions/models.DashboardPanel'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DashboardPanel'
         type: array
       settings:
-        $ref: '#/definitions/models.DashboardSettings'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSettings'
       thumbnail:
         type: string
     type: object
-  models.UpdateDatasourceRequest:
+  github_com_tviviano_dashboard_internal_models.UpdateDatasourceRequest:
     properties:
       config:
-        $ref: '#/definitions/models.DatasourceConfig'
+        $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig'
       description:
         type: string
+      mask_secrets:
+        description: If provided, updates secret masking setting
+        type: boolean
       name:
         type: string
       tags:
@@ -1017,7 +1296,70 @@ definitions:
           type: string
         type: array
     type: object
-  models.UserConfigResponse:
+  github_com_tviviano_dashboard_internal_models.UpdateSettingRequest:
+    properties:
+      value: {}
+    required:
+    - value
+    type: object
+  github_com_tviviano_dashboard_internal_models.UpdateUserRequest:
+    description: Request body for updating an existing user
+    properties:
+      active:
+        type: boolean
+      capabilities:
+        items:
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Capability'
+        type: array
+      email:
+        type: string
+      name:
+        type: string
+    type: object
+  github_com_tviviano_dashboard_internal_models.User:
+    description: User account with authentication and capabilities
+    properties:
+      active:
+        description: Whether user is active
+        type: boolean
+      capabilities:
+        description: User capabilities
+        items:
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Capability'
+        type: array
+      created:
+        type: string
+      email:
+        description: Optional email
+        type: string
+      guid:
+        description: UUID for authentication header
+        type: string
+      id:
+        type: string
+      name:
+        description: Display name
+        type: string
+      updated:
+        type: string
+    type: object
+  github_com_tviviano_dashboard_internal_models.UserCapabilitiesResponse:
+    description: Current user's capabilities and access permissions
+    properties:
+      can_design:
+        type: boolean
+      can_manage:
+        type: boolean
+      capabilities:
+        items:
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Capability'
+        type: array
+      name:
+        type: string
+      user_id:
+        type: string
+    type: object
+  github_com_tviviano_dashboard_internal_models.UserConfigResponse:
     properties:
       settings:
         additionalProperties: true
@@ -1025,7 +1367,21 @@ definitions:
       user_id:
         type: string
     type: object
-  streaming.StreamStatus:
+  github_com_tviviano_dashboard_internal_models.UserListResponse:
+    description: Response containing a list of users with pagination
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      users:
+        items:
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.User'
+        type: array
+    type: object
+  github_com_tviviano_dashboard_internal_streaming.StreamStatus:
     properties:
       bufferCount:
         type: integer
@@ -1036,6 +1392,64 @@ definitions:
       lastError: {}
       subscriberCount:
         type: integer
+    type: object
+  internal_handlers.SaveSessionRequest:
+    properties:
+      name:
+        type: string
+    type: object
+  internal_handlers.StreamAggregatedRequest:
+    properties:
+      function:
+        description: avg, min, max, sum, count
+        type: string
+      interval:
+        description: Bucket interval in seconds
+        type: integer
+      series_col:
+        description: Column to partition by (e.g., "location") - optional
+        type: string
+      timestamp_col:
+        description: Timestamp column
+        type: string
+      value_cols:
+        description: Columns to aggregate
+        items:
+          type: string
+        type: array
+    required:
+    - function
+    - interval
+    - timestamp_col
+    - value_cols
+    type: object
+  internal_mcp.JSONRPCError:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  internal_mcp.JSONRPCRequest:
+    properties:
+      id: {}
+      jsonrpc:
+        type: string
+      method:
+        type: string
+      params:
+        additionalProperties: true
+        type: object
+    type: object
+  internal_mcp.JSONRPCResponse:
+    properties:
+      error:
+        $ref: '#/definitions/internal_mcp.JSONRPCError'
+      id: {}
+      jsonrpc:
+        type: string
+      result: {}
     type: object
 host: localhost:3001
 info:
@@ -1058,14 +1472,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/models.CreateAISessionRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.CreateAISessionRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/models.AISessionResponse'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.AISessionResponse'
         "400":
           description: Bad Request
           schema:
@@ -1118,7 +1532,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.AISessionResponse'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.AISessionResponse'
         "404":
           description: Not Found
           schema:
@@ -1149,7 +1563,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/models.SendMessageRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.SendMessageRequest'
       produces:
       - application/json
       responses:
@@ -1192,14 +1606,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.SaveSessionRequest'
+          $ref: '#/definitions/internal_handlers.SaveSessionRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Chart'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Chart'
         "400":
           description: Bad Request
           schema:
@@ -1268,6 +1682,123 @@ paths:
       summary: Get debug status
       tags:
       - debug
+  /api/settings:
+    get:
+      consumes:
+      - application/json
+      description: Get all settings that can be modified by administrators
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.SettingsListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get all user-configurable settings
+      tags:
+      - settings
+  /api/settings/{key}:
+    get:
+      consumes:
+      - application/json
+      description: Get a single setting by key
+      parameters:
+      - description: Setting key
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ConfigItem'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a single setting
+      tags:
+      - settings
+    put:
+      consumes:
+      - application/json
+      description: Update the value of a user-configurable setting
+      parameters:
+      - description: Setting key
+        in: path
+        name: key
+        required: true
+        type: string
+      - description: New value for the setting
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.UpdateSettingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ConfigItem'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update a setting
+      tags:
+      - settings
+  /auth/me:
+    get:
+      description: Returns the authenticated user's ID, name, and capabilities
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.UserCapabilitiesResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get current user capabilities
+      tags:
+      - Auth
   /charts:
     get:
       description: Get a paginated list of charts (latest version of each) with optional
@@ -1305,7 +1836,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.ChartListResponse'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ChartListResponse'
         "400":
           description: Bad Request
           schema:
@@ -1330,14 +1861,14 @@ paths:
         name: chart
         required: true
         schema:
-          $ref: '#/definitions/models.CreateChartRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.CreateChartRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/models.Chart'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Chart'
         "400":
           description: Bad Request
           schema:
@@ -1390,7 +1921,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Chart'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Chart'
         "404":
           description: Not Found
           schema:
@@ -1419,14 +1950,14 @@ paths:
         name: chart
         required: true
         schema:
-          $ref: '#/definitions/models.UpdateChartRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.UpdateChartRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Chart'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Chart'
         "400":
           description: Bad Request
           schema:
@@ -1484,7 +2015,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Chart'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Chart'
         "404":
           description: Not Found
           schema:
@@ -1513,7 +2044,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.ChartVersionInfo'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ChartVersionInfo'
         "404":
           description: Not Found
           schema:
@@ -1606,7 +2137,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Chart'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Chart'
         "404":
           description: Not Found
           schema:
@@ -1636,7 +2167,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/models.ChartSummary'
+              $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.ChartSummary'
             type: array
         "500":
           description: Internal Server Error
@@ -1655,7 +2186,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.SystemConfigResponse'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.SystemConfigResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1675,14 +2206,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/models.UpdateConfigRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.UpdateConfigRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.SystemConfigResponse'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.SystemConfigResponse'
         "400":
           description: Bad Request
           schema:
@@ -1713,7 +2244,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.UserConfigResponse'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.UserConfigResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1738,14 +2269,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/models.UpdateConfigRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.UpdateConfigRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.UserConfigResponse'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.UserConfigResponse'
         "400":
           description: Bad Request
           schema:
@@ -1794,7 +2325,7 @@ paths:
         "200":
           description: Response when include_datasources=true
           schema:
-            $ref: '#/definitions/models.DashboardSummaryListResponse'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSummaryListResponse'
         "400":
           description: Bad Request
           schema:
@@ -1818,14 +2349,14 @@ paths:
         name: dashboard
         required: true
         schema:
-          $ref: '#/definitions/models.CreateDashboardRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.CreateDashboardRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/models.Dashboard'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard'
         "400":
           description: Bad Request
           schema:
@@ -1878,7 +2409,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Dashboard'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard'
         "404":
           description: Not Found
           schema:
@@ -1907,14 +2438,14 @@ paths:
         name: dashboard
         required: true
         schema:
-          $ref: '#/definitions/models.UpdateDashboardRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.UpdateDashboardRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Dashboard'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard'
         "400":
           description: Bad Request
           schema:
@@ -1972,14 +2503,14 @@ paths:
         name: datasource
         required: true
         schema:
-          $ref: '#/definitions/models.CreateDatasourceRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.CreateDatasourceRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/models.Datasource'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Datasource'
         "400":
           description: Bad Request
           schema:
@@ -2032,7 +2563,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Datasource'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Datasource'
         "400":
           description: Bad Request
           schema:
@@ -2061,14 +2592,14 @@ paths:
         name: datasource
         required: true
         schema:
-          $ref: '#/definitions/models.UpdateDatasourceRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.UpdateDatasourceRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.Datasource'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.Datasource'
         "400":
           description: Bad Request
           schema:
@@ -2087,6 +2618,113 @@ paths:
       summary: Update a datasource
       tags:
       - datasources
+  /datasources/{id}/edgelake/databases:
+    get:
+      description: Retrieve all database names from an EdgeLake node's blockchain
+        registry
+      parameters:
+      - description: Datasource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get databases from an EdgeLake data source
+      tags:
+      - datasources
+  /datasources/{id}/edgelake/schema:
+    get:
+      description: Retrieve column names and types for a specific table from an EdgeLake
+        node
+      parameters:
+      - description: Datasource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Database name
+        in: query
+        name: database
+        required: true
+        type: string
+      - description: Table name
+        in: query
+        name: table
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get table schema from an EdgeLake data source
+      tags:
+      - datasources
+  /datasources/{id}/edgelake/tables:
+    get:
+      description: Retrieve table names for a specific database from an EdgeLake node
+      parameters:
+      - description: Datasource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Database name
+        in: query
+        name: database
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get tables from an EdgeLake data source
+      tags:
+      - datasources
   /datasources/{id}/health:
     post:
       description: Check the health of a specific datasource and update its status
@@ -2102,7 +2740,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.HealthInfo'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.HealthInfo'
         "400":
           description: Bad Request
           schema:
@@ -2114,6 +2752,42 @@ paths:
             additionalProperties: true
             type: object
       summary: Check datasource health
+      tags:
+      - datasources
+  /datasources/{id}/prometheus/labels/{label}/values:
+    get:
+      description: Retrieve all possible values for a specific label from a Prometheus
+        datasource
+      parameters:
+      - description: Datasource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label name
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get values for a Prometheus label
       tags:
       - datasources
   /datasources/{id}/query:
@@ -2132,14 +2806,14 @@ paths:
         name: query
         required: true
         schema:
-          $ref: '#/definitions/models.QueryRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.QueryRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.QueryResponse'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.QueryResponse'
         "400":
           description: Bad Request
           schema:
@@ -2169,7 +2843,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.SchemaResponse'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.SchemaResponse'
         "400":
           description: Bad Request
           schema:
@@ -2218,6 +2892,48 @@ paths:
       summary: Stream data from a socket datasource
       tags:
       - datasources
+  /datasources/{id}/stream/aggregated:
+    post:
+      consumes:
+      - application/json
+      description: Opens an SSE connection to stream time-bucketed aggregated data
+      parameters:
+      - description: Datasource ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Aggregation configuration
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handlers.StreamAggregatedRequest'
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE stream
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Stream aggregated data from a socket datasource
+      tags:
+      - datasources
   /datasources/{id}/stream/status:
     get:
       description: Get status information for an active stream
@@ -2233,13 +2949,27 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/streaming.StreamStatus'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_streaming.StreamStatus'
         "404":
           description: Not Found
           schema:
             additionalProperties: true
             type: object
       summary: Get stream status
+      tags:
+      - datasources
+  /datasources/aggregators:
+    get:
+      description: Get statistics about active bucket aggregators
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get aggregator statistics
       tags:
       - datasources
   /datasources/streams:
@@ -2267,14 +2997,14 @@ paths:
         name: datasource
         required: true
         schema:
-          $ref: '#/definitions/models.TestDatasourceRequest'
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.TestDatasourceRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.TestDatasourceResponse'
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.TestDatasourceResponse'
         "400":
           description: Bad Request
           schema:
@@ -2313,22 +3043,22 @@ paths:
         name: message
         required: true
         schema:
-          $ref: '#/definitions/mcp.JSONRPCRequest'
+          $ref: '#/definitions/internal_mcp.JSONRPCRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/mcp.JSONRPCResponse'
+            $ref: '#/definitions/internal_mcp.JSONRPCResponse'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/mcp.JSONRPCResponse'
+            $ref: '#/definitions/internal_mcp.JSONRPCResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/mcp.JSONRPCResponse'
+            $ref: '#/definitions/internal_mcp.JSONRPCResponse'
       summary: Handle MCP Message
       tags:
       - MCP
@@ -2345,4 +3075,144 @@ paths:
       summary: MCP SSE Connection
       tags:
       - MCP
+  /users:
+    get:
+      description: Returns a paginated list of all users
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.UserListResponse'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List all users
+      tags:
+      - Users
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account
+      parameters:
+      - description: User data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.User'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a new user
+      tags:
+      - Users
+  /users/{id}:
+    delete:
+      description: Deletes a user account
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete a user
+      tags:
+      - Users
+    get:
+      description: Returns a user by their ID
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.User'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get user by ID
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing user's information
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User data
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_tviviano_dashboard_internal_models.User'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update a user
+      tags:
+      - Users
 swagger: "2.0"
