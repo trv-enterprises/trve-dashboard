@@ -936,11 +936,12 @@ const ChartEditor = forwardRef(function ChartEditor({
         />
       )}
 
-      {/* Component type selector - Chart vs Control */}
+      {/* Component type selector - Display vs Control */}
       <div className="component-type-section">
         <ContentSwitcher
-          selectedIndex={componentType === 'chart' ? 0 : 1}
+          selectedIndex={componentType === 'control' ? 1 : 0}
           onChange={({ index }) => {
+            // Store 'chart' in DB for backward compatibility, but display as "Display"
             const newType = index === 0 ? 'chart' : 'control';
             setComponentType(newType);
             if (newType === 'control' && !controlConfig) {
@@ -953,29 +954,29 @@ const ChartEditor = forwardRef(function ChartEditor({
           }}
           className="component-type-switcher"
         >
-          <Switch name="chart" text="Chart" />
+          <Switch name="display" text="Display" />
           <Switch name="control" text="Control" />
         </ContentSwitcher>
       </div>
 
-      {/* Chart/Control basic info */}
+      {/* Display/Control basic info */}
       <div className="chart-metadata-section">
         <div className="metadata-row">
           <TextInput
             id="chart-name"
-            labelText={componentType === 'control' ? 'Control Name' : 'Chart Name'}
+            labelText={componentType === 'control' ? 'Control Name' : 'Display Name'}
             value={name}
             onChange={(e) => {
               setName(e.target.value);
               if (nameError) setNameError('');
             }}
             onBlur={(e) => checkDuplicateChartName(e.target.value)}
-            placeholder={componentType === 'control' ? 'Enter control name' : 'Enter chart name'}
+            placeholder={componentType === 'control' ? 'Enter control name' : 'Enter display name'}
             size="md"
             invalid={!!nameError}
             invalidText={nameError}
           />
-          {componentType === 'chart' && (
+          {componentType !== 'control' && (
             <Select
               id="chart-type"
               labelText="Chart Type"

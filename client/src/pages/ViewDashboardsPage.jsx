@@ -9,10 +9,12 @@ import {
   Loading,
   Tag,
   Search,
-  Tooltip
+  Tooltip,
+  OverflowMenu,
+  OverflowMenuItem
 } from '@carbon/react';
-import { Dashboard, View, ChartMultitype, DataBase, Information } from '@carbon/icons-react';
-import { API_BASE } from '../api/client';
+import { Dashboard, View, ChartMultitype, DataBase, Information, StarFilled } from '@carbon/icons-react';
+import apiClient, { API_BASE } from '../api/client';
 import './ViewDashboardsPage.scss';
 
 /**
@@ -27,10 +29,42 @@ function ViewDashboardsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [defaultDashboardId, setDefaultDashboardId] = useState(null);
 
   useEffect(() => {
     fetchDashboards();
+    fetchUserConfig();
   }, []);
+
+  const fetchUserConfig = async () => {
+    const userGuid = apiClient.getCurrentUserGuid();
+    if (!userGuid) return;
+
+    try {
+      const config = await apiClient.getUserConfig(userGuid);
+      if (config.settings?.default_dashboard_id) {
+        setDefaultDashboardId(config.settings.default_dashboard_id);
+      }
+    } catch (err) {
+      // Ignore errors - user may not have config yet
+      console.log('No user config found');
+    }
+  };
+
+  const handleSetDefault = async (e, dashboardId) => {
+    e.stopPropagation(); // Prevent tile click
+    const userGuid = apiClient.getCurrentUserGuid();
+    if (!userGuid) return;
+
+    try {
+      await apiClient.updateUserConfig(userGuid, {
+        default_dashboard_id: dashboardId
+      });
+      setDefaultDashboardId(dashboardId);
+    } catch (err) {
+      console.error('Failed to set default dashboard:', err);
+    }
+  };
 
   const fetchDashboards = async () => {
     try {
@@ -128,12 +162,15 @@ function ViewDashboardsPage() {
           {filteredDashboards.map((dashboard) => (
             <Tile
               key={dashboard.id}
-              className="dashboard-tile"
+              className={`dashboard-tile ${defaultDashboardId === dashboard.id ? 'dashboard-tile--default' : ''}`}
               onClick={() => handleViewDashboard(dashboard)}
             >
               <div className="tile-header">
                 <ChartMultitype size={24} className="tile-icon" />
                 <h3>{dashboard.name}</h3>
+                {defaultDashboardId === dashboard.id && (
+                  <StarFilled size={16} className="default-star" />
+                )}
                 {dashboard.description && (
                   <Tooltip label={dashboard.description} align="bottom">
                     <button type="button" className="info-button" onClick={(e) => e.stopPropagation()}>
@@ -141,6 +178,18 @@ function ViewDashboardsPage() {
                     </button>
                   </Tooltip>
                 )}
+                <OverflowMenu
+                  flipped
+                  size="sm"
+                  className="tile-menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <OverflowMenuItem
+                    itemText={defaultDashboardId === dashboard.id ? 'Default Dashboard' : 'Set as Default'}
+                    disabled={defaultDashboardId === dashboard.id}
+                    onClick={(e) => handleSetDefault(e, dashboard.id)}
+                  />
+                </OverflowMenu>
               </div>
 
               {getDatasourceNames(dashboard).length > 0 && (

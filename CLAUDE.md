@@ -18,6 +18,10 @@ This file provides context and guidance for AI assistants working on this projec
 - Use "connection" (not "data source" or "datasource") for external data connections in UI text
 - Internal code can use `datasource` for backwards compatibility with existing database records
 - API endpoints: `/api/connections` is preferred, `/api/datasources` kept as deprecated alias
+- Use "display" (not "chart") for data visualization components in UI text
+- Use "control" for interactive components (buttons, sliders, toggles)
+- Internal code uses `component_type: 'chart'` in DB for displays (backward compatibility), but UI shows "Display"
+- "Component" is the umbrella term for both displays and controls
 
 ### 4. Full-Stack Awareness
 - **Always consider frontend impact**: When making backend changes (API endpoints, models, response formats), identify and implement the corresponding frontend changes (API client, components, forms, types).
@@ -273,8 +277,8 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
 Create and configure dashboard components:
 - **Layouts** (`/design/layouts`) - Define 12-column grid layouts with panels
 - **Connections** (`/design/connections`) - Configure SQL, API, CSV, WebSocket connections
-- **Charts** (`/design/charts`) - Build React components with ECharts (includes Controls)
-- **Dashboards** (`/design/dashboards`) - Combine layouts with components
+- **Components** (`/design/charts`) - Build displays (charts, gauges, tables) and controls (buttons, sliders)
+- **Dashboards** (`/design/dashboards`) - Combine components with layouts
 
 ### View Mode (`/view/*`)
 End-user dashboard viewing:
@@ -487,6 +491,7 @@ const Component = () => {
 - **Prometheus Connection**: Full Prometheus integration with schema discovery, visual PromQL builder, and AI tool support
 - **EdgeLake Connection**: Full EdgeLake integration with distributed query support, cascading schema discovery (database → table → columns), visual query builder, and AI tool support
 - **Terminology Rename**: "Data Sources" renamed to "Connections" throughout UI and API (`/api/connections`)
+- **Terminology Rename**: "Chart" renamed to "Display" in UI (DB still uses `component_type: 'chart'` for backward compatibility)
 
 ### 🚧 In Progress
 - AI Builder Phase 8: Polish & Testing

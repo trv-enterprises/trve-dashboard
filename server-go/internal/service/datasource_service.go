@@ -16,6 +16,7 @@ import (
 
 	"github.com/tviviano/dashboard/internal/datasource"
 	"github.com/tviviano/dashboard/internal/models"
+	"github.com/tviviano/dashboard/internal/registry"
 	"github.com/tviviano/dashboard/internal/repository"
 )
 
@@ -1076,4 +1077,11 @@ func (s *DatasourceService) GetEdgeLakeSchema(ctx context.Context, id string, da
 	}
 
 	return columns, nil
+}
+
+// CreateAdapter creates a registry.Adapter for the given data source
+// This is used by the command handler for bidirectional communication
+func (s *DatasourceService) CreateAdapter(ctx context.Context, ds *models.Datasource) (registry.Adapter, error) {
+	factory := datasource.NewDataSourceFactory()
+	return factory.CreateAdapterFromConfig(ds)
 }

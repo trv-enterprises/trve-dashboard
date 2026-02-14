@@ -14,7 +14,316 @@ import (
 	"time"
 
 	"github.com/tviviano/dashboard/internal/models"
+	"github.com/tviviano/dashboard/internal/registry"
 )
+
+func init() {
+	// Register EdgeLake adapter
+	registry.Register(
+		"api.edgelake",
+		"EdgeLake",
+		registry.Capabilities{CanRead: true, CanWrite: false, CanStream: false},
+		edgelakeConfigSchema(),
+		func(config map[string]interface{}) (registry.Adapter, error) {
+			return newEdgeLakeAdapterFromConfig(config)
+		},
+	)
+}
+
+// edgelakeConfigSchema returns configuration fields for EdgeLake adapter
+func edgelakeConfigSchema() []registry.ConfigField {
+	return []registry.ConfigField{
+		{Name: "host", Type: "string", Required: true, Description: "EdgeLake node host"},
+		{Name: "port", Type: "int", Required: true, Description: "REST API port"},
+		{Name: "timeout", Type: "int", Required: false, Default: 20, Description: "Request timeout (seconds)"},
+		{Name: "use_distributed_query", Type: "bool", Required: false, Default: false, Description: "Use distributed queries"},
+	}
+}
+
+// EdgeLakeAdapter implements registry.Adapter for EdgeLake
+type EdgeLakeAdapter struct {
+	config *models.EdgeLakeConfig
+	client *http.Client
+}
+
+// newEdgeLakeAdapterFromConfig creates an EdgeLake adapter from config map
+func newEdgeLakeAdapterFromConfig(config map[string]interface{}) (*EdgeLakeAdapter, error) {
+	elConfig := &models.EdgeLakeConfig{}
+
+	if host, ok := config["host"].(string); ok {
+		elConfig.Host = host
+	}
+	if port, ok := config["port"].(float64); ok {
+		elConfig.Port = int(port)
+	} else if port, ok := config["port"].(int); ok {
+		elConfig.Port = port
+	}
+	if timeout, ok := config["timeout"].(float64); ok {
+		elConfig.Timeout = int(timeout)
+	} else if timeout, ok := config["timeout"].(int); ok {
+		elConfig.Timeout = timeout
+	}
+	if distributed, ok := config["use_distributed_query"].(bool); ok {
+		elConfig.UseDistributedQuery = distributed
+	}
+
+	httpTimeout := 20 * time.Second
+	if elConfig.Timeout > 0 {
+		httpTimeout = time.Duration(elConfig.Timeout) * time.Second
+	}
+
+	return &EdgeLakeAdapter{
+		config: elConfig,
+		client: &http.Client{Timeout: httpTimeout},
+	}, nil
+}
+
+// TypeID returns the adapter type identifier
+func (a *EdgeLakeAdapter) TypeID() string {
+	return "api.edgelake"
+}
+
+// DisplayName returns a human-readable name
+func (a *EdgeLakeAdapter) DisplayName() string {
+	return "EdgeLake"
+}
+
+// Capabilities returns what this adapter can do
+func (a *EdgeLakeAdapter) Capabilities() registry.Capabilities {
+	return registry.Capabilities{CanRead: true, CanWrite: false, CanStream: false}
+}
+
+// ConfigSchema returns configuration fields
+func (a *EdgeLakeAdapter) ConfigSchema() []registry.ConfigField {
+	return edgelakeConfigSchema()
+}
+
+// Connect tests connection to EdgeLake
+func (a *EdgeLakeAdapter) Connect(ctx context.Context) error {
+	return a.TestConnection(ctx)
+}
+
+// TestConnection tests the connection to EdgeLake
+func (a *EdgeLakeAdapter) TestConnection(ctx context.Context) error {
+	_, err := a.executeCommandInternal(ctx, "get status", false)
+	return err
+}
+
+// Close is a no-op for EdgeLake
+func (a *EdgeLakeAdapter) Close() error {
+	return nil
+}
+
+// Query executes a SQL query against EdgeLake
+func (a *EdgeLakeAdapter) Query(ctx context.Context, query registry.Query) (*registry.ResultSet, error) {
+	if query.Raw == "" {
+		return nil, fmt.Errorf("query is required")
+	}
+
+	database := ""
+	if query.Params != nil {
+		if db, ok := query.Params["database"].(string); ok {
+			database = db
+		}
+	}
+	if database == "" {
+		return nil, fmt.Errorf("database parameter is required for EdgeLake queries")
+	}
+
+	command := fmt.Sprintf(`sql %s format = json "%s"`, database, query.Raw)
+
+	distributed := a.config.UseDistributedQuery
+	if query.Params != nil {
+		if dist, ok := query.Params["distributed"].(bool); ok {
+			distributed = dist
+		}
+	}
+
+	body, err := a.executeCommandInternal(ctx, command, distributed)
+	if err != nil {
+		return nil, err
+	}
+
+	return a.parseQueryResponseRegistry(body)
+}
+
+// Stream is not supported for EdgeLake
+func (a *EdgeLakeAdapter) Stream(ctx context.Context, query registry.Query) (<-chan registry.Record, error) {
+	return nil, fmt.Errorf("streaming is not supported for EdgeLake; use refresh interval for periodic updates")
+}
+
+// Write is not supported for EdgeLake
+func (a *EdgeLakeAdapter) Write(ctx context.Context, cmd registry.Command) (*registry.WriteResult, error) {
+	return nil, fmt.Errorf("api.edgelake does not support write operations")
+}
+
+// baseURLInternal returns the base URL
+func (a *EdgeLakeAdapter) baseURLInternal() string {
+	return fmt.Sprintf("http://%s:%d", a.config.Host, a.config.Port)
+}
+
+// executeCommandInternal sends a command to EdgeLake
+func (a *EdgeLakeAdapter) executeCommandInternal(ctx context.Context, command string, distributed bool) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", a.baseURLInternal(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "anylog")
+	req.Header.Set("command", command)
+
+	if distributed || a.config.UseDistributedQuery {
+		req.Header.Set("destination", "network")
+	}
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("connection failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("EdgeLake returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return body, nil
+}
+
+// parseQueryResponseRegistry parses EdgeLake response into registry.ResultSet
+func (a *EdgeLakeAdapter) parseQueryResponseRegistry(body []byte) (*registry.ResultSet, error) {
+	bodyStr := strings.TrimSpace(string(body))
+
+	if bodyStr == "" || bodyStr == "[]" || bodyStr == "{}" {
+		return &registry.ResultSet{
+			Columns: []string{},
+			Rows:    [][]interface{}{},
+		}, nil
+	}
+
+	var queryResult struct {
+		Query []map[string]interface{} `json:"Query"`
+	}
+	if err := json.Unmarshal(body, &queryResult); err == nil && queryResult.Query != nil {
+		return a.recordsToRegistryResultSet(queryResult.Query), nil
+	}
+
+	var records []map[string]interface{}
+	if err := json.Unmarshal(body, &records); err == nil {
+		return a.recordsToRegistryResultSet(records), nil
+	}
+
+	var rowsResult struct {
+		Rows []map[string]interface{} `json:"rows"`
+	}
+	if err := json.Unmarshal(body, &rowsResult); err == nil && rowsResult.Rows != nil {
+		return a.recordsToRegistryResultSet(rowsResult.Rows), nil
+	}
+
+	return nil, fmt.Errorf("unable to parse EdgeLake response: %s", string(body[:minInt(200, len(body))]))
+}
+
+// recordsToRegistryResultSet converts array of maps to registry.ResultSet
+func (a *EdgeLakeAdapter) recordsToRegistryResultSet(records []map[string]interface{}) *registry.ResultSet {
+	if len(records) == 0 {
+		return &registry.ResultSet{
+			Columns: []string{},
+			Rows:    [][]interface{}{},
+		}
+	}
+
+	columns := make([]string, 0)
+	seen := make(map[string]bool)
+	for _, record := range records {
+		for key := range record {
+			if !seen[key] {
+				columns = append(columns, key)
+				seen[key] = true
+			}
+		}
+	}
+
+	rows := make([][]interface{}, len(records))
+	for i, record := range records {
+		row := make([]interface{}, len(columns))
+		for j, col := range columns {
+			row[j] = record[col]
+		}
+		rows[i] = row
+	}
+
+	return &registry.ResultSet{
+		Columns:  columns,
+		Rows:     rows,
+		Metadata: map[string]interface{}{"row_count": len(rows)},
+	}
+}
+
+// ListDatabasesAdapter returns all databases
+func (a *EdgeLakeAdapter) ListDatabasesAdapter(ctx context.Context) ([]string, error) {
+	body, err := a.executeCommandInternal(ctx, "blockchain get table", false)
+	if err != nil {
+		return nil, err
+	}
+	return a.parseDatabaseListInternal(body)
+}
+
+// parseDatabaseListInternal extracts database names
+func (a *EdgeLakeAdapter) parseDatabaseListInternal(body []byte) ([]string, error) {
+	bodyStr := strings.TrimSpace(string(body))
+
+	var tables []map[string]interface{}
+	if err := json.Unmarshal(body, &tables); err == nil {
+		dbSet := make(map[string]bool)
+		for _, t := range tables {
+			if db, ok := t["dbms"].(string); ok && db != "" {
+				dbSet[db] = true
+			}
+			if db, ok := t["database"].(string); ok && db != "" {
+				dbSet[db] = true
+			}
+		}
+		databases := make([]string, 0, len(dbSet))
+		for db := range dbSet {
+			databases = append(databases, db)
+		}
+		return databases, nil
+	}
+
+	databases := make(map[string]bool)
+	lines := strings.Split(bodyStr, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "-") || strings.Contains(line, "Database") {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 2)
+		if len(parts) >= 1 {
+			db := strings.TrimSpace(parts[0])
+			if db != "" {
+				databases[db] = true
+			}
+		}
+	}
+
+	result := make([]string, 0, len(databases))
+	for db := range databases {
+		result = append(result, db)
+	}
+	return result, nil
+}
+
+// minInt returns minimum of two ints
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
 
 // EdgeLakeDataSource implements the DataSource interface for EdgeLake
 type EdgeLakeDataSource struct {

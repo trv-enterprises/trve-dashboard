@@ -3,7 +3,7 @@
 // See LICENSE file for details.
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Loading, Modal } from '@carbon/react';
 import { Save, Close, ArrowLeft } from '@carbon/icons-react';
 import ChartEditor from '../components/ChartEditor';
@@ -13,15 +13,24 @@ import './ChartDetailPage.scss';
 /**
  * ChartDetailPage Component
  *
- * Standalone page for creating/editing charts.
+ * Standalone page for creating/editing charts and controls.
  * Uses shared ChartEditor component.
+ * Pass ?type=control to create a control instead of a chart.
  */
 function ChartDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isCreateMode = id === 'new';
+  const initialComponentType = searchParams.get('type') || 'chart';
 
-  const [chart, setChart] = useState(null);
+  // Initialize chart with component_type from URL param for new controls
+  const [chart, setChart] = useState(() => {
+    if (isCreateMode && initialComponentType === 'control') {
+      return { component_type: 'control' };
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(!isCreateMode);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -114,7 +123,7 @@ function ChartDetailPage() {
           >
             Back
           </Button>
-          <h1>{isCreateMode ? 'Create Chart' : 'Edit Chart'}</h1>
+          <h1>{isCreateMode ? 'Create Component' : 'Edit Component'}</h1>
         </div>
         <div className="page-actions">
           <Button
@@ -132,7 +141,7 @@ function ChartDetailPage() {
             disabled={saving || !isValid}
             size="md"
           >
-            Save Chart
+            Save
           </Button>
         </div>
       </div>
@@ -154,15 +163,15 @@ function ChartDetailPage() {
           open={true}
           onRequestClose={() => setShowSaveModal(false)}
           onRequestSubmit={confirmSave}
-          modalHeading={isCreateMode ? "Create Chart" : "Save Changes"}
+          modalHeading={isCreateMode ? "Create Component" : "Save Changes"}
           primaryButtonText={saving ? "Saving..." : "Save"}
           secondaryButtonText="Cancel"
           primaryButtonDisabled={saving}
         >
           <p>
             {isCreateMode
-              ? `Create chart "${pendingPayload?.name}"?`
-              : `Save changes to chart "${pendingPayload?.name}"?`}
+              ? `Create component "${pendingPayload?.name}"?`
+              : `Save changes to "${pendingPayload?.name}"?`}
           </p>
         </Modal>
       )}

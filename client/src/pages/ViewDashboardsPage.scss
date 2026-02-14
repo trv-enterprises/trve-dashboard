@@ -123,6 +123,15 @@
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       }
 
+      // Default dashboard styling
+      &--default {
+        border-color: #f1c21b;
+
+        &:hover {
+          border-color: #f1c21b;
+        }
+      }
+
       .tile-header {
         display: flex;
         align-items: center;
@@ -158,6 +167,29 @@
 
           &:hover {
             color: #78a9ff;
+          }
+        }
+
+        .default-star {
+          color: #f1c21b; // Yellow star for default
+          flex-shrink: 0;
+        }
+
+        .tile-menu {
+          flex-shrink: 0;
+          margin-left: auto;
+
+          // Make the overflow menu icon visible
+          svg {
+            fill: #c6c6c6 !important;
+          }
+
+          &:hover {
+            background-color: #4c4c4c;
+
+            svg {
+              fill: #f4f4f4 !important;
+            }
           }
         }
       }

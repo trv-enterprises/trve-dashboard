@@ -26,6 +26,20 @@
       display: flex;
       align-items: center;
       gap: spacing.$spacing-04;
+
+      // Fix Back button color to match dark theme
+      .cds--btn--ghost {
+        color: var(--cds-text-primary);
+
+        svg {
+          fill: var(--cds-text-primary);
+        }
+
+        &:hover {
+          color: var(--cds-text-primary);
+          background-color: var(--cds-layer-hover-01);
+        }
+      }
     }
 
     h1 {

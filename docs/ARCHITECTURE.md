@@ -96,10 +96,9 @@ The dashboard operates in three distinct modes, each with its own navigation and
 
 ### 1. Design Mode
 Create and configure dashboard components:
-- **Layouts**: Define grid-based panel layouts (12-column system)
-- **Data Sources**: Configure connections to SQL, API, CSV, WebSocket sources
-- **Charts**: Build React components with ECharts visualizations (manual or AI-assisted)
-- **Dashboards**: Combine layouts with charts, configure settings
+- **Connections**: Configure connections to SQL, API, CSV, WebSocket sources
+- **Components**: Build displays (charts, gauges, tables) and controls (buttons, sliders) - manual or AI-assisted
+- **Dashboards**: Combine components with layouts, configure settings
 
 ### 2. View Mode
 End-user dashboard viewing experience:

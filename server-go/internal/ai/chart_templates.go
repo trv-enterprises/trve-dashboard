@@ -181,6 +181,98 @@ var chartTemplates = map[string]string{
   return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} />;
 };`,
 
+	"number": `const Component = ({ data }) => {
+  // Configuration - customize these values
+  const title = 'Title';           // Replace with your metric title
+  const units = 'units';           // Replace with your units (e.g., 'ms', '°F', 'req/s')
+  const valueColumn = null;        // Set to column name, or null to auto-detect first numeric column
+
+  // Auto-detect value column if not specified
+  const getValueColumn = () => {
+    if (valueColumn) return valueColumn;
+    if (!data || !data.columns || !data.rows || !data.rows.length) return null;
+    
+    // Find first column with a numeric value
+    for (let i = 0; i < data.columns.length; i++) {
+      const val = data.rows[0][i];
+      if (typeof val === 'number') {
+        return data.columns[i];
+      }
+    }
+    // Fall back to first column
+    return data.columns[0];
+  };
+
+  const effectiveColumn = getValueColumn();
+  const rawValue = effectiveColumn ? getValue(data, effectiveColumn) : 0;
+
+  // Format the number for display
+  const formatNumber = (num) => {
+    if (num == null) return '--';
+    if (typeof num !== 'number') return String(num);
+
+    // Format large numbers with abbreviations to fit 6 chars
+    if (Math.abs(num) >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+    if (Math.abs(num) >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+    if (Math.abs(num) >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+
+    // Format decimal numbers
+    if (num % 1 !== 0) return num.toFixed(2);
+
+    return num.toLocaleString();
+  };
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      height: '100%',
+      width: '100%',
+      padding: '16px',
+      paddingTop: '8px',
+      backgroundColor: 'transparent',
+      color: '#f4f4f4'
+    }}>
+      {/* Title - at top, primary text color */}
+      <div style={{
+        fontSize: '0.875rem',
+        fontWeight: '600',
+        color: '#f4f4f4',
+        textAlign: 'center',
+        marginBottom: 'auto'
+      }}>
+        {title}
+      </div>
+
+      {/* Value - centered, sized for 6 characters */}
+      <div style={{
+        fontSize: 'clamp(2.5rem, 10vw, 5rem)',
+        fontWeight: '300',
+        lineHeight: 1,
+        color: '#0f62fe',
+        textAlign: 'center',
+        fontFamily: 'IBM Plex Mono, monospace'
+      }}>
+        {formatNumber(rawValue)}
+      </div>
+
+      {/* Units - at bottom, larger text */}
+      <div style={{
+        fontSize: '1.125rem',
+        fontWeight: '400',
+        color: '#f4f4f4',
+        textAlign: 'center',
+        marginTop: 'auto',
+        marginBottom: '8px'
+      }}>
+        {units}
+      </div>
+    </div>
+  );
+};`,
+
 	"gauge": `const Component = ({ data }) => {
   const containerRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 200, height: 200 });

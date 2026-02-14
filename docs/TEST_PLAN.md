@@ -1,0 +1,455 @@
+# Dashboard End-to-End Test Plan
+
+## Overview
+Comprehensive test plan for all dashboard features, datasource types, and aggregation capabilities.
+
+**Version**: v0.3.1
+**Date**: 2026-02-10
+**Excludes**: Rules Engine (not in scope)
+
+---
+
+## 1. Datasource Types
+
+### 1.1 SQL (PostgreSQL)
+- [ ] Create PostgreSQL datasource with host/port/database/user/password
+- [ ] Test connection succeeds
+- [ ] Schema discovery returns tables and columns with types
+- [ ] Execute SELECT query returns data
+- [ ] Execute query with parameters works
+- [ ] Health check shows healthy status
+- [ ] Update datasource configuration
+- [ ] Delete datasource
+
+### 1.2 SQL (MySQL)
+- [ ] Create MySQL datasource
+- [ ] Test connection succeeds
+- [ ] Schema discovery returns tables and columns
+- [ ] Execute query returns data
+
+### 1.3 SQL (SQLite)
+- [ ] Create SQLite datasource with file path
+- [ ] Test connection succeeds
+- [ ] Schema discovery works
+- [ ] Execute query returns data
+
+### 1.4 REST API
+- [ ] Create API datasource with URL
+- [ ] Configure Bearer token authentication
+- [ ] Configure Basic authentication
+- [ ] Configure API-Key authentication
+- [ ] Test connection succeeds
+- [ ] Execute GET request returns data
+- [ ] Response parsing with JSON path extraction works
+- [ ] Custom headers are sent
+- [ ] Query parameters are applied
+
+### 1.5 CSV
+- [ ] Create CSV datasource with file path
+- [ ] Configure custom delimiter
+- [ ] Header detection works correctly
+- [ ] Schema inference from file works
+- [ ] Query with filter expression returns filtered data
+
+### 1.6 WebSocket/Socket
+- [ ] Create WebSocket datasource with URL
+- [ ] Configure message parser (JSON path, field mapping)
+- [ ] Test connection succeeds
+- [ ] Stream endpoint receives real-time data
+- [ ] Reconnection on disconnect works
+- [ ] Buffer configuration works (initial records sent on connect)
+
+### 1.7 TSStore
+- [ ] Create TSStore datasource with URL and API key
+- [ ] Test connection succeeds
+- [ ] Schema discovery returns store fields
+- [ ] Query with time range returns data
+- [ ] Push streaming connection works (TSStore dials back)
+- [ ] Aggregation window configuration works
+- [ ] Format options (full/compact) work correctly
+
+### 1.8 Prometheus
+- [ ] Create Prometheus datasource with URL
+- [ ] Configure basic auth if required
+- [ ] Test connection succeeds
+- [ ] Schema discovery returns metrics list
+- [ ] Schema discovery returns label names
+- [ ] Get label values for specific label
+- [ ] Execute instant query returns current values
+- [ ] Execute range query with start/end/step returns time series
+- [ ] Relative time expressions work (now-1h, now-5m)
+
+### 1.9 EdgeLake
+- [ ] Create EdgeLake datasource with URL
+- [ ] Test connection succeeds
+- [ ] Schema discovery: list databases
+- [ ] Schema discovery: list tables for database
+- [ ] Schema discovery: list columns for table
+- [ ] Execute SQL query with database parameter
+- [ ] Distributed query option works
+- [ ] Extended fields (+ip, +hostname) work
+
+---
+
+## 2. Chart Types
+
+### 2.1 Standard Chart Types
+- [ ] Create Line chart with data mapping
+- [ ] Create Bar chart with data mapping
+- [ ] Create Area chart with data mapping
+- [ ] Create Pie chart with data mapping
+- [ ] Create Scatter chart with data mapping
+- [ ] Create Gauge chart with single value
+- [ ] Create Heatmap chart
+- [ ] Create Radar chart
+- [ ] Create Funnel chart
+- [ ] Create DataView (table) chart
+
+### 2.2 Chart Configuration
+- [ ] Set chart title and description
+- [ ] Configure X-axis label (e.g., "Time")
+- [ ] Configure Y-axis label (e.g., "Temperature (°F)")
+- [ ] Configure multiple Y-axis columns
+- [ ] Configure group by for multiple series
+- [ ] Configure legend position
+- [ ] Configure tooltip formatting
+- [ ] Configure colors
+- [ ] Enable/disable data labels
+- [ ] Enable stacking (bar/area)
+- [ ] Enable line smoothing
+
+### 2.3 Custom Code Charts
+- [ ] Create chart with custom React component code
+- [ ] Access `data` prop with columns and rows
+- [ ] Use `toObjects(data)` utility
+- [ ] Use `getValue(data, 'column')` utility
+- [ ] Use `formatTimestamp()` utility
+- [ ] ReactECharts renders correctly
+- [ ] Carbon DataTable renders correctly
+
+### 2.4 Chart Versioning
+- [ ] New chart starts at version 1 (final)
+- [ ] Update creates new version
+- [ ] List versions shows history
+- [ ] Get specific version works
+- [ ] Delete specific version works
+- [ ] Draft creation for AI sessions works
+- [ ] Save draft as final version works
+
+---
+
+## 3. Data Filtering
+
+### 3.1 Filter Operators
+- [ ] `eq` (equals) filter works
+- [ ] `neq` (not equals) filter works
+- [ ] `gt` (greater than) filter works
+- [ ] `gte` (greater than or equal) filter works
+- [ ] `lt` (less than) filter works
+- [ ] `lte` (less than or equal) filter works
+- [ ] `contains` (string contains) filter works
+- [ ] `in` (value in array) filter works
+- [ ] `isNull` filter works
+- [ ] `isNotNull` filter works
+
+### 3.2 Multiple Filters
+- [ ] Multiple filters combine with AND logic
+- [ ] Filters on different columns work together
+- [ ] Filters with aggregation work correctly
+
+---
+
+## 4. Aggregation
+
+### 4.1 Simple Aggregations
+- [ ] `first` aggregation returns first row
+- [ ] `last` aggregation returns last row
+- [ ] `min` aggregation returns minimum value
+- [ ] `max` aggregation returns maximum value
+- [ ] `avg` aggregation returns average value
+- [ ] `sum` aggregation returns sum of values
+- [ ] `count` aggregation returns row count
+- [ ] Aggregation with sort column works (for first/last)
+- [ ] Aggregation on specific field works
+
+### 4.2 Row Limiting
+- [ ] Limit parameter restricts row count
+- [ ] Limit with sort order works
+
+### 4.3 Sliding Window (Time-based)
+- [ ] Configure sliding window duration (e.g., 300 seconds)
+- [ ] Specify timestamp column
+- [ ] Data outside window is excluded
+- [ ] Window slides with new data
+
+### 4.4 Time Bucketing
+- [ ] Configure bucket interval (e.g., 60 seconds)
+- [ ] Configure aggregation function per bucket
+- [ ] Timestamp column alignment works
+- [ ] Multiple columns aggregate correctly
+- [ ] Empty buckets handled appropriately
+
+---
+
+## 5. Dashboards
+
+### 5.1 Dashboard CRUD
+- [ ] Create dashboard with name and description
+- [ ] List dashboards with pagination
+- [ ] Get dashboard by ID
+- [ ] Update dashboard settings
+- [ ] Delete dashboard
+
+### 5.2 Dashboard Layout
+- [ ] Add panel to 12-column grid
+- [ ] Set panel position (x, y)
+- [ ] Set panel dimensions (width, height)
+- [ ] Multiple panels arrange correctly
+- [ ] Assign chart to panel
+- [ ] Panel renders assigned chart
+
+### 5.3 Dashboard Settings
+- [ ] Configure refresh interval
+- [ ] Configure timezone
+- [ ] Set public/private access
+- [ ] Configure title scale (50-200%)
+- [ ] Enable/disable export
+
+### 5.4 Dashboard Viewer
+- [ ] Dashboard loads all charts
+- [ ] Auto-refresh triggers at interval
+- [ ] Manual refresh button works
+- [ ] Last refresh timestamp displays
+- [ ] Fullscreen mode works
+- [ ] Reduce-to-fit scaling works
+- [ ] Chart data inspection modal works
+- [ ] Navigate to chart editor works
+
+### 5.5 Dashboard Tiles
+- [ ] Tile view shows all dashboards
+- [ ] Thumbnails display correctly
+- [ ] Datasource names shown
+- [ ] Click tile opens dashboard
+- [ ] First dashboard auto-loads on app start
+
+---
+
+## 6. AI Chart Builder
+
+### 6.1 Session Management
+- [ ] Create new AI session
+- [ ] Session creates draft chart
+- [ ] Get session state returns current state
+- [ ] Cancel session cleans up draft
+- [ ] Save session commits chart with name
+
+### 6.2 Chat Interaction
+- [ ] Send message receives SSE response
+- [ ] AI responses stream correctly
+- [ ] Tool calls are displayed
+- [ ] Chart updates reflect in preview
+- [ ] Message history is preserved
+- [ ] WebSocket connection works as alternative
+
+### 6.3 AI Tool Usage
+- [ ] AI calls `list_datasources` to find sources
+- [ ] AI calls `get_schema` to discover columns
+- [ ] AI calls `update_chart_config` to set type
+- [ ] AI calls `get_chart_template` for starter code
+- [ ] AI calls `update_data_mapping` with columns
+- [ ] AI calls `update_filters` when needed
+- [ ] AI calls `update_aggregation` when needed
+- [ ] AI calls `set_custom_code` for complex charts
+- [ ] AI calls `query_datasource` to test queries
+- [ ] AI calls `preview_data` to see results
+
+### 6.4 AI with Different Datasources
+- [ ] AI creates chart from SQL datasource
+- [ ] AI creates chart from Prometheus datasource
+- [ ] AI creates chart from EdgeLake datasource
+- [ ] AI creates chart from API datasource
+- [ ] AI creates chart from WebSocket datasource
+- [ ] AI creates chart from TSStore datasource
+
+### 6.5 AI Chart Types
+- [ ] AI creates line chart on request
+- [ ] AI creates bar chart on request
+- [ ] AI creates pie chart on request
+- [ ] AI creates gauge chart on request
+- [ ] AI creates custom chart when needed
+- [ ] AI applies appropriate formatting
+
+---
+
+## 7. Streaming & Real-time
+
+### 7.1 WebSocket Streaming
+- [ ] Connect to stream endpoint via SSE
+- [ ] Receive buffered records on connect
+- [ ] Receive new records as they arrive
+- [ ] Heartbeat keeps connection alive
+- [ ] Reconnect on disconnect
+- [ ] Multiple clients receive same data
+
+### 7.2 TSStore Push Streaming
+- [ ] TSStore dials back to inbound endpoint
+- [ ] Data flows through push connection
+- [ ] Aggregation window applies to stream
+- [ ] Format selection works (full/compact)
+
+### 7.3 Prometheus Polling
+- [ ] Polling interval triggers queries
+- [ ] New values sent on each poll
+- [ ] Instant queries return current state
+
+### 7.4 Real-time Dashboard
+- [ ] Streaming chart updates in dashboard
+- [ ] Multiple streaming charts work together
+- [ ] No memory leaks on long-running streams
+
+---
+
+## 8. API Endpoints
+
+### 8.1 Health & System
+- [ ] `GET /health` returns status and version
+- [ ] `GET /version` returns version info
+- [ ] `GET /api/health` returns service health
+
+### 8.2 Authentication
+- [ ] `GET /api/auth/me` returns current user
+- [ ] X-User-ID header sets user context
+
+### 8.3 Datasource Endpoints
+- [ ] `POST /api/datasources` creates datasource
+- [ ] `GET /api/datasources` lists with pagination
+- [ ] `GET /api/datasources/:id` returns datasource
+- [ ] `PUT /api/datasources/:id` updates datasource
+- [ ] `DELETE /api/datasources/:id` deletes datasource
+- [ ] `POST /api/datasources/test` tests connection
+- [ ] `POST /api/datasources/:id/health` checks health
+- [ ] `POST /api/datasources/:id/query` executes query
+- [ ] `GET /api/datasources/:id/schema` returns schema
+
+### 8.4 Chart Endpoints
+- [ ] `POST /api/charts` creates chart
+- [ ] `GET /api/charts` lists with pagination
+- [ ] `GET /api/charts/:id` returns latest version
+- [ ] `PUT /api/charts/:id` updates chart
+- [ ] `DELETE /api/charts/:id` deletes chart
+- [ ] `GET /api/charts/:id/versions` returns version history
+- [ ] `GET /api/charts/:id/draft` returns draft
+
+### 8.5 Dashboard Endpoints
+- [ ] `POST /api/dashboards` creates dashboard
+- [ ] `GET /api/dashboards` lists with pagination
+- [ ] `GET /api/dashboards/:id` returns dashboard
+- [ ] `GET /api/dashboards/:id/details` returns expanded
+- [ ] `PUT /api/dashboards/:id` updates dashboard
+- [ ] `DELETE /api/dashboards/:id` deletes dashboard
+
+### 8.6 AI Session Endpoints
+- [ ] `POST /api/ai/sessions` creates session
+- [ ] `GET /api/ai/sessions/:id` returns session
+- [ ] `POST /api/ai/sessions/:id/messages` sends message (SSE)
+- [ ] `POST /api/ai/sessions/:id/save` saves chart
+- [ ] `DELETE /api/ai/sessions/:id` cancels session
+
+---
+
+## 9. Error Handling
+
+### 9.1 Datasource Errors
+- [ ] Invalid connection string shows clear error
+- [ ] Connection timeout handled gracefully
+- [ ] Authentication failure shows clear message
+- [ ] Invalid query shows syntax error
+- [ ] Missing database/table shows not found
+
+### 9.2 Chart Errors
+- [ ] Invalid datasource reference caught
+- [ ] Missing required fields show validation error
+- [ ] Invalid chart type rejected
+- [ ] Malformed custom code shows error
+
+### 9.3 Dashboard Errors
+- [ ] Invalid chart reference caught
+- [ ] Invalid panel configuration rejected
+- [ ] Missing layout shows error
+
+### 9.4 AI Errors
+- [ ] Rate limit (429) handled with message
+- [ ] API error shows user-friendly message
+- [ ] Tool execution error captured
+- [ ] Session timeout handled
+
+---
+
+## 10. UI/UX Verification
+
+### 10.1 Design Mode Navigation
+- [ ] Datasources list page loads
+- [ ] Charts list page loads
+- [ ] Dashboards list page loads
+- [ ] Create buttons work
+- [ ] Edit navigation works
+- [ ] Delete with confirmation works
+
+### 10.2 View Mode Navigation
+- [ ] Dashboard tiles load
+- [ ] Click tile opens viewer
+- [ ] Mode toggle switches correctly
+- [ ] Sidebar navigation works
+
+### 10.3 Forms & Validation
+- [ ] Required fields show validation
+- [ ] Invalid input shows error message
+- [ ] Save button disabled when invalid
+- [ ] Success notification on save
+
+### 10.4 Responsive Design
+- [ ] Dashboard renders on different screen sizes
+- [ ] Charts scale appropriately
+- [ ] Navigation works on smaller screens
+
+---
+
+## Test Environment Checklist
+
+### Infrastructure
+- [ ] MongoDB running and accessible
+- [ ] Redis running and accessible
+- [ ] Go server running on port 3001
+- [ ] Client running on port 5173 (dev) or served by Caddy
+
+### Test Datasources Available
+- [ ] PostgreSQL with test data (simulators)
+- [ ] WebSocket simulator running
+- [ ] REST API simulator running
+- [ ] Prometheus instance (if testing)
+- [ ] EdgeLake instance (if testing)
+- [ ] TSStore instance (if testing)
+- [ ] CSV test file available
+
+### Test Data
+- [ ] Sensor readings in PostgreSQL
+- [ ] Time series data for streaming tests
+- [ ] Multiple data types for filter testing
+
+---
+
+## Notes
+
+Use this space to track issues found during testing:
+
+### Issues Found
+| # | Area | Description | Severity | Status |
+|---|------|-------------|----------|--------|
+| 1 |      |             |          |        |
+| 2 |      |             |          |        |
+| 3 |      |             |          |        |
+
+### Test Session Log
+| Date | Tester | Sections Completed | Notes |
+|------|--------|-------------------|-------|
+|      |        |                   |       |

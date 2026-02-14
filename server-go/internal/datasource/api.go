@@ -14,7 +14,434 @@ import (
 	"time"
 
 	"github.com/tviviano/dashboard/internal/models"
+	"github.com/tviviano/dashboard/internal/registry"
 )
+
+func init() {
+	// Register REST API adapter
+	registry.Register(
+		"api.rest",
+		"REST API",
+		registry.Capabilities{CanRead: true, CanWrite: false, CanStream: false},
+		apiConfigSchema(),
+		func(config map[string]interface{}) (registry.Adapter, error) {
+			return newAPIAdapterFromConfig(config)
+		},
+	)
+}
+
+// apiConfigSchema returns configuration fields for API adapter
+func apiConfigSchema() []registry.ConfigField {
+	return []registry.ConfigField{
+		{Name: "url", Type: "string", Required: true, Description: "API base URL"},
+		{Name: "method", Type: "string", Required: false, Default: "GET", Options: []string{"GET", "POST", "PUT", "DELETE"}, Description: "HTTP method"},
+		{Name: "headers", Type: "object", Required: false, Description: "Request headers"},
+		{Name: "auth_type", Type: "string", Required: false, Options: []string{"none", "bearer", "basic", "api-key"}, Description: "Authentication type"},
+		{Name: "auth_credentials", Type: "object", Required: false, Description: "Auth credentials"},
+		{Name: "query_params", Type: "object", Required: false, Description: "Query parameters"},
+		{Name: "body", Type: "string", Required: false, Description: "Request body template"},
+		{Name: "timeout", Type: "int", Required: false, Default: 30, Description: "Timeout (seconds)"},
+		{Name: "retry_count", Type: "int", Required: false, Default: 3, Description: "Retry count"},
+		{Name: "retry_delay", Type: "int", Required: false, Default: 1000, Description: "Retry delay (ms)"},
+		{Name: "data_path", Type: "string", Required: false, Description: "JSON path to data array"},
+	}
+}
+
+// APIAdapter implements registry.Adapter for REST APIs
+type APIAdapter struct {
+	config *models.APIConfig
+	client *http.Client
+}
+
+// newAPIAdapterFromConfig creates an API adapter from config map
+func newAPIAdapterFromConfig(config map[string]interface{}) (*APIAdapter, error) {
+	apiConfig := &models.APIConfig{
+		Method: "GET",
+	}
+
+	if url, ok := config["url"].(string); ok {
+		apiConfig.URL = url
+	}
+	if method, ok := config["method"].(string); ok {
+		apiConfig.Method = method
+	}
+	if headers, ok := config["headers"].(map[string]interface{}); ok {
+		apiConfig.Headers = make(map[string]string)
+		for k, v := range headers {
+			if sv, ok := v.(string); ok {
+				apiConfig.Headers[k] = sv
+			}
+		}
+	}
+	if authType, ok := config["auth_type"].(string); ok {
+		apiConfig.AuthType = authType
+	}
+	if authCreds, ok := config["auth_credentials"].(map[string]interface{}); ok {
+		apiConfig.AuthCredentials = make(map[string]string)
+		for k, v := range authCreds {
+			if sv, ok := v.(string); ok {
+				apiConfig.AuthCredentials[k] = sv
+			}
+		}
+	}
+	if queryParams, ok := config["query_params"].(map[string]interface{}); ok {
+		apiConfig.QueryParams = make(map[string]string)
+		for k, v := range queryParams {
+			if sv, ok := v.(string); ok {
+				apiConfig.QueryParams[k] = sv
+			}
+		}
+	}
+	if body, ok := config["body"].(string); ok {
+		apiConfig.Body = body
+	}
+	if timeout, ok := config["timeout"].(float64); ok {
+		apiConfig.Timeout = int(timeout)
+	} else if timeout, ok := config["timeout"].(int); ok {
+		apiConfig.Timeout = timeout
+	}
+	if retryCount, ok := config["retry_count"].(float64); ok {
+		apiConfig.RetryCount = int(retryCount)
+	} else if retryCount, ok := config["retry_count"].(int); ok {
+		apiConfig.RetryCount = retryCount
+	}
+	if retryDelay, ok := config["retry_delay"].(float64); ok {
+		apiConfig.RetryDelay = int(retryDelay)
+	} else if retryDelay, ok := config["retry_delay"].(int); ok {
+		apiConfig.RetryDelay = retryDelay
+	}
+	if dataPath, ok := config["data_path"].(string); ok {
+		apiConfig.ResponseConfig = &models.APIResponseConfig{DataPath: dataPath}
+	}
+
+	timeout := 30 * time.Second
+	if apiConfig.Timeout > 0 {
+		timeout = time.Duration(apiConfig.Timeout) * time.Second
+	}
+
+	return &APIAdapter{
+		config: apiConfig,
+		client: &http.Client{Timeout: timeout},
+	}, nil
+}
+
+// TypeID returns the adapter type identifier
+func (a *APIAdapter) TypeID() string {
+	return "api.rest"
+}
+
+// DisplayName returns a human-readable name
+func (a *APIAdapter) DisplayName() string {
+	return "REST API"
+}
+
+// Capabilities returns what this adapter can do
+func (a *APIAdapter) Capabilities() registry.Capabilities {
+	return registry.Capabilities{CanRead: true, CanWrite: false, CanStream: false}
+}
+
+// ConfigSchema returns configuration fields
+func (a *APIAdapter) ConfigSchema() []registry.ConfigField {
+	return apiConfigSchema()
+}
+
+// Connect is a no-op for API (stateless)
+func (a *APIAdapter) Connect(ctx context.Context) error {
+	return nil
+}
+
+// TestConnection verifies the API endpoint is reachable
+func (a *APIAdapter) TestConnection(ctx context.Context) error {
+	req, err := a.buildRequest(ctx, registry.Query{})
+	if err != nil {
+		return err
+	}
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("connection failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// Close closes idle connections
+func (a *APIAdapter) Close() error {
+	a.client.CloseIdleConnections()
+	return nil
+}
+
+// Query executes an API request and returns normalized results
+func (a *APIAdapter) Query(ctx context.Context, query registry.Query) (*registry.ResultSet, error) {
+	req, err := a.buildRequest(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build request: %w", err)
+	}
+
+	var resp *http.Response
+	var lastErr error
+
+	maxRetries := a.config.RetryCount
+	if maxRetries <= 0 {
+		maxRetries = 1
+	}
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			retryDelay := a.config.RetryDelay
+			if retryDelay <= 0 {
+				retryDelay = 1000
+			}
+			time.Sleep(time.Duration(retryDelay) * time.Millisecond)
+		}
+
+		resp, lastErr = a.client.Do(req)
+		if lastErr == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			break
+		}
+
+		if resp != nil {
+			resp.Body.Close()
+		}
+	}
+
+	if lastErr != nil {
+		return nil, fmt.Errorf("request failed after %d attempts: %w", maxRetries, lastErr)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	return a.parseResponse(body, resp.Header.Get("Content-Type"))
+}
+
+// Stream polls the API at regular intervals
+func (a *APIAdapter) Stream(ctx context.Context, query registry.Query) (<-chan registry.Record, error) {
+	recordChan := make(chan registry.Record, 100)
+
+	go func() {
+		defer close(recordChan)
+
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				resultSet, err := a.Query(ctx, query)
+				if err != nil {
+					continue
+				}
+
+				for _, row := range resultSet.Rows {
+					record := make(registry.Record)
+					for i, col := range resultSet.Columns {
+						if i < len(row) {
+							record[col] = row[i]
+						}
+					}
+
+					select {
+					case recordChan <- record:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}
+		}
+	}()
+
+	return recordChan, nil
+}
+
+// Write is not supported for API adapter
+func (a *APIAdapter) Write(ctx context.Context, cmd registry.Command) (*registry.WriteResult, error) {
+	return nil, fmt.Errorf("api.rest does not support write operations")
+}
+
+// buildRequest creates an HTTP request
+func (a *APIAdapter) buildRequest(ctx context.Context, query registry.Query) (*http.Request, error) {
+	url := a.config.URL
+	if query.Raw != "" {
+		if strings.HasPrefix(query.Raw, "/") {
+			url = strings.TrimSuffix(a.config.URL, "/") + query.Raw
+		} else if strings.HasPrefix(query.Raw, "http://") || strings.HasPrefix(query.Raw, "https://") {
+			url = query.Raw
+		} else {
+			url = strings.TrimSuffix(a.config.URL, "/") + "/" + query.Raw
+		}
+	}
+
+	var bodyReader io.Reader
+	if a.config.Body != "" {
+		bodyReader = strings.NewReader(a.config.Body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, a.config.Method, url, bodyReader)
+	if err != nil {
+		return nil, err
+	}
+
+	for key, value := range a.config.Headers {
+		req.Header.Set(key, value)
+	}
+
+	if len(a.config.QueryParams) > 0 {
+		q := req.URL.Query()
+		for key, value := range a.config.QueryParams {
+			q.Add(key, value)
+		}
+		req.URL.RawQuery = q.Encode()
+	}
+
+	if len(query.Params) > 0 {
+		q := req.URL.Query()
+		for key, value := range query.Params {
+			q.Add(key, fmt.Sprintf("%v", value))
+		}
+		req.URL.RawQuery = q.Encode()
+	}
+
+	switch a.config.AuthType {
+	case "bearer":
+		if token := a.config.AuthCredentials["token"]; token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+	case "basic":
+		username := a.config.AuthCredentials["username"]
+		password := a.config.AuthCredentials["password"]
+		if username != "" || password != "" {
+			req.SetBasicAuth(username, password)
+		}
+	case "api-key":
+		if key := a.config.AuthCredentials["key"]; key != "" {
+			headerName := a.config.AuthCredentials["header"]
+			if headerName == "" {
+				headerName = "X-API-Key"
+			}
+			req.Header.Set(headerName, key)
+		}
+	}
+
+	return req, nil
+}
+
+// parseResponse parses API response into ResultSet
+func (a *APIAdapter) parseResponse(body []byte, contentType string) (*registry.ResultSet, error) {
+	if strings.Contains(contentType, "json") || strings.HasPrefix(string(body), "{") || strings.HasPrefix(string(body), "[") {
+		var data interface{}
+		if err := json.Unmarshal(body, &data); err != nil {
+			return a.parseAsText(body), nil
+		}
+
+		switch v := data.(type) {
+		case []interface{}:
+			return a.parseJSONArray(v), nil
+		case map[string]interface{}:
+			return a.parseJSONObject(v), nil
+		default:
+			return a.parseAsPrimitive(v), nil
+		}
+	}
+
+	return a.parseAsText(body), nil
+}
+
+// parseJSONArray converts JSON array to ResultSet
+func (a *APIAdapter) parseJSONArray(data []interface{}) *registry.ResultSet {
+	resultSet := &registry.ResultSet{
+		Rows:     make([][]interface{}, 0),
+		Metadata: make(map[string]interface{}),
+	}
+
+	if len(data) == 0 {
+		return resultSet
+	}
+
+	if first, ok := data[0].(map[string]interface{}); ok {
+		columns := make([]string, 0, len(first))
+		for key := range first {
+			columns = append(columns, key)
+		}
+		resultSet.Columns = columns
+
+		for _, item := range data {
+			if obj, ok := item.(map[string]interface{}); ok {
+				row := make([]interface{}, len(columns))
+				for i, col := range columns {
+					row[i] = obj[col]
+				}
+				resultSet.Rows = append(resultSet.Rows, row)
+			}
+		}
+	}
+
+	resultSet.Metadata["row_count"] = len(resultSet.Rows)
+	return resultSet
+}
+
+// parseJSONObject converts JSON object to ResultSet
+func (a *APIAdapter) parseJSONObject(data map[string]interface{}) *registry.ResultSet {
+	if a.config.ResponseConfig != nil && a.config.ResponseConfig.DataPath != "" {
+		if extracted, ok := data[a.config.ResponseConfig.DataPath]; ok {
+			if arr, ok := extracted.([]interface{}); ok {
+				return a.parseJSONArray(arr)
+			}
+		}
+	}
+
+	resultSet := &registry.ResultSet{
+		Columns:  []string{"key", "value"},
+		Rows:     make([][]interface{}, 0),
+		Metadata: make(map[string]interface{}),
+	}
+
+	for key, value := range data {
+		row := []interface{}{key, value}
+		resultSet.Rows = append(resultSet.Rows, row)
+	}
+
+	resultSet.Metadata["row_count"] = len(resultSet.Rows)
+	return resultSet
+}
+
+// parseAsText converts plain text to ResultSet
+func (a *APIAdapter) parseAsText(body []byte) *registry.ResultSet {
+	return &registry.ResultSet{
+		Columns: []string{"data"},
+		Rows:    [][]interface{}{{string(body)}},
+		Metadata: map[string]interface{}{
+			"row_count": 1,
+			"format":    "text",
+		},
+	}
+}
+
+// parseAsPrimitive converts primitive value to ResultSet
+func (a *APIAdapter) parseAsPrimitive(value interface{}) *registry.ResultSet {
+	return &registry.ResultSet{
+		Columns: []string{"value"},
+		Rows:    [][]interface{}{{value}},
+		Metadata: map[string]interface{}{
+			"row_count": 1,
+			"format":    "primitive",
+		},
+	}
+}
 
 // APIDataSource implements the DataSource interface for REST APIs
 type APIDataSource struct {

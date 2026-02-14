@@ -16,7 +16,621 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/tviviano/dashboard/internal/models"
+	"github.com/tviviano/dashboard/internal/registry"
 )
+
+func init() {
+	// Register TSStore adapter
+	registry.Register(
+		"store.tsstore",
+		"TSStore Time Series",
+		registry.Capabilities{CanRead: true, CanWrite: false, CanStream: true},
+		tsstoreConfigSchema(),
+		func(config map[string]interface{}) (registry.Adapter, error) {
+			return newTSStoreAdapterFromConfig(config)
+		},
+	)
+}
+
+// tsstoreConfigSchema returns configuration fields for TSStore adapter
+func tsstoreConfigSchema() []registry.ConfigField {
+	return []registry.ConfigField{
+		{Name: "protocol", Type: "string", Required: true, Options: []string{"http", "https"}, Description: "Protocol (http or https)"},
+		{Name: "host", Type: "string", Required: true, Description: "TSStore host"},
+		{Name: "port", Type: "int", Required: true, Description: "TSStore port"},
+		{Name: "store_name", Type: "string", Required: true, Description: "Store name"},
+		{Name: "data_type", Type: "string", Required: false, Options: []string{"json", "schema", "text"}, Description: "Data type"},
+		{Name: "api_key", Type: "password", Required: false, Description: "API key"},
+		{Name: "timeout", Type: "int", Required: false, Default: 30, Description: "Timeout (seconds)"},
+	}
+}
+
+// TSStoreAdapter implements registry.Adapter for TSStore
+type TSStoreAdapter struct {
+	config     *models.TSStoreConfig
+	httpClient *http.Client
+	schema     *tsStoreSchema
+}
+
+// newTSStoreAdapterFromConfig creates a TSStore adapter from config map
+func newTSStoreAdapterFromConfig(config map[string]interface{}) (*TSStoreAdapter, error) {
+	tsConfig := &models.TSStoreConfig{}
+
+	if protocol, ok := config["protocol"].(string); ok {
+		tsConfig.Protocol = models.TSStoreProtocol(protocol)
+	}
+	if host, ok := config["host"].(string); ok {
+		tsConfig.Host = host
+	}
+	if port, ok := config["port"].(float64); ok {
+		tsConfig.Port = int(port)
+	} else if port, ok := config["port"].(int); ok {
+		tsConfig.Port = port
+	}
+	if storeName, ok := config["store_name"].(string); ok {
+		tsConfig.StoreName = storeName
+	}
+	if dataType, ok := config["data_type"].(string); ok {
+		tsConfig.DataType = models.TSStoreDataType(dataType)
+	}
+	if apiKey, ok := config["api_key"].(string); ok {
+		tsConfig.APIKey = apiKey
+	}
+	if timeout, ok := config["timeout"].(float64); ok {
+		tsConfig.Timeout = int(timeout)
+	} else if timeout, ok := config["timeout"].(int); ok {
+		tsConfig.Timeout = timeout
+	}
+
+	httpTimeout := 30 * time.Second
+	if tsConfig.Timeout > 0 {
+		httpTimeout = time.Duration(tsConfig.Timeout) * time.Second
+	}
+
+	return &TSStoreAdapter{
+		config:     tsConfig,
+		httpClient: &http.Client{Timeout: httpTimeout},
+	}, nil
+}
+
+// TypeID returns the adapter type identifier
+func (a *TSStoreAdapter) TypeID() string {
+	return "store.tsstore"
+}
+
+// DisplayName returns a human-readable name
+func (a *TSStoreAdapter) DisplayName() string {
+	return "TSStore Time Series"
+}
+
+// Capabilities returns what this adapter can do
+func (a *TSStoreAdapter) Capabilities() registry.Capabilities {
+	return registry.Capabilities{CanRead: true, CanWrite: false, CanStream: true}
+}
+
+// ConfigSchema returns configuration fields
+func (a *TSStoreAdapter) ConfigSchema() []registry.ConfigField {
+	return tsstoreConfigSchema()
+}
+
+// Connect tests the connection to TSStore
+func (a *TSStoreAdapter) Connect(ctx context.Context) error {
+	return a.TestConnection(ctx)
+}
+
+// TestConnection tests the connection to TSStore
+func (a *TSStoreAdapter) TestConnection(ctx context.Context) error {
+	reqURL := fmt.Sprintf("%s/api/stores/%s/stats", a.config.BaseURL(), a.config.StoreName)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+	if err != nil {
+		return err
+	}
+	a.addHeaders(req)
+
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("connection failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("store '%s' not found", a.config.StoreName)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("TSStore error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// Close is a no-op for TSStore
+func (a *TSStoreAdapter) Close() error {
+	return nil
+}
+
+// Query fetches data from TSStore
+func (a *TSStoreAdapter) Query(ctx context.Context, query registry.Query) (*registry.ResultSet, error) {
+	var limit int
+	hasExplicitLimit := false
+	if l, ok := query.Params["limit"].(float64); ok {
+		limit = int(l)
+		hasExplicitLimit = true
+	} else if l, ok := query.Params["limit"].(int); ok {
+		limit = l
+		hasExplicitLimit = true
+	}
+
+	filter, _ := query.Params["filter"].(string)
+	filterIgnoreCase, _ := query.Params["filter_ignore_case"].(bool)
+
+	var objects []dataResponse
+	var err error
+
+	queryType := query.Raw
+	if queryType == "" {
+		queryType = "newest"
+	}
+
+	switch {
+	case queryType == "newest":
+		if !hasExplicitLimit {
+			limit = 10
+		}
+		objects, err = a.fetchNewest(ctx, limit, "", filter, filterIgnoreCase)
+	case queryType == "oldest":
+		if !hasExplicitLimit {
+			limit = 10
+		}
+		objects, err = a.fetchOldest(ctx, limit, filter, filterIgnoreCase)
+	case len(queryType) > 6 && queryType[:6] == "since:":
+		if !hasExplicitLimit {
+			limit = 100000
+		}
+		since := queryType[6:]
+		objects, err = a.fetchNewest(ctx, limit, since, filter, filterIgnoreCase)
+	case len(queryType) > 6 && queryType[:6] == "range:":
+		if !hasExplicitLimit {
+			limit = 100000
+		}
+		var startTime, endTime int64
+		if _, parseErr := fmt.Sscanf(queryType, "range:%d:%d", &startTime, &endTime); parseErr == nil {
+			objects, err = a.fetchRange(ctx, startTime, endTime, limit, filter, filterIgnoreCase)
+		} else {
+			return nil, fmt.Errorf("invalid range format")
+		}
+	default:
+		if !hasExplicitLimit {
+			limit = 10
+		}
+		objects, err = a.fetchNewest(ctx, limit, "", filter, filterIgnoreCase)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return a.toRegistryResultSet(ctx, objects)
+}
+
+// Stream implements streaming for TSStore using WebSocket
+func (a *TSStoreAdapter) Stream(ctx context.Context, query registry.Query) (<-chan registry.Record, error) {
+	recordChan := make(chan registry.Record, 100)
+
+	wsURL, err := a.buildWebSocketURL(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build WebSocket URL: %w", err)
+	}
+
+	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
+	headers := http.Header{}
+	for k, v := range a.config.Headers {
+		headers.Set(k, v)
+	}
+
+	conn, _, err := dialer.DialContext(ctx, wsURL, headers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to TSStore WebSocket: %w", err)
+	}
+
+	go func() {
+		defer close(recordChan)
+		defer conn.Close()
+
+		if a.config.DataType == models.TSStoreDataTypeSchema {
+			schema, err := a.fetchSchemaInternal(ctx)
+			if err == nil && schema != nil {
+				schemaRecord := registry.Record{
+					"_type": "schema",
+					"schema": map[string]interface{}{
+						"version": schema.Version,
+						"fields":  a.schemaFieldsToInterface(schema.Fields),
+					},
+				}
+				select {
+				case recordChan <- schemaRecord:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+				_, messageBytes, err := conn.ReadMessage()
+				if err != nil {
+					if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+						return
+					}
+					if netErr, ok := err.(interface{ Timeout() bool }); ok && netErr.Timeout() {
+						continue
+					}
+					return
+				}
+
+				var msg wsMessage
+				if err := json.Unmarshal(messageBytes, &msg); err != nil {
+					continue
+				}
+
+				switch msg.Type {
+				case "data":
+					record := a.wsMessageToRegistryRecord(&msg)
+					select {
+					case recordChan <- record:
+					case <-ctx.Done():
+						return
+					}
+				case "caught_up":
+					select {
+					case recordChan <- registry.Record{"_type": "caught_up"}:
+					case <-ctx.Done():
+						return
+					}
+				case "error":
+					select {
+					case recordChan <- registry.Record{"_type": "error", "message": msg.Message}:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}
+		}
+	}()
+
+	return recordChan, nil
+}
+
+// Write is not supported for TSStore adapter
+func (a *TSStoreAdapter) Write(ctx context.Context, cmd registry.Command) (*registry.WriteResult, error) {
+	return nil, fmt.Errorf("store.tsstore does not support write operations")
+}
+
+// toRegistryResultSet converts TSStore objects to registry.ResultSet
+func (a *TSStoreAdapter) toRegistryResultSet(ctx context.Context, objects []dataResponse) (*registry.ResultSet, error) {
+	if len(objects) == 0 {
+		return &registry.ResultSet{
+			Columns:  []string{"timestamp"},
+			Rows:     make([][]interface{}, 0),
+			Metadata: map[string]interface{}{"row_count": 0},
+		}, nil
+	}
+
+	metadata := map[string]interface{}{
+		"store_name":  a.config.StoreName,
+		"source_type": "tsstore",
+		"data_type":   string(a.config.DataType),
+	}
+
+	if a.config.DataType == models.TSStoreDataTypeSchema {
+		schema, err := a.fetchSchemaInternal(ctx)
+		if err == nil && schema != nil {
+			schemaFields := make([]map[string]interface{}, len(schema.Fields))
+			for i, f := range schema.Fields {
+				schemaFields[i] = map[string]interface{}{
+					"index": f.Index,
+					"name":  f.Name,
+					"type":  f.Type,
+				}
+			}
+			metadata["schema"] = map[string]interface{}{
+				"version": schema.Version,
+				"fields":  schemaFields,
+			}
+		}
+	}
+
+	if a.config.DataType == models.TSStoreDataTypeText {
+		return a.textToRegistryResultSet(objects, metadata)
+	}
+
+	return a.jsonToRegistryResultSet(objects, metadata)
+}
+
+// textToRegistryResultSet converts text objects to ResultSet
+func (a *TSStoreAdapter) textToRegistryResultSet(objects []dataResponse, metadata map[string]interface{}) (*registry.ResultSet, error) {
+	columns := []string{"timestamp", "data"}
+	rows := make([][]interface{}, 0, len(objects))
+
+	for _, obj := range objects {
+		timestamp := obj.Timestamp / 1e9
+		var text string
+		if err := json.Unmarshal(obj.Data, &text); err != nil {
+			text = string(obj.Data)
+		}
+		rows = append(rows, []interface{}{timestamp, text})
+	}
+
+	metadata["row_count"] = len(rows)
+	return &registry.ResultSet{Columns: columns, Rows: rows, Metadata: metadata}, nil
+}
+
+// jsonToRegistryResultSet converts JSON objects to ResultSet
+func (a *TSStoreAdapter) jsonToRegistryResultSet(objects []dataResponse, metadata map[string]interface{}) (*registry.ResultSet, error) {
+	columnSet := make(map[string]bool)
+	columnOrder := []string{"timestamp"}
+	columnSet["timestamp"] = true
+
+	decodedObjects := make([]map[string]interface{}, 0, len(objects))
+
+	for _, obj := range objects {
+		timestamp := obj.Timestamp / 1e9
+
+		var records []map[string]interface{}
+		if err := json.Unmarshal(obj.Data, &records); err == nil {
+			for _, record := range records {
+				record["timestamp"] = timestamp
+				for key := range record {
+					if !columnSet[key] {
+						columnSet[key] = true
+						columnOrder = append(columnOrder, key)
+					}
+				}
+				decodedObjects = append(decodedObjects, record)
+			}
+		} else {
+			var record map[string]interface{}
+			if err := json.Unmarshal(obj.Data, &record); err != nil {
+				record = map[string]interface{}{"data": string(obj.Data)}
+			}
+			record["timestamp"] = timestamp
+			for key := range record {
+				if !columnSet[key] {
+					columnSet[key] = true
+					columnOrder = append(columnOrder, key)
+				}
+			}
+			decodedObjects = append(decodedObjects, record)
+		}
+	}
+
+	rows := make([][]interface{}, 0, len(decodedObjects))
+	for _, record := range decodedObjects {
+		row := make([]interface{}, len(columnOrder))
+		for i, col := range columnOrder {
+			if val, exists := record[col]; exists {
+				row[i] = flattenValue(val)
+			} else {
+				row[i] = nil
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	metadata["row_count"] = len(rows)
+	return &registry.ResultSet{Columns: columnOrder, Rows: rows, Metadata: metadata}, nil
+}
+
+// wsMessageToRegistryRecord converts WebSocket message to registry.Record
+func (a *TSStoreAdapter) wsMessageToRegistryRecord(msg *wsMessage) registry.Record {
+	record := registry.Record{
+		"_type":     "data",
+		"timestamp": msg.Timestamp / 1e9,
+	}
+
+	switch a.config.DataType {
+	case models.TSStoreDataTypeText:
+		var text string
+		if err := json.Unmarshal(msg.Data, &text); err != nil {
+			text = string(msg.Data)
+		}
+		record["data"] = text
+	default:
+		var data map[string]interface{}
+		if err := json.Unmarshal(msg.Data, &data); err != nil {
+			record["data"] = string(msg.Data)
+		} else {
+			for k, v := range data {
+				record[k] = v
+			}
+		}
+	}
+
+	return record
+}
+
+// fetchSchemaInternal fetches and caches schema
+func (a *TSStoreAdapter) fetchSchemaInternal(ctx context.Context) (*tsStoreSchema, error) {
+	if a.schema != nil {
+		return a.schema, nil
+	}
+
+	reqURL := fmt.Sprintf("%s/api/stores/%s/schema", a.config.BaseURL(), a.config.StoreName)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	a.addHeaders(req)
+
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch schema: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("TSStore schema error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var schema tsStoreSchema
+	if err := json.NewDecoder(resp.Body).Decode(&schema); err != nil {
+		return nil, fmt.Errorf("failed to decode schema: %w", err)
+	}
+
+	a.schema = &schema
+	return a.schema, nil
+}
+
+// schemaFieldsToInterface converts schema fields to interface slice
+func (a *TSStoreAdapter) schemaFieldsToInterface(fields []tsStoreSchemaField) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(fields))
+	for i, f := range fields {
+		result[i] = map[string]interface{}{
+			"index": f.Index,
+			"name":  f.Name,
+			"type":  f.Type,
+		}
+	}
+	return result
+}
+
+// buildWebSocketURL constructs WebSocket URL
+func (a *TSStoreAdapter) buildWebSocketURL(query registry.Query) (string, error) {
+	baseURL := a.config.WebSocketURL()
+	params := url.Values{}
+
+	if a.config.APIKey != "" {
+		params.Set("api_key", a.config.APIKey)
+	}
+
+	from := "now"
+	if f, ok := query.Params["from"].(string); ok && f != "" {
+		from = f
+	} else if f, ok := query.Params["from"].(int64); ok {
+		from = strconv.FormatInt(f, 10)
+	} else if f, ok := query.Params["from"].(float64); ok {
+		from = strconv.FormatInt(int64(f), 10)
+	}
+	params.Set("from", from)
+
+	if a.config.DataType == models.TSStoreDataTypeSchema {
+		params.Set("format", "compact")
+	}
+
+	if filter, ok := query.Params["filter"].(string); ok && filter != "" {
+		params.Set("filter", filter)
+		if ignoreCase, ok := query.Params["filter_ignore_case"].(bool); ok && ignoreCase {
+			params.Set("filter_ignore_case", "true")
+		}
+	}
+
+	return fmt.Sprintf("%s/api/stores/%s/ws/read?%s", baseURL, a.config.StoreName, params.Encode()), nil
+}
+
+// addHeaders adds authentication and custom headers
+func (a *TSStoreAdapter) addHeaders(req *http.Request) {
+	req.Header.Set("Content-Type", "application/json")
+	if a.config.APIKey != "" {
+		req.Header.Set("X-API-Key", a.config.APIKey)
+	}
+	for k, v := range a.config.Headers {
+		req.Header.Set(k, v)
+	}
+}
+
+// fetchNewest retrieves newest objects
+func (a *TSStoreAdapter) fetchNewest(ctx context.Context, limit int, since string, filter string, filterIgnoreCase bool) ([]dataResponse, error) {
+	params := url.Values{}
+	params.Set("limit", strconv.Itoa(limit))
+	if since != "" {
+		params.Set("since", since)
+	}
+	if filter != "" {
+		params.Set("filter", filter)
+		if filterIgnoreCase {
+			params.Set("filter_ignore_case", "true")
+		}
+	}
+	if a.config.DataType == models.TSStoreDataTypeSchema {
+		params.Set("format", "compact")
+	}
+
+	endpoint := fmt.Sprintf("/api/stores/%s/data/newest?%s", a.config.StoreName, params.Encode())
+	return a.fetchList(ctx, endpoint)
+}
+
+// fetchOldest retrieves oldest objects
+func (a *TSStoreAdapter) fetchOldest(ctx context.Context, limit int, filter string, filterIgnoreCase bool) ([]dataResponse, error) {
+	params := url.Values{}
+	params.Set("limit", strconv.Itoa(limit))
+	if filter != "" {
+		params.Set("filter", filter)
+		if filterIgnoreCase {
+			params.Set("filter_ignore_case", "true")
+		}
+	}
+	if a.config.DataType == models.TSStoreDataTypeSchema {
+		params.Set("format", "compact")
+	}
+
+	endpoint := fmt.Sprintf("/api/stores/%s/data/oldest?%s", a.config.StoreName, params.Encode())
+	return a.fetchList(ctx, endpoint)
+}
+
+// fetchRange retrieves objects in time range
+func (a *TSStoreAdapter) fetchRange(ctx context.Context, startTime, endTime int64, limit int, filter string, filterIgnoreCase bool) ([]dataResponse, error) {
+	params := url.Values{}
+	params.Set("start_time", strconv.FormatInt(startTime, 10))
+	params.Set("end_time", strconv.FormatInt(endTime, 10))
+	params.Set("limit", strconv.Itoa(limit))
+	params.Set("include_data", "true")
+	if filter != "" {
+		params.Set("filter", filter)
+		if filterIgnoreCase {
+			params.Set("filter_ignore_case", "true")
+		}
+	}
+	if a.config.DataType == models.TSStoreDataTypeSchema {
+		params.Set("format", "compact")
+	}
+
+	endpoint := fmt.Sprintf("/api/stores/%s/data/range?%s", a.config.StoreName, params.Encode())
+	return a.fetchList(ctx, endpoint)
+}
+
+// fetchList makes request to list endpoint
+func (a *TSStoreAdapter) fetchList(ctx context.Context, endpoint string) ([]dataResponse, error) {
+	reqURL := a.config.BaseURL() + endpoint
+
+	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	a.addHeaders(req)
+
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch data: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("TSStore API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var listResp dataListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&listResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return listResp.Objects, nil
+}
 
 // TSStoreDataSource implements the DataSource interface for TSStore timeseries databases.
 // TSStore stores objects at timestamps with support for json, schema (compact json), and text data types.

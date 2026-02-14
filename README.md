@@ -20,11 +20,11 @@ This system allows you to:
 │                    React 18 + Vite + Carbon Design System                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  Design Mode          │  View Mode            │  Manage Mode                │
-│  - Layouts            │  - Dashboard Viewer   │  - Settings (Future)        │
-│  - Data Sources       │  - Real-time Data     │  - User Config (Future)     │
-│  - Charts             │  - Auto-refresh       │                             │
-│  - Dashboards         │  - Fullscreen         │                             │
-│  - AI Builder         │  - Reduce to Fit      │                             │
+│  - Connections        │  - Dashboard Viewer   │  - Settings (Future)        │
+│  - Components         │  - Real-time Data     │  - User Config (Future)     │
+│  - Dashboards         │  - Auto-refresh       │                             │
+│  - AI Builder         │  - Fullscreen         │                             │
+│                       │  - Reduce to Fit      │                             │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     │ REST API + SSE
@@ -105,10 +105,9 @@ Then open http://localhost:5173 in your browser.
 
 ### Design Mode (`/design/*`)
 Create and configure dashboard components:
-- **Layouts** - Define 12-column grid layouts with resizable panels
-- **Data Sources** - Configure SQL, API, CSV, WebSocket connections
-- **Charts** - Build React components with ECharts, or use AI Builder
-- **Dashboards** - Combine layouts with charts and configure settings
+- **Connections** - Configure SQL, API, CSV, WebSocket data connections
+- **Components** - Build displays (charts, gauges, tables) and controls (buttons, sliders), or use AI Builder
+- **Dashboards** - Combine components with layouts and configure settings
 
 ### View Mode (`/view/*`)
 End-user dashboard viewing:
@@ -122,10 +121,10 @@ System administration and user configuration.
 
 ## Key Features
 
-### AI Chart Builder
-Create charts using natural language:
-1. Navigate to Design → Charts → Create with AI
-2. Describe the chart you want (e.g., "Create a bar chart showing sales by region")
+### AI Component Builder
+Create displays using natural language:
+1. Navigate to Design → Components → Create with AI
+2. Describe the display you want (e.g., "Create a bar chart showing sales by region")
 3. AI generates the ECharts component code
 4. Preview, refine with follow-up messages, and save
 

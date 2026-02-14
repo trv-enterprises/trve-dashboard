@@ -54,24 +54,6 @@
   .component-type-section {
     margin-bottom: spacing.$spacing-05;
     max-width: 300px;
-
-    .component-type-switcher {
-      background-color: var(--cds-layer-01);
-
-      button {
-        background-color: var(--cds-layer-01);
-        color: var(--cds-text-secondary);
-
-        &[aria-selected="true"] {
-          background-color: var(--cds-interactive);
-          color: var(--cds-text-on-color);
-        }
-
-        &:hover:not([aria-selected="true"]) {
-          background-color: var(--cds-layer-hover-01);
-        }
-      }
-    }
   }
 
   // Chart metadata section (name, type, description)

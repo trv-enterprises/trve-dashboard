@@ -5,10 +5,12 @@
 package datasource
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
 	"github.com/tviviano/dashboard/internal/models"
+	"github.com/tviviano/dashboard/internal/registry"
 )
 
 // DataSourceFactory manages datasource instances
@@ -99,7 +101,19 @@ func (f *DataSourceFactory) CloseAll() error {
 }
 
 // CreateFromConfig creates a datasource from configuration
+// Uses the registry for new TypeID-based datasources, falls back to legacy switch for old Type-based
 func (f *DataSourceFactory) CreateFromConfig(ds *models.Datasource) (models.DataSource, error) {
+	// NEW: Use registry if TypeID is set
+	if ds.TypeID != "" {
+		adapter, err := registry.CreateAdapter(ds.TypeID, ds.GetEffectiveConfig())
+		if err != nil {
+			return nil, err
+		}
+		// Wrap registry.Adapter in a models.DataSource compatible wrapper
+		return &RegistryAdapterWrapper{adapter: adapter}, nil
+	}
+
+	// LEGACY: Fall back to old switch statement for backwards compatibility
 	switch ds.Type {
 	case models.DatasourceTypeSQL:
 		if ds.Config.SQL == nil {
@@ -157,4 +171,78 @@ func (f *DataSourceFactory) RegisterFromConfig(ds *models.Datasource) error {
 
 	f.Register(ds.Name, dataSource)
 	return nil
+}
+
+// CreateAdapterFromConfig creates a registry.Adapter from datasource configuration
+// This is the preferred method for new code using the registry system
+func (f *DataSourceFactory) CreateAdapterFromConfig(ds *models.Datasource) (registry.Adapter, error) {
+	typeID := ds.GetEffectiveTypeID()
+	if typeID == "" {
+		return nil, fmt.Errorf("unable to determine type ID for datasource")
+	}
+
+	return registry.CreateAdapter(typeID, ds.GetEffectiveConfig())
+}
+
+// ============================================================================
+// RegistryAdapterWrapper wraps registry.Adapter to implement models.DataSource
+// This allows registry adapters to work with the legacy DataSourceFactory
+// ============================================================================
+
+// RegistryAdapterWrapper wraps a registry.Adapter to implement models.DataSource
+type RegistryAdapterWrapper struct {
+	adapter registry.Adapter
+}
+
+// Query converts registry types and calls the adapter
+func (w *RegistryAdapterWrapper) Query(ctx context.Context, query models.Query) (*models.ResultSet, error) {
+	regQuery := registry.Query{
+		Raw:    query.Raw,
+		Params: query.Params,
+	}
+
+	result, err := w.adapter.Query(ctx, regQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.ResultSet{
+		Columns:  result.Columns,
+		Rows:     result.Rows,
+		Metadata: result.Metadata,
+	}, nil
+}
+
+// Stream converts registry types and calls the adapter
+func (w *RegistryAdapterWrapper) Stream(ctx context.Context, query models.Query) (<-chan models.Record, error) {
+	regQuery := registry.Query{
+		Raw:    query.Raw,
+		Params: query.Params,
+	}
+
+	regChan, err := w.adapter.Stream(ctx, regQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert registry.Record channel to models.Record channel
+	modelsChan := make(chan models.Record, 100)
+	go func() {
+		defer close(modelsChan)
+		for record := range regChan {
+			modelsChan <- models.Record(record)
+		}
+	}()
+
+	return modelsChan, nil
+}
+
+// Close closes the adapter
+func (w *RegistryAdapterWrapper) Close() error {
+	return w.adapter.Close()
+}
+
+// GetAdapter returns the underlying registry.Adapter
+func (w *RegistryAdapterWrapper) GetAdapter() registry.Adapter {
+	return w.adapter
 }

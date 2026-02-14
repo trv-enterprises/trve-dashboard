@@ -15,9 +15,9 @@ import './DesignModeNav.scss';
  * DesignModeNav Component
  *
  * Navigation for Design Mode with 3 sections:
- * - Data Sources: Configure data connections
- * - Charts: Create and edit chart components
- * - Dashboards: Combine charts + data sources with embedded layouts
+ * - Connections: Configure data connections
+ * - Components: Create and edit displays and controls
+ * - Dashboards: Combine components with layouts
  */
 function DesignModeNav({ location, navigate }) {
   const designNavItems = [
@@ -31,13 +31,13 @@ function DesignModeNav({ location, navigate }) {
       path: '/design/charts',
       icon: ChartLineSmooth,
       label: 'Components',
-      description: 'Create and edit charts and controls'
+      description: 'Create and edit displays and controls'
     },
     {
       path: '/design/dashboards',
       icon: Dashboard,
       label: 'Dashboards',
-      description: 'Combine charts and data sources'
+      description: 'Combine components with layouts'
     }
   ];
 

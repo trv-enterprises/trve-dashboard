@@ -1,0 +1,129 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
+@use '@carbon/react/scss/spacing' as spacing;
+
+.component-picker-modal {
+  // Ensure modal content has proper height
+  .cds--modal-content {
+    padding: 0;
+  }
+}
+
+.picker-content {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-05;
+  padding: spacing.$spacing-05;
+  min-height: 400px;
+
+  // Search input styling
+  .cds--search {
+    background-color: var(--cds-field-01);
+  }
+}
+
+.picker-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: spacing.$spacing-09;
+}
+
+.picker-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: spacing.$spacing-04;
+  padding: spacing.$spacing-09;
+  color: var(--cds-text-secondary);
+
+  svg {
+    color: var(--cds-icon-secondary);
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.875rem;
+    text-align: center;
+  }
+}
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: spacing.$spacing-04;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: spacing.$spacing-02;
+}
+
+.picker-tile {
+  background-color: var(--cds-layer-01);
+  border: 2px solid transparent;
+  border-radius: 4px;
+  padding: spacing.$spacing-04;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+  min-height: 120px;
+
+  &:hover {
+    background-color: var(--cds-layer-hover-01);
+    border-color: var(--cds-border-subtle-01);
+  }
+
+  &.selected {
+    border-color: var(--cds-focus);
+    background-color: var(--cds-layer-selected-01);
+  }
+}
+
+.picker-tile-icon {
+  color: var(--cds-icon-secondary);
+}
+
+.picker-tile-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-02;
+
+  h4 {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--cds-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--cds-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+}
+
+.picker-tile-tags {
+  display: flex;
+  gap: spacing.$spacing-02;
+  flex-wrap: wrap;
+  margin-top: auto;
+
+  .cds--tag {
+    margin: 0;
+  }
+}

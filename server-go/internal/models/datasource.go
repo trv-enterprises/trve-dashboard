@@ -81,13 +81,155 @@ type Datasource struct {
 	ID          primitive.ObjectID `json:"id" bson:"_id,omitempty"`
 	Name        string             `json:"name" bson:"name" binding:"required"`
 	Description string             `json:"description" bson:"description"`
-	Type        DatasourceType     `json:"type" bson:"type" binding:"required,oneof=sql csv socket api tsstore prometheus edgelake"`
-	Config      DatasourceConfig   `json:"config" bson:"config" binding:"required"`
-	Health      HealthInfo         `json:"health" bson:"health"`
-	Tags        []string           `json:"tags,omitempty" bson:"tags,omitempty"`
-	MaskSecrets bool               `json:"mask_secrets" bson:"mask_secrets"` // If true, secrets are masked in API responses
-	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at" bson:"updated_at"`
+
+	// NEW: Registry-based type system (preferred)
+	// TypeID format: "category.name" (e.g., "db.postgres", "stream.websocket-bidir")
+	TypeID     string                 `json:"type_id,omitempty" bson:"type_id,omitempty"`
+	TypeConfig map[string]interface{} `json:"type_config,omitempty" bson:"type_config,omitempty"`
+
+	// LEGACY: Keep for backwards compatibility during migration
+	Type   DatasourceType   `json:"type,omitempty" bson:"type,omitempty"`
+	Config DatasourceConfig `json:"config,omitempty" bson:"config,omitempty"`
+
+	Health      HealthInfo `json:"health" bson:"health"`
+	Tags        []string   `json:"tags,omitempty" bson:"tags,omitempty"`
+	MaskSecrets bool       `json:"mask_secrets" bson:"mask_secrets"` // If true, secrets are masked in API responses
+	CreatedAt   time.Time  `json:"created_at" bson:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at" bson:"updated_at"`
+}
+
+// IsRegistryBased returns true if this datasource uses the new registry-based type system
+func (d *Datasource) IsRegistryBased() bool {
+	return d.TypeID != ""
+}
+
+// GetEffectiveTypeID returns the registry type ID, converting from legacy Type if needed
+func (d *Datasource) GetEffectiveTypeID() string {
+	if d.TypeID != "" {
+		return d.TypeID
+	}
+
+	// Convert legacy Type to registry TypeID
+	switch d.Type {
+	case DatasourceTypeSQL:
+		if d.Config.SQL != nil {
+			return "db." + d.Config.SQL.Driver
+		}
+		return "db.postgres" // default
+	case DatasourceTypeCSV:
+		return "file.csv"
+	case DatasourceTypeSocket:
+		if d.Config.Socket != nil {
+			switch d.Config.Socket.Protocol {
+			case "websocket":
+				return "stream.websocket"
+			case "tcp":
+				return "stream.tcp"
+			case "udp":
+				return "stream.udp"
+			}
+		}
+		return "stream.websocket"
+	case DatasourceTypeAPI:
+		return "api.rest"
+	case DatasourceTypeTSStore:
+		return "store.tsstore"
+	case DatasourceTypePrometheus:
+		return "api.prometheus"
+	case DatasourceTypeEdgeLake:
+		return "api.edgelake"
+	default:
+		return ""
+	}
+}
+
+// GetEffectiveConfig returns the unified config map, converting from legacy Config if needed
+func (d *Datasource) GetEffectiveConfig() map[string]interface{} {
+	if d.TypeConfig != nil {
+		return d.TypeConfig
+	}
+
+	// Convert legacy Config to map
+	config := make(map[string]interface{})
+
+	switch d.Type {
+	case DatasourceTypeSQL:
+		if d.Config.SQL != nil {
+			config["host"] = d.Config.SQL.Host
+			config["port"] = d.Config.SQL.Port
+			config["database"] = d.Config.SQL.Database
+			config["username"] = d.Config.SQL.Username
+			config["password"] = d.Config.SQL.Password
+			config["ssl"] = d.Config.SQL.SSL
+			config["max_connections"] = d.Config.SQL.MaxConnections
+			config["timeout"] = d.Config.SQL.Timeout
+			config["options"] = d.Config.SQL.Options
+		}
+	case DatasourceTypeCSV:
+		if d.Config.CSV != nil {
+			config["path"] = d.Config.CSV.Path
+			config["delimiter"] = d.Config.CSV.Delimiter
+			config["has_header"] = d.Config.CSV.HasHeader
+			config["columns"] = d.Config.CSV.Columns
+			config["encoding"] = d.Config.CSV.Encoding
+		}
+	case DatasourceTypeSocket:
+		if d.Config.Socket != nil {
+			config["url"] = d.Config.Socket.URL
+			config["headers"] = d.Config.Socket.Headers
+			config["reconnect_on_error"] = d.Config.Socket.ReconnectOnError
+			config["reconnect_delay"] = d.Config.Socket.ReconnectDelay
+			config["ping_interval"] = d.Config.Socket.PingInterval
+			config["buffer_size"] = d.Config.Socket.BufferSize
+			config["message_format"] = d.Config.Socket.MessageFormat
+			if d.Config.Socket.Parser != nil {
+				config["data_path"] = d.Config.Socket.Parser.DataPath
+				config["timestamp_field"] = d.Config.Socket.Parser.TimestampField
+			}
+		}
+	case DatasourceTypeAPI:
+		if d.Config.API != nil {
+			config["url"] = d.Config.API.URL
+			config["method"] = d.Config.API.Method
+			config["headers"] = d.Config.API.Headers
+			config["auth_type"] = d.Config.API.AuthType
+			config["auth_credentials"] = d.Config.API.AuthCredentials
+			config["query_params"] = d.Config.API.QueryParams
+			config["body"] = d.Config.API.Body
+			config["timeout"] = d.Config.API.Timeout
+			config["retry_count"] = d.Config.API.RetryCount
+			config["retry_delay"] = d.Config.API.RetryDelay
+			if d.Config.API.ResponseConfig != nil {
+				config["data_path"] = d.Config.API.ResponseConfig.DataPath
+			}
+		}
+	case DatasourceTypeTSStore:
+		if d.Config.TSStore != nil {
+			config["protocol"] = string(d.Config.TSStore.Protocol)
+			config["host"] = d.Config.TSStore.Host
+			config["port"] = d.Config.TSStore.Port
+			config["store_name"] = d.Config.TSStore.StoreName
+			config["data_type"] = string(d.Config.TSStore.DataType)
+			config["api_key"] = d.Config.TSStore.APIKey
+			config["timeout"] = d.Config.TSStore.Timeout
+		}
+	case DatasourceTypePrometheus:
+		if d.Config.Prometheus != nil {
+			config["url"] = d.Config.Prometheus.URL
+			config["username"] = d.Config.Prometheus.Username
+			config["password"] = d.Config.Prometheus.Password
+			config["timeout"] = d.Config.Prometheus.Timeout
+		}
+	case DatasourceTypeEdgeLake:
+		if d.Config.EdgeLake != nil {
+			config["host"] = d.Config.EdgeLake.Host
+			config["port"] = d.Config.EdgeLake.Port
+			config["timeout"] = d.Config.EdgeLake.Timeout
+			config["use_distributed_query"] = d.Config.EdgeLake.UseDistributedQuery
+		}
+	}
+
+	return config
 }
 
 // DatasourceConfig holds type-specific configuration
@@ -330,27 +472,46 @@ type HealthInfo struct {
 
 // CreateDatasourceRequest represents request to create a data source
 type CreateDatasourceRequest struct {
-	Name        string           `json:"name" binding:"required"`
-	Description string           `json:"description"`
-	Type        DatasourceType   `json:"type" binding:"required,oneof=sql csv socket api tsstore prometheus edgelake"`
-	Config      DatasourceConfig `json:"config" binding:"required"`
-	Tags        []string         `json:"tags,omitempty"`
-	MaskSecrets *bool            `json:"mask_secrets,omitempty"` // If true, secrets are masked in API responses (default: true)
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description"`
+
+	// NEW: Registry-based type system (preferred)
+	TypeID     string                 `json:"type_id,omitempty"`
+	TypeConfig map[string]interface{} `json:"type_config,omitempty"`
+
+	// LEGACY: Keep for backwards compatibility
+	Type   DatasourceType   `json:"type,omitempty"`
+	Config DatasourceConfig `json:"config,omitempty"`
+
+	Tags        []string `json:"tags,omitempty"`
+	MaskSecrets *bool    `json:"mask_secrets,omitempty"` // If true, secrets are masked in API responses (default: true)
 }
 
 // UpdateDatasourceRequest represents request to update a data source
 type UpdateDatasourceRequest struct {
-	Name        string           `json:"name,omitempty"`
-	Description string           `json:"description,omitempty"`
-	Config      DatasourceConfig `json:"config,omitempty"`
-	Tags        []string         `json:"tags,omitempty"`
-	MaskSecrets *bool            `json:"mask_secrets,omitempty"` // If provided, updates secret masking setting
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+
+	// NEW: Registry-based type system
+	TypeID     string                 `json:"type_id,omitempty"`
+	TypeConfig map[string]interface{} `json:"type_config,omitempty"`
+
+	// LEGACY: Keep for backwards compatibility
+	Config DatasourceConfig `json:"config,omitempty"`
+
+	Tags        []string `json:"tags,omitempty"`
+	MaskSecrets *bool    `json:"mask_secrets,omitempty"` // If provided, updates secret masking setting
 }
 
 // TestDatasourceRequest represents request to test a data source connection
 type TestDatasourceRequest struct {
-	Type   DatasourceType   `json:"type" binding:"required,oneof=sql csv socket api tsstore prometheus edgelake"`
-	Config DatasourceConfig `json:"config" binding:"required"`
+	// NEW: Registry-based type system (preferred)
+	TypeID     string                 `json:"type_id,omitempty"`
+	TypeConfig map[string]interface{} `json:"type_config,omitempty"`
+
+	// LEGACY: Keep for backwards compatibility
+	Type   DatasourceType   `json:"type,omitempty"`
+	Config DatasourceConfig `json:"config,omitempty"`
 }
 
 // TestDatasourceResponse represents response from testing a data source

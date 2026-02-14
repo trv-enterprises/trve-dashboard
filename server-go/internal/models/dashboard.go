@@ -75,9 +75,10 @@ type ChartDataMapping struct {
 	Aggregation   *DataAggregation `json:"aggregation" bson:"aggregation"`           // Aggregation to apply (first, last, avg, etc.)
 	SlidingWindow *SlidingWindow   `json:"sliding_window" bson:"sliding_window"`     // Time-based sliding window (e.g., last 5 minutes)
 	TimeBucket    *TimeBucket      `json:"time_bucket" bson:"time_bucket"`           // Time-bucketed aggregation for streaming data
-	SortBy        string           `json:"sort_by" bson:"sort_by"`                   // Column to sort by
-	SortOrder     string           `json:"sort_order" bson:"sort_order"`             // asc or desc
-	Limit         int              `json:"limit" bson:"limit"`                       // Max rows to return
+	SortBy        string            `json:"sort_by" bson:"sort_by"`                   // Column to sort by
+	SortOrder     string            `json:"sort_order" bson:"sort_order"`             // asc or desc
+	Limit         int               `json:"limit" bson:"limit"`                       // Max rows to return
+	ColumnAliases map[string]string `json:"column_aliases" bson:"column_aliases"`     // Display names for columns (column name -> display name), primarily for dataview
 }
 
 // EmbeddedChart represents a chart embedded directly in a dashboard
@@ -86,7 +87,7 @@ type EmbeddedChart struct {
 	ID            string                 `json:"id" bson:"id"`
 	Name          string                 `json:"name" bson:"name"`
 	ChartType     string                 `json:"chart_type" bson:"chart_type"`           // bar, line, pie, etc.
-	DatasourceID  string                 `json:"datasource_id" bson:"datasource_id"`     // Reference to datasource
+	DatasourceID  string                 `json:"connection_id" bson:"datasource_id"`     // Reference to connection (was datasource_id)
 	QueryConfig   *ChartQueryConfig      `json:"query_config" bson:"query_config"`       // How to query data
 	DataMapping   *ChartDataMapping      `json:"data_mapping" bson:"data_mapping"`       // How to map data to chart
 	ComponentCode string                 `json:"component_code" bson:"component_code"`   // Custom React component code
