@@ -203,75 +203,128 @@ class APIClient {
     });
   }
 
-  // Data sources endpoints
-  async getDatasources(filters = {}) {
+  // Connection endpoints (new terminology - preferred)
+  async getConnections(filters = {}) {
     const params = new URLSearchParams(filters);
-    return this.request(`/api/datasources?${params}`);
+    return this.request(`/api/connections?${params}`);
   }
 
-  async getDatasource(id) {
-    return this.request(`/api/datasources/${id}`);
+  async getConnection(id) {
+    return this.request(`/api/connections/${id}`);
   }
 
-  async queryDatasource(id, query) {
-    return this.request(`/api/datasources/${id}/query`, {
+  async queryConnection(id, query) {
+    return this.request(`/api/connections/${id}/query`, {
       method: 'POST',
       body: JSON.stringify(query),
     });
   }
 
-  async getDatasourceSchema(id) {
-    return this.request(`/api/datasources/${id}/schema`);
+  async getConnectionSchema(id) {
+    return this.request(`/api/connections/${id}/schema`);
   }
 
-  async createDatasource(datasource) {
-    return this.request('/api/datasources', {
+  async createConnection(connection) {
+    return this.request('/api/connections', {
       method: 'POST',
-      body: JSON.stringify(datasource),
+      body: JSON.stringify(connection),
     });
   }
 
-  async updateDatasource(id, updates) {
-    return this.request(`/api/datasources/${id}`, {
+  async updateConnection(id, updates) {
+    return this.request(`/api/connections/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
   }
 
-  async deleteDatasource(id) {
-    return this.request(`/api/datasources/${id}`, {
+  async deleteConnection(id) {
+    return this.request(`/api/connections/${id}`, {
       method: 'DELETE',
     });
   }
 
-  async testDatasource(type, config) {
-    return this.request('/api/datasources/test', {
+  async testConnection(type, config) {
+    return this.request('/api/connections/test', {
       method: 'POST',
       body: JSON.stringify({ type, config }),
     });
   }
 
-  // Check health of an existing datasource (uses stored credentials)
-  async checkDatasourceHealth(id) {
-    return this.request(`/api/datasources/${id}/health`, {
+  // Check health of an existing connection (uses stored credentials)
+  async checkConnectionHealth(id) {
+    return this.request(`/api/connections/${id}/health`, {
       method: 'POST',
     });
   }
 
-  async getPrometheusLabelValues(datasourceId, labelName) {
-    return this.request(`/api/datasources/${datasourceId}/prometheus/labels/${encodeURIComponent(labelName)}/values`);
+  async getPrometheusLabelValues(connectionId, labelName) {
+    return this.request(`/api/connections/${connectionId}/prometheus/labels/${encodeURIComponent(labelName)}/values`);
   }
 
-  async getEdgeLakeDatabases(datasourceId) {
-    return this.request(`/api/datasources/${datasourceId}/edgelake/databases`);
+  async getEdgeLakeDatabases(connectionId) {
+    return this.request(`/api/connections/${connectionId}/edgelake/databases`);
   }
 
-  async getEdgeLakeTables(datasourceId, database) {
-    return this.request(`/api/datasources/${datasourceId}/edgelake/tables?database=${encodeURIComponent(database)}`);
+  async getEdgeLakeTables(connectionId, database) {
+    return this.request(`/api/connections/${connectionId}/edgelake/tables?database=${encodeURIComponent(database)}`);
   }
 
-  async getEdgeLakeSchema(datasourceId, database, table) {
-    return this.request(`/api/datasources/${datasourceId}/edgelake/schema?database=${encodeURIComponent(database)}&table=${encodeURIComponent(table)}`);
+  async getEdgeLakeSchema(connectionId, database, table) {
+    return this.request(`/api/connections/${connectionId}/edgelake/schema?database=${encodeURIComponent(database)}&table=${encodeURIComponent(table)}`);
+  }
+
+  // Get connections that support write operations (for controls)
+  async getWritableConnections() {
+    const response = await this.getConnections();
+    return {
+      connections: (response.datasources || response.connections || []).filter(c => c.capabilities?.can_write)
+    };
+  }
+
+  // Execute a control command
+  async executeControlCommand(controlId, value) {
+    return this.request(`/api/controls/${controlId}/execute`, {
+      method: 'POST',
+      body: JSON.stringify({ value }),
+    });
+  }
+
+  // Deprecated aliases - keep for backwards compatibility
+  async getDatasources(filters = {}) {
+    return this.getConnections(filters);
+  }
+
+  async getDatasource(id) {
+    return this.getConnection(id);
+  }
+
+  async queryDatasource(id, query) {
+    return this.queryConnection(id, query);
+  }
+
+  async getDatasourceSchema(id) {
+    return this.getConnectionSchema(id);
+  }
+
+  async createDatasource(datasource) {
+    return this.createConnection(datasource);
+  }
+
+  async updateDatasource(id, updates) {
+    return this.updateConnection(id, updates);
+  }
+
+  async deleteDatasource(id) {
+    return this.deleteConnection(id);
+  }
+
+  async testDatasource(type, config) {
+    return this.testConnection(type, config);
+  }
+
+  async checkDatasourceHealth(id) {
+    return this.checkConnectionHealth(id);
   }
 
   // AI Session endpoints

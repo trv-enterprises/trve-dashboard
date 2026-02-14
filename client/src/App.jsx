@@ -26,8 +26,8 @@ import {
   Checkmark
 } from '@carbon/icons-react';
 import apiClient, { API_BASE } from './api/client';
-import DatasourcesPage from './pages/DatasourcesPage';
-import DatasourceDetailPage from './pages/DatasourceDetailPage';
+import ConnectionsPage from './pages/ConnectionsPage';
+import ConnectionDetailPage from './pages/ConnectionDetailPage';
 import ChartsListPage from './pages/ChartsListPage';
 import ChartDetailPage from './pages/ChartDetailPage';
 import AIBuilderPage from './pages/AIBuilderPage';
@@ -260,8 +260,11 @@ function AppContent() {
           } />
 
           {/* Design Mode Routes */}
-          <Route path="/design/datasources" element={<DatasourcesPage />} />
-          <Route path="/design/datasources/:id" element={<DatasourceDetailPage />} />
+          <Route path="/design/connections" element={<ConnectionsPage />} />
+          <Route path="/design/connections/:id" element={<ConnectionDetailPage />} />
+          {/* Legacy datasources routes - redirect to connections */}
+          <Route path="/design/datasources" element={<Navigate to="/design/connections" replace />} />
+          <Route path="/design/datasources/:id" element={<Navigate to="/design/connections" replace />} />
           <Route path="/design/charts" element={<ChartsListPage />} />
           <Route path="/design/charts/ai/:chartId" element={<AIBuilderPage />} />
           <Route path="/design/charts/:id" element={<ChartDetailPage />} />
@@ -282,8 +285,8 @@ function AppContent() {
           <Route path="/dashboard" element={<Navigate to="/design/dashboards" replace />} />
           <Route path="/design/layouts" element={<Navigate to="/design/dashboards" replace />} />
           <Route path="/design/layouts/:id" element={<Navigate to="/design/dashboards" replace />} />
-          <Route path="/nodes" element={<Navigate to="/design/datasources" replace />} />
-          <Route path="/queries" element={<Navigate to="/design/datasources" replace />} />
+          <Route path="/nodes" element={<Navigate to="/design/connections" replace />} />
+          <Route path="/queries" element={<Navigate to="/design/connections" replace />} />
           <Route path="/chart-design" element={<Navigate to="/design/charts" replace />} />
         </Routes>
       </Content>

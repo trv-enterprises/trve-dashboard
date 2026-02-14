@@ -42,9 +42,16 @@ func (s *ChartService) CreateChart(ctx context.Context, req *models.CreateChartR
 		title = req.Name
 	}
 
+	// Default component type to "chart" if not specified
+	componentType := req.ComponentType
+	if componentType == "" {
+		componentType = models.ComponentTypeChart
+	}
+
 	chart := &models.Chart{
 		Version:       1,
 		Status:        models.ChartStatusFinal,
+		ComponentType: componentType,
 		Name:          req.Name,
 		Title:         title,
 		Description:   req.Description,
@@ -52,6 +59,7 @@ func (s *ChartService) CreateChart(ctx context.Context, req *models.CreateChartR
 		DatasourceID:  req.DatasourceID,
 		QueryConfig:   req.QueryConfig,
 		DataMapping:   req.DataMapping,
+		ControlConfig: req.ControlConfig,
 		ComponentCode: req.ComponentCode,
 		UseCustomCode: req.UseCustomCode,
 		Options:       req.Options,
@@ -199,6 +207,9 @@ func (s *ChartService) UpdateChart(ctx context.Context, id string, req *models.U
 	}
 
 	// Update fields if provided
+	if req.ComponentType != nil {
+		chart.ComponentType = *req.ComponentType
+	}
 	if req.Title != nil {
 		chart.Title = *req.Title
 	}
@@ -216,6 +227,9 @@ func (s *ChartService) UpdateChart(ctx context.Context, id string, req *models.U
 	}
 	if req.DataMapping != nil {
 		chart.DataMapping = req.DataMapping
+	}
+	if req.ControlConfig != nil {
+		chart.ControlConfig = req.ControlConfig
 	}
 	if req.ComponentCode != nil {
 		chart.ComponentCode = *req.ComponentCode

@@ -25,23 +25,23 @@ import {
 } from '@carbon/react';
 import { Save, Close, TrashCan, Play, ConnectionSignal, Checkmark, ErrorFilled, ArrowLeft } from '@carbon/icons-react';
 import apiClient, { API_BASE } from '../api/client';
-import './DatasourceDetailPage.scss';
+import './ConnectionDetailPage.scss';
 
 /**
- * DatasourceDetailPage Component
+ * ConnectionDetailPage Component
  *
- * Create/Edit datasource with type-specific configuration forms.
- * Supports datasource types: SQL, CSV, Socket, API, TSStore, Prometheus, EdgeLake
+ * Create/Edit connection with type-specific configuration forms.
+ * Supports connection types: SQL, CSV, Socket, API, TSStore, Prometheus, EdgeLake
  */
 // Constant for masked secret value - must match backend SecretMaskedValue
 const SECRET_MASKED_VALUE = '********';
 
-function DatasourceDetailPage() {
+function ConnectionDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isCreateMode = id === 'new';
 
-  const [datasource, setDatasource] = useState(null);
+  const [connection, setConnection] = useState(null);
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState('');
   const [description, setDescription] = useState('');
@@ -64,20 +64,20 @@ function DatasourceDetailPage() {
 
   useEffect(() => {
     if (!isCreateMode) {
-      fetchDatasource();
+      fetchConnection();
     } else {
       // Initialize empty config for create mode
       setConfig(getDefaultConfig('sql'));
     }
   }, [id]);
 
-  const fetchDatasource = async () => {
+  const fetchConnection = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.getDatasource(id);
-      console.log('Datasource response:', data);
+      const data = await apiClient.getConnection(id);
+      console.log('Connection response:', data);
 
-      setDatasource(data);
+      setConnection(data);
       setName(data.name);
       setDescription(data.description || '');
       setType(data.type);
@@ -90,32 +90,32 @@ function DatasourceDetailPage() {
     }
   };
 
-  // Check for duplicate datasource name on blur
-  const checkDuplicateDatasourceName = async (nameToCheck) => {
+  // Check for duplicate connection name on blur
+  const checkDuplicateConnectionName = async (nameToCheck) => {
     if (!nameToCheck || !nameToCheck.trim()) {
       setNameError('');
       return;
     }
     try {
-      const response = await apiClient.getDatasources();
-      const datasources = response.datasources || [];
-      const duplicate = datasources.find(ds =>
-        ds.name.toLowerCase() === nameToCheck.trim().toLowerCase() &&
-        ds.id !== id
+      const response = await apiClient.getConnections();
+      const connections = response.datasources || response.connections || [];
+      const duplicate = connections.find(conn =>
+        conn.name.toLowerCase() === nameToCheck.trim().toLowerCase() &&
+        conn.id !== id
       );
       if (duplicate) {
-        setNameError('A data source with this name already exists');
+        setNameError('A connection with this name already exists');
       } else {
         setNameError('');
       }
     } catch (err) {
-      console.error('Error checking data source name:', err);
+      console.error('Error checking connection name:', err);
       setNameError('');
     }
   };
 
-  const getDefaultConfig = (datasourceType) => {
-    switch (datasourceType) {
+  const getDefaultConfig = (connectionType) => {
+    switch (connectionType) {
       case 'sql':
         return {
           sql: {
@@ -239,21 +239,21 @@ function DatasourceDetailPage() {
 
     // For SQL: if password is empty and was masked, keep the masked value
     if (prepared.sql) {
-      if (prepared.sql.password === '' && datasource?.config?.sql?.password === SECRET_MASKED_VALUE) {
+      if (prepared.sql.password === '' && connection?.config?.sql?.password === SECRET_MASKED_VALUE) {
         prepared.sql.password = SECRET_MASKED_VALUE;
       }
     }
 
     // For TSStore: if api_key is empty and was masked, keep the masked value
     if (prepared.tsstore) {
-      if (prepared.tsstore.api_key === '' && datasource?.config?.tsstore?.api_key === SECRET_MASKED_VALUE) {
+      if (prepared.tsstore.api_key === '' && connection?.config?.tsstore?.api_key === SECRET_MASKED_VALUE) {
         prepared.tsstore.api_key = SECRET_MASKED_VALUE;
       }
     }
 
     // For API: preserve masked auth_credentials
     if (prepared.api && prepared.api.auth_credentials) {
-      const originalCreds = datasource?.config?.api?.auth_credentials || {};
+      const originalCreds = connection?.config?.api?.auth_credentials || {};
       for (const key in prepared.api.auth_credentials) {
         if (prepared.api.auth_credentials[key] === '' && originalCreds[key] === SECRET_MASKED_VALUE) {
           prepared.api.auth_credentials[key] = SECRET_MASKED_VALUE;
@@ -278,14 +278,14 @@ function DatasourceDetailPage() {
       };
 
       if (isCreateMode) {
-        await apiClient.createDatasource(payload);
+        await apiClient.createConnection(payload);
       } else {
-        await apiClient.updateDatasource(id, payload);
+        await apiClient.updateConnection(id, payload);
       }
 
       setHasChanges(false);
       setShowSaveModal(false);
-      navigate('/design/datasources');
+      navigate('/design/connections');
     } catch (err) {
       alert(`Failed to save: ${err.message}`);
     } finally {
@@ -297,13 +297,13 @@ function DatasourceDetailPage() {
     if (hasChanges) {
       setShowCancelModal(true);
     } else {
-      navigate('/design/datasources');
+      navigate('/design/connections');
     }
   };
 
   const confirmCancel = () => {
     setShowCancelModal(false);
-    navigate('/design/datasources');
+    navigate('/design/connections');
   };
 
   // Test connection handler
@@ -315,11 +315,11 @@ function DatasourceDetailPage() {
     try {
       let result;
       if (isCreateMode) {
-        // For new datasources, test with the provided config
-        result = await apiClient.testDatasource(type, config);
+        // For new connections, test with the provided config
+        result = await apiClient.testConnection(type, config);
       } else {
-        // For existing datasources, use health check which fetches credentials from DB
-        const healthResult = await apiClient.checkDatasourceHealth(id);
+        // For existing connections, use health check which fetches credentials from DB
+        const healthResult = await apiClient.checkConnectionHealth(id);
         // Convert health response to test response format
         result = {
           success: healthResult.status === 'healthy',
@@ -330,7 +330,7 @@ function DatasourceDetailPage() {
       }
       setTestResult(result);
 
-      // For SQL datasources, schema is included in the test response data
+      // For SQL connections, schema is included in the test response data
       if (result.success && type === 'sql' && result.data) {
         setTestSchema(result.data);
       }
@@ -914,7 +914,7 @@ function DatasourceDetailPage() {
           Streaming Configuration (Optional)
         </h4>
         <p style={{ fontSize: '0.875rem', color: 'var(--cds-text-helper)', marginBottom: '1rem' }}>
-          Configure how data is pushed from ts-store to the dashboard. These settings affect all charts using this data source.
+          Configure how data is pushed from ts-store to the dashboard. These settings affect all charts using this connection.
         </p>
 
         <TextInput
@@ -1207,35 +1207,35 @@ function DatasourceDetailPage() {
 
   if (loading) {
     return (
-      <div className="datasource-detail-page">
-        <Loading description="Loading datasource..." withOverlay={false} />
+      <div className="connection-detail-page">
+        <Loading description="Loading connection..." withOverlay={false} />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="datasource-detail-page">
+      <div className="connection-detail-page">
         <div className="error-message">Error: {error}</div>
-        <Button onClick={() => navigate('/design/datasources')}>Back to Datasources</Button>
+        <Button onClick={() => navigate('/design/connections')}>Back to Connections</Button>
       </div>
     );
   }
 
   return (
-    <div className="datasource-detail-page">
+    <div className="connection-detail-page">
       {/* Page header bar with title and actions */}
       <div className="page-header-bar">
         <div className="header-left">
           <Button
             kind="ghost"
             renderIcon={ArrowLeft}
-            onClick={() => navigate('/design/datasources')}
+            onClick={() => navigate('/design/connections')}
             size="md"
           >
             Back
           </Button>
-          <h1>{isCreateMode ? 'Create Data Source' : 'Edit Data Source'}</h1>
+          <h1>{isCreateMode ? 'Create Connection' : 'Edit Connection'}</h1>
         </div>
         <div className="page-actions">
           <Button
@@ -1253,26 +1253,26 @@ function DatasourceDetailPage() {
             disabled={!name || !type}
             size="md"
           >
-            Save Data Source
+            Save Connection
           </Button>
         </div>
       </div>
 
       {/* Form content */}
       <div className="form-content">
-        {/* Datasource Name - full width */}
+        {/* Connection Name - full width */}
         <div className="form-row">
           <TextInput
-            id="datasource-name"
-            labelText="Data Source Name"
+            id="connection-name"
+            labelText="Connection Name"
             value={name}
             onChange={(e) => {
               setName(e.target.value);
               setHasChanges(true);
               if (nameError) setNameError('');
             }}
-            onBlur={(e) => checkDuplicateDatasourceName(e.target.value)}
-            placeholder="Enter data source name"
+            onBlur={(e) => checkDuplicateConnectionName(e.target.value)}
+            placeholder="Enter connection name"
             invalid={!!nameError}
             invalidText={nameError}
           />
@@ -1281,22 +1281,22 @@ function DatasourceDetailPage() {
         {/* Description - full width */}
         <div className="form-row">
           <TextInput
-            id="datasource-description"
+            id="connection-description"
             labelText="Description (optional)"
             value={description}
             onChange={(e) => {
               setDescription(e.target.value);
               setHasChanges(true);
             }}
-            placeholder="Enter data source description"
+            placeholder="Enter connection description"
           />
         </div>
 
         {/* Type selector */}
         <div className="form-row">
           <Select
-            id="datasource-type"
-            labelText="Data Source Type"
+            id="connection-type"
+            labelText="Connection Type"
             value={type}
             onChange={handleTypeChange}
             disabled={!isCreateMode}
@@ -1356,15 +1356,15 @@ function DatasourceDetailPage() {
           open={true}
           onRequestClose={() => setShowSaveModal(false)}
           onRequestSubmit={handleSave}
-          modalHeading={isCreateMode ? "Create Datasource" : "Save Changes"}
+          modalHeading={isCreateMode ? "Create Connection" : "Save Changes"}
           primaryButtonText={saving ? "Saving..." : "Save"}
           secondaryButtonText="Cancel"
           primaryButtonDisabled={saving}
         >
           <p>
             {isCreateMode
-              ? `Create datasource "${name}" of type ${type}?`
-              : `Save changes to datasource "${name}"?`}
+              ? `Create connection "${name}" of type ${type}?`
+              : `Save changes to connection "${name}"?`}
           </p>
         </Modal>
       )}
@@ -1408,7 +1408,7 @@ function DatasourceDetailPage() {
               </p>
             )}
 
-            {/* Schema information for SQL datasources */}
+            {/* Schema information for SQL connections */}
             {testResult.success && testSchema && testSchema.tables && (
               <div className="schema-info">
                 <h4>Database Schema</h4>
@@ -1436,4 +1436,4 @@ function DatasourceDetailPage() {
   );
 }
 
-export default DatasourceDetailPage;
+export default ConnectionDetailPage;

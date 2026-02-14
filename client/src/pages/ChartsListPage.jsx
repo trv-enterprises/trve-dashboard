@@ -2,8 +2,8 @@
 // Licensed under Apache 2.0
 // See LICENSE file for details.
 
-import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   DataTable,
   TableContainer,
@@ -21,17 +21,19 @@ import {
   Loading,
   Tag,
   Link,
-  MenuButton,
-  MenuItem,
   Tile,
   ContentSwitcher,
   Switch,
-  Tooltip
+  Tooltip,
+  InlineNotification,
+  Dropdown
 } from '@carbon/react';
-import { TrashCan, ChartLineSmooth, List, Grid, Edit, DataBase, Information, Dashboard } from '@carbon/icons-react';
+import { TrashCan, ChartLineSmooth, List, Grid, Edit, DataBase, Information, Dashboard, Keyboard } from '@carbon/icons-react';
 import AiIcon from '../components/icons/AiIcon';
 import apiClient from '../api/client';
 import ChartDeleteDialog from '../components/ChartDeleteDialog';
+import CreateMenu from '../components/CreateMenu';
+import ComponentPickerModal from '../components/ComponentPickerModal';
 import './ChartsListPage.scss';
 
 /**
@@ -45,17 +47,40 @@ import './ChartsListPage.scss';
  */
 function ChartsListPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Initialize state from URL params (persist filters across navigation)
   const [charts, setCharts] = useState([]);
-  const [datasources, setDatasources] = useState({});
+  const [connections, setConnections] = useState({});
   const [dashboardCounts, setDashboardCounts] = useState({}); // Map of chart_id -> dashboard count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortKey, setSortKey] = useState('name');
-  const [sortDirection, setSortDirection] = useState('asc');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [sortKey, setSortKey] = useState(searchParams.get('sortKey') || 'name');
+  const [sortDirection, setSortDirection] = useState(searchParams.get('sortDir') || 'asc');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [chartToDelete, setChartToDelete] = useState(null);
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'tile'
+  const [viewMode, setViewMode] = useState(searchParams.get('view') || 'list'); // 'list' or 'tile'
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerCategory, setPickerCategory] = useState('chart');
+  const [controlNotice, setControlNotice] = useState(null);
+  const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || 'all'); // 'all', 'chart', 'control'
+  const [connectionFilter, setConnectionFilter] = useState(searchParams.get('ds') || 'all'); // 'all' or connection id
+
+  // Update URL params when filters change
+  const updateSearchParams = useCallback((updates) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value && value !== 'all' && value !== 'name' && value !== 'asc' && value !== 'list' && value !== '') {
+          newParams.set(key, value);
+        } else {
+          newParams.delete(key);
+        }
+      });
+      return newParams;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   // Fetch charts and data sources from API
   useEffect(() => {
@@ -65,10 +90,10 @@ function ChartsListPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // Fetch charts, data sources, and dashboards in parallel
-      const [chartsData, datasourcesData, dashboardsData] = await Promise.all([
+      // Fetch charts, connections, and dashboards in parallel
+      const [chartsData, connectionsData, dashboardsData] = await Promise.all([
         apiClient.getCharts(),
-        apiClient.getDatasources(),
+        apiClient.getConnections(),
         apiClient.getDashboards()
       ]);
 
@@ -80,13 +105,13 @@ function ChartsListPage() {
         setCharts([]);
       }
 
-      // Create a lookup map for data sources
-      if (datasourcesData.datasources) {
-        const dsMap = {};
-        datasourcesData.datasources.forEach(ds => {
-          dsMap[ds.id] = ds.name;
+      // Create a lookup map for connections
+      if (connectionsData.datasources) {
+        const connMap = {};
+        connectionsData.datasources.forEach(conn => {
+          connMap[conn.id] = conn.name;
         });
-        setDatasources(dsMap);
+        setConnections(connMap);
       }
 
       // Build dashboard count map by chart_id
@@ -121,6 +146,35 @@ function ChartsListPage() {
 
   const handleCreateWithAI = () => {
     navigate('/design/charts/ai/new');
+  };
+
+  // Chart picker handlers
+  const handleSelectChart = () => {
+    setPickerCategory('chart');
+    setPickerOpen(true);
+  };
+
+  const handlePickerSelect = (item) => {
+    setPickerOpen(false);
+    if (pickerCategory === 'chart') {
+      navigate(`/design/charts/${item.id}`);
+    } else {
+      navigate(`/design/controls/${item.id}`);
+    }
+  };
+
+  // Control handlers (future routes)
+  const handleCreateControl = () => {
+    setControlNotice('Controls feature is coming soon.');
+  };
+
+  const handleCreateControlAI = () => {
+    setControlNotice('Controls feature is coming soon.');
+  };
+
+  const handleSelectControl = () => {
+    setPickerCategory('control');
+    setPickerOpen(true);
   };
 
   const handleRowClick = (chart) => {
@@ -170,38 +224,62 @@ function ChartsListPage() {
 
   // Handle column sorting
   const handleSort = (key) => {
+    let newDirection = 'asc';
     if (sortKey === key) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+      setSortDirection(newDirection);
     } else {
       setSortKey(key);
       setSortDirection('asc');
     }
+    updateSearchParams({ sortKey: key, sortDir: newDirection });
   };
 
-  // Filter and sort charts
+  // Filter and sort components (charts + controls)
   const filteredAndSortedCharts = useMemo(() => {
     let result = [...charts];
+
+    // Filter by component type (chart vs control)
+    if (typeFilter !== 'all') {
+      result = result.filter(item => {
+        // For now, all items are charts. Controls will have component_type: 'control'
+        const componentType = item.component_type || 'chart';
+        return componentType === typeFilter;
+      });
+    }
+
+    // Filter by connection
+    if (connectionFilter !== 'all') {
+      result = result.filter(item => (item.connection_id || item.datasource_id) === connectionFilter);
+    }
 
     // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(chart => {
-        const dsName = datasources[chart.datasource_id] || '';
+        const connName = connections[chart.connection_id || chart.datasource_id] || '';
         return chart.name?.toLowerCase().includes(term) ||
           chart.description?.toLowerCase().includes(term) ||
           chart.chart_type?.toLowerCase().includes(term) ||
-          dsName.toLowerCase().includes(term);
+          connName.toLowerCase().includes(term);
       });
     }
 
-    // Sort
+    // Sort - drafts first, then by selected sort key
     result.sort((a, b) => {
+      // Primary sort: drafts come first
+      const aIsDraft = (a.status || 'draft') === 'draft';
+      const bIsDraft = (b.status || 'draft') === 'draft';
+      if (aIsDraft && !bIsDraft) return -1;
+      if (!aIsDraft && bIsDraft) return 1;
+
+      // Secondary sort: by selected sort key
       let aVal, bVal;
 
-      // Handle datasource sorting (use name lookup)
-      if (sortKey === 'datasource') {
-        aVal = datasources[a.datasource_id] || '';
-        bVal = datasources[b.datasource_id] || '';
+      // Handle connection sorting (use name lookup)
+      if (sortKey === 'connection') {
+        aVal = connections[a.connection_id || a.datasource_id] || '';
+        bVal = connections[b.connection_id || b.datasource_id] || '';
       } else if (sortKey === 'dashboards') {
         // Handle dashboards count sorting
         aVal = dashboardCounts[a.id] || 0;
@@ -226,12 +304,13 @@ function ChartsListPage() {
     });
 
     return result;
-  }, [charts, datasources, dashboardCounts, searchTerm, sortKey, sortDirection]);
+  }, [charts, connections, dashboardCounts, searchTerm, sortKey, sortDirection, typeFilter, connectionFilter]);
 
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
+    { key: 'component_type', header: 'Component', isSortable: true },
     { key: 'chart_type', header: 'Type', isSortable: true },
-    { key: 'datasource', header: 'Data Source', isSortable: true },
+    { key: 'connection', header: 'Connection', isSortable: true },
     { key: 'dashboards', header: 'Dashboards', isSortable: true },
     { key: 'status', header: 'Status', isSortable: true },
     { key: 'description', header: 'Description', isSortable: false },
@@ -242,8 +321,9 @@ function ChartsListPage() {
   const rows = filteredAndSortedCharts.map((chart) => ({
     id: chart.id,
     name: chart.name,
+    component_type: chart.component_type || 'chart',
     chart_type: chart.chart_type,
-    datasource: datasources[chart.datasource_id] || 'None',
+    connection: connections[chart.connection_id || chart.datasource_id] || 'None',
     dashboards: dashboardCounts[chart.id] || 0,
     status: chart.status || 'draft',
     description: chart.description || '',
@@ -255,7 +335,7 @@ function ChartsListPage() {
   if (loading) {
     return (
       <div className="charts-list-page">
-        <Loading description="Loading charts..." withOverlay={false} />
+        <Loading description="Loading components..." withOverlay={false} />
       </div>
     );
   }
@@ -272,10 +352,10 @@ function ChartsListPage() {
     <div className="charts-list-page">
       {/* Page Header */}
       <div className="page-header">
-        <h1>Charts</h1>
+        <h1>Components</h1>
         <p className="page-description">
-          Create and manage reusable chart components for your dashboards.
-          Charts can connect to data sources and be placed in multiple dashboards.
+          Create and manage reusable components for your dashboards.
+          Components include charts for data visualization and controls for user interaction.
           {' '}<Link href="#" onClick={(e) => e.preventDefault()}>Learn more</Link>.
         </p>
       </div>
@@ -284,12 +364,54 @@ function ChartsListPage() {
       <div className="page-toolbar">
         <div className="toolbar-left">
           <TableToolbarSearch
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              updateSearchParams({ search: e.target.value });
+            }}
             placeholder="Search"
             persistent
+            value={searchTerm}
+          />
+          <Dropdown
+            id="type-filter"
+            label="Filter by type"
+            titleText=""
+            items={[
+              { id: 'all', text: 'All Components' },
+              { id: 'chart', text: 'Charts' },
+              { id: 'control', text: 'Controls' }
+            ]}
+            itemToString={(item) => item?.text || ''}
+            selectedItem={{ id: typeFilter, text: typeFilter === 'all' ? 'All Components' : typeFilter === 'chart' ? 'Charts' : 'Controls' }}
+            onChange={({ selectedItem }) => {
+              const newType = selectedItem?.id || 'all';
+              setTypeFilter(newType);
+              updateSearchParams({ type: newType });
+            }}
+            size="md"
+          />
+          <Dropdown
+            id="connection-filter"
+            label="Filter by connection"
+            titleText=""
+            items={[
+              { id: 'all', text: 'All Connections' },
+              ...Object.entries(connections).map(([id, name]) => ({ id, text: name }))
+            ]}
+            itemToString={(item) => item?.text || ''}
+            selectedItem={{ id: connectionFilter, text: connectionFilter === 'all' ? 'All Connections' : (connections[connectionFilter] || 'Unknown') }}
+            onChange={({ selectedItem }) => {
+              const newConn = selectedItem?.id || 'all';
+              setConnectionFilter(newConn);
+              updateSearchParams({ ds: newConn });
+            }}
+            size="md"
           />
           <ContentSwitcher
-            onChange={(e) => setViewMode(e.name)}
+            onChange={(e) => {
+              setViewMode(e.name);
+              updateSearchParams({ view: e.name });
+            }}
             selectedIndex={viewMode === 'list' ? 0 : 1}
             size="md"
           >
@@ -302,21 +424,14 @@ function ChartsListPage() {
           </ContentSwitcher>
         </div>
         <div className="toolbar-actions">
-          <MenuButton
-            label="Create"
-            size="md"
-            kind="primary"
-          >
-            <MenuItem
-              label="Create"
-              onClick={handleCreate}
-            />
-            <MenuItem
-              label="Create with AI"
-              renderIcon={AiIcon}
-              onClick={handleCreateWithAI}
-            />
-          </MenuButton>
+          <CreateMenu
+            onCreateChart={handleCreate}
+            onCreateChartAI={handleCreateWithAI}
+            onSelectChart={handleSelectChart}
+            onCreateControl={handleCreateControl}
+            onCreateControlAI={handleCreateControlAI}
+            onSelectControl={handleSelectControl}
+          />
         </div>
       </div>
 
@@ -326,9 +441,9 @@ function ChartsListPage() {
           {filteredAndSortedCharts.length === 0 ? (
             <div className="empty-state">
               <ChartLineSmooth size={64} />
-              <h3>No charts available</h3>
+              <h3>No components available</h3>
               <p>
-                Looks like you haven't added any charts. Click{' '}
+                Looks like you haven't added any components. Click{' '}
                 <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
                 {' '}to get started.
               </p>
@@ -366,6 +481,9 @@ function ChartsListPage() {
                     </div>
 
                     <div className="tile-meta">
+                      <Tag type={(chart.component_type || 'chart') === 'chart' ? 'blue' : 'purple'} size="sm">
+                        {(chart.component_type || 'chart') === 'chart' ? 'CHART' : 'CONTROL'}
+                      </Tag>
                       <Tag type={getChartTypeColor(chart.chart_type)} size="sm">
                         {chart.chart_type?.toUpperCase() || 'N/A'}
                       </Tag>
@@ -376,10 +494,10 @@ function ChartsListPage() {
                       </Tag>
                     </div>
 
-                    {datasources[chart.datasource_id] && (
-                      <div className="tile-datasource">
+                    {connections[chart.connection_id || chart.datasource_id] && (
+                      <div className="tile-connection">
                         <DataBase size={14} />
-                        <span>{datasources[chart.datasource_id]}</span>
+                        <span>{connections[chart.connection_id || chart.datasource_id]}</span>
                       </div>
                     )}
 
@@ -457,9 +575,9 @@ function ChartsListPage() {
                       <TableCell colSpan={headers.length}>
                         <div className="empty-state">
                           <ChartLineSmooth size={64} />
-                          <h3>No charts available</h3>
+                          <h3>No components available</h3>
                           <p>
-                            Looks like you haven't added any charts. Click{' '}
+                            Looks like you haven't added any components. Click{' '}
                             <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
                             {' '}to get started.
                           </p>
@@ -477,6 +595,16 @@ function ChartsListPage() {
                           className="clickable-row"
                         >
                           {row.cells.map((cell) => {
+                            if (cell.info.header === 'component_type') {
+                              const isChart = cell.value === 'chart';
+                              return (
+                                <TableCell key={cell.id}>
+                                  <Tag type={isChart ? 'blue' : 'purple'} size="md">
+                                    {isChart ? 'CHART' : 'CONTROL'}
+                                  </Tag>
+                                </TableCell>
+                              );
+                            }
                             if (cell.info.header === 'chart_type') {
                               return (
                                 <TableCell key={cell.id}>
@@ -546,6 +674,27 @@ function ChartsListPage() {
         onClose={handleDeleteClose}
         onDelete={handleDeleteConfirm}
       />
+
+      {/* Component Picker Modal */}
+      <ComponentPickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={handlePickerSelect}
+        category={pickerCategory}
+      />
+
+      {/* Controls Coming Soon Notice */}
+      {controlNotice && (
+        <div className="control-notice">
+          <InlineNotification
+            kind="info"
+            title="Coming Soon"
+            subtitle={controlNotice}
+            onCloseButtonClick={() => setControlNotice(null)}
+            lowContrast
+          />
+        </div>
+      )}
     </div>
   );
 }

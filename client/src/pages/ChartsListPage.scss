@@ -59,6 +59,16 @@
         background-color: var(--cds-layer-01);
       }
 
+      // Filter dropdowns
+      .cds--dropdown {
+        min-width: 160px;
+        background-color: var(--cds-layer-01);
+      }
+
+      #connection-filter {
+        min-width: 220px;
+      }
+
       // Content switcher for view toggle
       .cds--content-switcher {
         flex-shrink: 100;
@@ -83,12 +93,6 @@
       align-items: center;
       gap: spacing.$spacing-04;
     }
-  }
-
-  // MenuButton container fix - Carbon sets max-width: 18rem by default
-  .cds--menu-button__container {
-    max-width: none !important;
-    width: auto !important;
   }
 
   .error-message {
@@ -213,7 +217,7 @@
         flex-wrap: wrap;
       }
 
-      .tile-datasource {
+      .tile-connection {
         display: flex;
         align-items: center;
         gap: spacing.$spacing-02;
@@ -444,5 +448,17 @@
   // Tags styling
   .cds--tag {
     margin: 0;
+  }
+
+  // Control notice (fixed position at bottom)
+  .control-notice {
+    position: fixed;
+    bottom: spacing.$spacing-05;
+    right: spacing.$spacing-05;
+    z-index: 9000;
+
+    .cds--inline-notification {
+      max-width: 400px;
+    }
   }
 }

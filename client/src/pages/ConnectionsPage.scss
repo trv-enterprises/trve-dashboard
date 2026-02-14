@@ -4,7 +4,7 @@
 
 @use '@carbon/react/scss/spacing' as spacing;
 
-.datasources-page {
+.connections-page {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -95,22 +95,22 @@
     border-radius: 4px;
   }
 
-  // Datasources content area (for tile view)
-  .datasources-content {
+  // Connections content area (for tile view)
+  .connections-content {
     flex: 1;
     overflow-y: auto;
     padding: 0 spacing.$spacing-06 spacing.$spacing-06;
   }
 
-  // Datasources grid (tile view)
-  .datasources-grid {
+  // Connections grid (tile view)
+  .connections-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: spacing.$spacing-05;
   }
 
-  // Datasource tile styling
-  .datasource-tile {
+  // Connection tile styling
+  .connection-tile {
     background-color: var(--cds-layer-01);
     border: 1px solid transparent;
     border-radius: 4px;

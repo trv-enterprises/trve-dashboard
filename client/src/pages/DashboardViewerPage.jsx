@@ -25,6 +25,7 @@ import {
 import html2canvas from 'html2canvas';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import ChartDataModal from '../components/ChartDataModal';
+import { ControlRenderer } from '../components/controls';
 import apiClient from '../api/client';
 import './DashboardViewerPage.scss';
 
@@ -347,22 +348,31 @@ function DashboardViewerPage({ canDesign = false }) {
                 >
                   {hasChart ? (
                     <>
-                      {/* Show header only for datatable type (no built-in title) */}
-                      {chart.chart_type === 'datatable' && (
-                        <div className="chart-header">
-                          <span className="chart-name">{chart.title || chart.name || 'Untitled Chart'}</span>
+                      {/* Render control components differently */}
+                      {chart.component_type === 'control' ? (
+                        <div className="component-wrapper control-wrapper">
+                          <ControlRenderer control={chart} />
                         </div>
+                      ) : (
+                        <>
+                          {/* Show header only for datatable type (no built-in title) */}
+                          {chart.chart_type === 'datatable' && (
+                            <div className="chart-header">
+                              <span className="chart-name">{chart.title || chart.name || 'Untitled Chart'}</span>
+                            </div>
+                          )}
+                          <div className={`component-wrapper ${chart.chart_type === 'datatable' ? 'with-header' : ''}`}>
+                            <DynamicComponentLoader
+                              code={chart.component_code}
+                              props={{}}
+                              dataMapping={chart.data_mapping}
+                              datasourceId={chart.datasource_id}
+                              queryConfig={chart.query_config}
+                              dataRefreshInterval={dashboard?.settings?.refresh_interval > 0 ? dashboard.settings.refresh_interval * 1000 : null}
+                            />
+                          </div>
+                        </>
                       )}
-                      <div className={`component-wrapper ${chart.chart_type === 'datatable' ? 'with-header' : ''}`}>
-                        <DynamicComponentLoader
-                          code={chart.component_code}
-                          props={{}}
-                          dataMapping={chart.data_mapping}
-                          datasourceId={chart.datasource_id}
-                          queryConfig={chart.query_config}
-                          dataRefreshInterval={dashboard?.settings?.refresh_interval > 0 ? dashboard.settings.refresh_interval * 1000 : null}
-                        />
-                      </div>
                     </>
                   ) : (
                     <div className="empty-panel-placeholder">

@@ -15,8 +15,9 @@ This file provides context and guidance for AI assistants working on this projec
 - Never include AI mentions in commits
 
 ### 3. Terminology
-- Don't mention "datasource" (single word) in code or documentation
-- Use "data source" (two words) or "source system" instead
+- Use "connection" (not "data source" or "datasource") for external data connections in UI text
+- Internal code can use `datasource` for backwards compatibility with existing database records
+- API endpoints: `/api/connections` is preferred, `/api/datasources` kept as deprecated alias
 
 ### 4. Full-Stack Awareness
 - **Always consider frontend impact**: When making backend changes (API endpoints, models, response formats), identify and implement the corresponding frontend changes (API client, components, forms, types).
@@ -26,6 +27,13 @@ This file provides context and guidance for AI assistants working on this projec
   - Display components that show the entity
   - Any TypeScript types or PropTypes if used
 - Don't leave the frontend out of sync with backend changes.
+
+### 5. Testing Reminder
+- **Triggers**: Session start, server restart, or daylog write
+- **Action**: Immediately remind the user to test:
+  - "Don't forget to test! Test plan: [docs/TEST_PLAN.md](docs/TEST_PLAN.md)"
+- For session start: Show reminder as first response
+- For daylog write: Show reminder immediately after confirming daylog was written
 
 ---
 
@@ -216,7 +224,7 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  Design Mode          │  View Mode            │  Manage Mode                │
 │  - Layouts            │  - Dashboard Viewer   │  - Settings (Future)        │
-│  - Data Sources       │  - Real-time Data     │  - User Config (Future)     │
+│  - Connections        │  - Real-time Data     │  - User Config (Future)     │
 │  - Charts/Components  │  - Auto-refresh       │                             │
 │  - Dashboards         │  - Fullscreen         │                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -227,13 +235,13 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
 │                      GO BACKEND (Port 3001)                                  │
 │                    Gin + MongoDB + Redis + Swagger                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  /api/layouts    │  /api/datasources  │  /api/components  │  /api/dashboards│
+│  /api/layouts    │  /api/connections  │  /api/components  │  /api/dashboards│
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                     ┌───────────────┼───────────────┐
                     ▼               ▼               ▼
               ┌──────────┐   ┌──────────┐   ┌───────────────┐
-              │ MongoDB  │   │  Redis   │   │ Data Sources  │
+              │ MongoDB  │   │  Redis   │   │  Connections  │
               │   7.x    │   │   7.x    │   │ SQL/API/CSV/WS│
               └──────────┘   └──────────┘   └───────────────┘
 ```
@@ -264,8 +272,8 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
 ### Design Mode (`/design/*`)
 Create and configure dashboard components:
 - **Layouts** (`/design/layouts`) - Define 12-column grid layouts with panels
-- **Data Sources** (`/design/datasources`) - Configure SQL, API, CSV, WebSocket connections
-- **Charts** (`/design/charts`) - Build React components with ECharts
+- **Connections** (`/design/connections`) - Configure SQL, API, CSV, WebSocket connections
+- **Charts** (`/design/charts`) - Build React components with ECharts (includes Controls)
 - **Dashboards** (`/design/dashboards`) - Combine layouts with components
 
 ### View Mode (`/view/*`)
@@ -329,14 +337,16 @@ dashboard/
 | GET | `/api/layouts/:id` | Get layout |
 | PUT | `/api/layouts/:id` | Update layout |
 | DELETE | `/api/layouts/:id` | Delete layout |
-| **Data Sources** |||
-| GET | `/api/datasources` | List data sources |
-| POST | `/api/datasources` | Create data source |
-| GET | `/api/datasources/:id` | Get data source |
-| PUT | `/api/datasources/:id` | Update data source |
-| DELETE | `/api/datasources/:id` | Delete data source |
-| POST | `/api/datasources/test` | Test connection |
-| POST | `/api/datasources/:id/query` | Execute query |
+| **Connections** |||
+| GET | `/api/connections` | List connections |
+| POST | `/api/connections` | Create connection |
+| GET | `/api/connections/:id` | Get connection |
+| PUT | `/api/connections/:id` | Update connection |
+| DELETE | `/api/connections/:id` | Delete connection |
+| POST | `/api/connections/test` | Test connection |
+| POST | `/api/connections/:id/query` | Execute query |
+| **Controls** |||
+| POST | `/api/controls/:id/execute` | Execute control command |
 | **Components** |||
 | GET | `/api/components` | List components |
 | GET | `/api/components/systems` | Get system hierarchy |
@@ -455,26 +465,28 @@ const Component = () => {
 └───────────────────────────────┴────────────────────────────────┘
 ```
 
-## Current Status (2025-12-06)
+## Current Status (2026-02-13)
 
 ### ✅ Completed
-- Go backend with MongoDB (layouts, data sources, components, dashboards, charts)
+- Go backend with MongoDB (layouts, connections, components, dashboards, charts)
 - React frontend with three modes (Design, View, Manage placeholder)
-- Design Mode: All CRUD pages for layouts, data sources, charts, dashboards
+- Design Mode: All CRUD pages for layouts, connections, charts, dashboards
 - View Mode: Dashboard viewer with real-time refresh, sidebar tiles, reduce-to-fit mode
 - Carbon Design System theming throughout (g100 dark theme)
 - Auto-redirect to first dashboard on app load
 - **Chart Editor**: Full chart builder with live preview, data mapping, filters, aggregation
-- **Socket Data Sources**: WebSocket connections with parser config (data_path extraction, JSON/regex parsing)
+- **Control Components**: Button, toggle, slider, text input controls that send commands to bidirectional connections
+- **Socket Connections**: WebSocket connections with parser config (data_path extraction, JSON/regex parsing)
 - **Axis Labels**: Configurable X/Y axis labels for charts (e.g., "Temperature (°F)")
 - **Timestamp Formatting**: Utility functions for consistent date/time display in charts
 - **Chart Versioning**: Version tracking with increment on save, status (draft/final)
 - **AI Builder (Phases 1-7)**: Full-page AI chat with SSE streaming, MCP tools, session management
 - **AI Session API**: Start, message, save, cancel endpoints with `/api/ai/session`
 - **Custom AI Icon**: Replaced WatsonxAi with custom sparkle icon component
-- **SQL Data Source Refactor**: Removed connection_string field; connection strings now built from individual fields (host, port, database, username, password, ssl, options)
-- **Prometheus Data Source**: Full Prometheus integration with schema discovery, visual PromQL builder, and AI tool support
-- **EdgeLake Data Source**: Full EdgeLake integration with distributed query support, cascading schema discovery (database → table → columns), visual query builder, and AI tool support
+- **SQL Connection Refactor**: Removed connection_string field; connection strings now built from individual fields (host, port, database, username, password, ssl, options)
+- **Prometheus Connection**: Full Prometheus integration with schema discovery, visual PromQL builder, and AI tool support
+- **EdgeLake Connection**: Full EdgeLake integration with distributed query support, cascading schema discovery (database → table → columns), visual query builder, and AI tool support
+- **Terminology Rename**: "Data Sources" renamed to "Connections" throughout UI and API (`/api/connections`)
 
 ### 🚧 In Progress
 - AI Builder Phase 8: Polish & Testing
@@ -482,11 +494,12 @@ const Component = () => {
 - Performance optimization
 
 ### 📋 Planned
+- **Fix Component Tile View Thumbnails**: The component list page tile view shows placeholder icons instead of actual component preview images. Need to generate/capture chart thumbnails when saving components.
 - **Fix AI Chart Builder 429 Rate Limit Error**: Hitting Anthropic's 30k input tokens/minute limit after just a few messages. Options: implement retry-with-backoff on 429 errors, trim conversation history to last N messages, or summarize older context to reduce token usage.
 - **Tabbed Panel Layout**: Allow panels to contain multiple charts with tabs to switch between
-- **Data Source Testing in Editor**: Add connection test capability to data source editor UI (backend API already exists at `/api/datasources/test`)
+- **Connection Testing in Editor**: Add connection test capability to connection editor UI (backend API already exists at `/api/connections/test`)
 - **Dashboard Design Preset Sizes**: Implement solution for layout dimensions/aspect ratios for fullscreen viewing
-- **Fix `include_datasources` Aggregation**: The `ListWithDatasources` MongoDB aggregation in `dashboard_repository.go` has a bug where `panel_count` returns 0. Currently worked around by fetching dashboards, charts, and datasources separately client-side. Fix the aggregation to reduce API calls as dashboard count grows.
+- **Fix `include_connections` Aggregation**: The `ListWithDatasources` MongoDB aggregation in `dashboard_repository.go` has a bug where `panel_count` returns 0. Currently worked around by fetching dashboards, charts, and connections separately client-side. Fix the aggregation to reduce API calls as dashboard count grows.
 - Manage Mode implementation
 - User authentication
 - ModeContext for shared state (replace localStorage-based mode switching)

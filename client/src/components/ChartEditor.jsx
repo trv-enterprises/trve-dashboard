@@ -28,6 +28,7 @@ import { API_BASE } from '../api/client';
 import SQLQueryBuilder from './SQLQueryBuilder';
 import PrometheusQueryBuilder from './PrometheusQueryBuilder';
 import EdgeLakeQueryBuilder from './EdgeLakeQueryBuilder';
+import ControlEditor from './ControlEditor';
 import { transformData, formatCellValue } from '../utils/dataTransforms';
 import apiClient from '../api/client';
 import './ChartEditor.scss';
@@ -205,7 +206,11 @@ const ChartEditor = forwardRef(function ChartEditor({
   const [nameError, setNameError] = useState('');
   const [title, setTitle] = useState(''); // Display title (defaults to name)
   const [description, setDescription] = useState('');
+  const [componentType, setComponentType] = useState('chart'); // 'chart' or 'control'
   const [chartType, setChartType] = useState('bar');
+
+  // Control configuration (when componentType === 'control')
+  const [controlConfig, setControlConfig] = useState(null);
 
   // Data source configuration
   const [datasources, setDatasources] = useState([]);
@@ -231,6 +236,7 @@ const ChartEditor = forwardRef(function ChartEditor({
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
   const [limitRows, setLimitRows] = useState(0);
+  const [columnAliases, setColumnAliases] = useState({}); // For dataview: column name -> display name
 
   // Sliding window for time-series data
   const [slidingWindowEnabled, setSlidingWindowEnabled] = useState(false);
@@ -380,8 +386,10 @@ const ChartEditor = forwardRef(function ChartEditor({
       setName(chart.name || '');
       setTitle(chart.title || '');
       setDescription(chart.description || '');
+      setComponentType(chart.component_type || 'chart');
       setChartType(chart.chart_type || 'bar');
-      setSelectedDatasourceId(chart.datasource_id || '');
+      setControlConfig(chart.control_config || null);
+      setSelectedDatasourceId(chart.connection_id || chart.datasource_id || '');
       setQueryRaw(chart.query_config?.raw || '');
       setQueryType(chart.query_config?.type || 'sql');
       setXAxisColumn(chart.data_mapping?.x_axis || '');
@@ -396,6 +404,7 @@ const ChartEditor = forwardRef(function ChartEditor({
       setSortBy(chart.data_mapping?.sort_by || '');
       setSortOrder(chart.data_mapping?.sort_order || 'desc');
       setLimitRows(chart.data_mapping?.limit || 0);
+      setColumnAliases(chart.data_mapping?.column_aliases || {});
       // Sliding window initialization
       const sw = chart.data_mapping?.sliding_window;
       setSlidingWindowEnabled(sw?.duration > 0 && !!sw?.timestamp_col);
@@ -593,19 +602,19 @@ const ChartEditor = forwardRef(function ChartEditor({
 
   const fetchDatasources = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/datasources?page=1&page_size=100`);
+      const response = await fetch(`${API_BASE}/api/connections?page=1&page_size=100`);
       const data = await response.json();
-      if (data.datasources) {
-        setDatasources(data.datasources);
+      if (data.datasources || data.connections) {
+        setDatasources(data.datasources || data.connections);
       }
     } catch (err) {
-      console.error('Failed to fetch datasources:', err);
+      console.error('Failed to fetch connections:', err);
     }
   };
 
   const fetchPreviewData = async () => {
     if (!selectedDatasourceId) {
-      setPreviewError('Please select a data source');
+      setPreviewError('Please select a connection');
       return;
     }
 
@@ -640,7 +649,7 @@ const ChartEditor = forwardRef(function ChartEditor({
         queryParams = { database: edgelakeDatabase };
       }
 
-      const response = await fetch(`${API_BASE}/api/datasources/${selectedDatasourceId}/query`, {
+      const response = await fetch(`${API_BASE}/api/connections/${selectedDatasourceId}/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -716,8 +725,8 @@ const ChartEditor = forwardRef(function ChartEditor({
       chartName: name || ''
     };
 
-    return getDataDrivenChartCode(chartType, selectedDatasourceId, rawQuery, queryType, xAxisColumn, yAxisColumns, transforms, chartOptions, queryParams, seriesColumn);
-  }, [chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, xAxisLabel, xAxisFormat, yAxisColumns, yAxisLabel, filters, aggregation, sortBy, sortOrder, limitRows, showCustomCode, componentCode, name, chartOptions, selectedDatasource, tsstoreLimit, tsstoreQueryType, tsstoreSinceDuration, seriesColumn, edgelakeDatabase]);
+    return getDataDrivenChartCode(chartType, selectedDatasourceId, rawQuery, queryType, xAxisColumn, yAxisColumns, transforms, chartOptions, queryParams, seriesColumn, columnAliases);
+  }, [chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, xAxisLabel, xAxisFormat, yAxisColumns, yAxisLabel, filters, aggregation, sortBy, sortOrder, limitRows, showCustomCode, componentCode, name, chartOptions, selectedDatasource, tsstoreLimit, tsstoreQueryType, tsstoreSinceDuration, seriesColumn, edgelakeDatabase, columnAliases]);
 
   const filteredPreviewData = useMemo(() => {
     if (!previewData) return null;
@@ -815,8 +824,10 @@ const ChartEditor = forwardRef(function ChartEditor({
       name: name.trim(),
       title: title.trim() || name.trim(), // Default to name if no title provided
       description: description.trim(),
-      chart_type: chartType,
-      datasource_id: selectedDatasourceId || '',
+      component_type: componentType,
+      chart_type: componentType === 'chart' ? chartType : '',
+      control_config: componentType === 'control' ? controlConfig : null,
+      datasource_id: componentType === 'control' ? (controlConfig?.connection_id || '') : (selectedDatasourceId || ''),
       query_config: selectedDatasourceId ? {
         raw: selectedDatasource?.type === 'tsstore'
           ? (tsstoreQueryType === 'since' ? `since:${tsstoreSinceDuration}` : tsstoreQueryType)
@@ -866,7 +877,8 @@ const ChartEditor = forwardRef(function ChartEditor({
         })(),
         sort_by: sortBy || '',
         sort_order: sortOrder || 'desc',
-        limit: limitRows || 0
+        limit: limitRows || 0,
+        column_aliases: Object.keys(columnAliases).length > 0 ? columnAliases : null
       } : null,
       component_code: showCustomCode ? componentCode : generatedCode,
       use_custom_code: showCustomCode,
@@ -913,7 +925,7 @@ const ChartEditor = forwardRef(function ChartEditor({
   return (
     <div className={`chart-editor ${className}`}>
       {/* Custom code warning */}
-      {showCustomCode && (
+      {showCustomCode && componentType === 'chart' && (
         <InlineNotification
           kind="warning"
           title="Custom Code Mode"
@@ -924,36 +936,60 @@ const ChartEditor = forwardRef(function ChartEditor({
         />
       )}
 
-      {/* Chart basic info */}
+      {/* Component type selector - Chart vs Control */}
+      <div className="component-type-section">
+        <ContentSwitcher
+          selectedIndex={componentType === 'chart' ? 0 : 1}
+          onChange={({ index }) => {
+            const newType = index === 0 ? 'chart' : 'control';
+            setComponentType(newType);
+            if (newType === 'control' && !controlConfig) {
+              setControlConfig({
+                control_type: 'button',
+                command_config: { action: '', target: '', payload_template: {} },
+                ui_config: { label: 'Execute', kind: 'primary' }
+              });
+            }
+          }}
+          className="component-type-switcher"
+        >
+          <Switch name="chart" text="Chart" />
+          <Switch name="control" text="Control" />
+        </ContentSwitcher>
+      </div>
+
+      {/* Chart/Control basic info */}
       <div className="chart-metadata-section">
         <div className="metadata-row">
           <TextInput
             id="chart-name"
-            labelText="Chart Name"
+            labelText={componentType === 'control' ? 'Control Name' : 'Chart Name'}
             value={name}
             onChange={(e) => {
               setName(e.target.value);
               if (nameError) setNameError('');
             }}
             onBlur={(e) => checkDuplicateChartName(e.target.value)}
-            placeholder="Enter chart name"
+            placeholder={componentType === 'control' ? 'Enter control name' : 'Enter chart name'}
             size="md"
             invalid={!!nameError}
             invalidText={nameError}
           />
-          <Select
-            id="chart-type"
-            labelText="Chart Type"
-            value={chartType}
-            onChange={(e) => {
-              handleChartTypeChange(e.target.value);
-              setShowCustomCode(e.target.value === 'custom');
-            }}
-          >
-            {CHART_TYPES.map(type => (
-              <SelectItem key={type.id} value={type.id} text={type.label} />
-            ))}
-          </Select>
+          {componentType === 'chart' && (
+            <Select
+              id="chart-type"
+              labelText="Chart Type"
+              value={chartType}
+              onChange={(e) => {
+                handleChartTypeChange(e.target.value);
+                setShowCustomCode(e.target.value === 'custom');
+              }}
+            >
+              {CHART_TYPES.map(type => (
+                <SelectItem key={type.id} value={type.id} text={type.label} />
+              ))}
+            </Select>
+          )}
         </div>
         <div className="metadata-row">
           <TextInput
@@ -961,46 +997,59 @@ const ChartEditor = forwardRef(function ChartEditor({
             labelText="Display Title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={name || 'Defaults to chart name'}
+            placeholder={name || (componentType === 'control' ? 'Defaults to control name' : 'Defaults to chart name')}
             size="md"
-            helperText="Title shown on dashboards (defaults to chart name)"
+            helperText={componentType === 'control' ? 'Title shown on dashboards (defaults to control name)' : 'Title shown on dashboards (defaults to chart name)'}
           />
           <TextInput
             id="chart-description"
             labelText="Description (optional)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Enter chart description"
+            placeholder={componentType === 'control' ? 'Enter control description' : 'Enter chart description'}
             size="md"
           />
         </div>
       </div>
 
-      <div className="chart-editor-switcher-wrapper">
-        <ContentSwitcher
-          selectedIndex={activeTab}
-          onChange={({ index }) => setActiveTab(index)}
-          className="chart-editor-switcher"
-        >
-          <Switch name="datasource" text="Data Source" />
-          <Switch name="preview" text="Preview" />
-          <Switch name="code" text="Code" />
-        </ContentSwitcher>
-      </div>
+      {/* Control Editor - shown when componentType is 'control' */}
+      {componentType === 'control' && (
+        <ControlEditor
+          controlConfig={controlConfig}
+          connectionId={controlConfig?.connection_id || ''}
+          onControlConfigChange={(newConfig) => setControlConfig(newConfig)}
+          onConnectionIdChange={(connId) => setControlConfig(prev => ({ ...prev, connection_id: connId }))}
+        />
+      )}
 
-      <div className="tab-panels">
-        {/* Data Source Tab */}
+      {/* Chart Configuration - shown when componentType is 'chart' */}
+      {componentType === 'chart' && (
+        <>
+          <div className="chart-editor-switcher-wrapper">
+            <ContentSwitcher
+              selectedIndex={activeTab}
+              onChange={({ index }) => setActiveTab(index)}
+              className="chart-editor-switcher"
+            >
+              <Switch name="datasource" text="Connection" />
+              <Switch name="preview" text="Preview" />
+              <Switch name="code" text="Code" />
+            </ContentSwitcher>
+          </div>
+
+          <div className="tab-panels">
+        {/* Connection Tab */}
         {activeTab === 0 && (
           <div className="tab-content">
             <Grid narrow>
               <Column lg={6} md={4} sm={4}>
                 <Select
                   id="datasource-select"
-                  labelText="Data Source"
+                  labelText="Connection"
                   value={selectedDatasourceId}
                   onChange={(e) => handleDatasourceChange(e.target.value)}
                 >
-                  <SelectItem value="" text="Select a data source..." />
+                  <SelectItem value="" text="Select a connection..." />
                   {datasources.map(ds => (
                     <SelectItem
                       key={ds.id}
@@ -1249,9 +1298,43 @@ const ChartEditor = forwardRef(function ChartEditor({
 
                 <div className="mapping-section">
                   <h4>Data Mapping</h4>
-                  {/* Show message for dataview type */}
+                  {/* Show column aliases UI for dataview type */}
                   {chartType === 'dataview' && (
-                    <p className="mapping-hint">Data tables display all columns from your query. Use filters below to refine the data.</p>
+                    <div className="dataview-config">
+                      <p className="mapping-hint">Data tables display all columns from your query. Use filters below to refine the data.</p>
+                      {availableColumns.length > 0 && (
+                        <div className="column-aliases-section">
+                          <h5>Column Display Names</h5>
+                          <p className="aliases-hint">Set custom display names for columns in the table header.</p>
+                          <div className="aliases-grid">
+                            {availableColumns.map(col => (
+                              <div key={col} className="alias-row">
+                                <span className="column-name" title={col}>{col}</span>
+                                <TextInput
+                                  id={`alias-${col}`}
+                                  labelText=""
+                                  placeholder={col}
+                                  value={columnAliases[col] || ''}
+                                  onChange={(e) => {
+                                    const newValue = e.target.value;
+                                    setColumnAliases(prev => {
+                                      const updated = { ...prev };
+                                      if (newValue) {
+                                        updated[col] = newValue;
+                                      } else {
+                                        delete updated[col];
+                                      }
+                                      return updated;
+                                    });
+                                  }}
+                                  size="sm"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
                   {/* Show mapping fields for applicable chart types */}
                   {(chartTypeConfig.hasXAxis || chartTypeConfig.hasYAxis) && (
@@ -2104,7 +2187,7 @@ const ChartEditor = forwardRef(function ChartEditor({
 
             {!selectedDatasource && (
               <div className="no-datasource-message">
-                <p>Select a data source to configure data-driven charts, or switch to the Code tab for a static chart.</p>
+                <p>Select a connection to configure data-driven charts, or switch to the Code tab for a static chart.</p>
               </div>
             )}
           </div>
@@ -2129,7 +2212,7 @@ const ChartEditor = forwardRef(function ChartEditor({
               ) : (
                 <div className="preview-placeholder">
                   <ChartBar size={48} />
-                  <p>Configure data source and mapping to see chart preview</p>
+                  <p>Configure connection and mapping to see chart preview</p>
                 </div>
               )}
             </div>
@@ -2171,6 +2254,8 @@ const ChartEditor = forwardRef(function ChartEditor({
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* Action buttons (optional, for standalone page use) */}
       {showActions && (
@@ -2358,7 +2443,7 @@ function getStaticChartCode(chartType) {
   return templates[chartType] || templates.bar;
 }
 
-function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xAxisCol, yAxisCols, transforms = {}, chartOptions = {}, queryParams = {}, seriesCol = '') {
+function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xAxisCol, yAxisCols, transforms = {}, chartOptions = {}, queryParams = {}, seriesCol = '', columnAliases = {}) {
   const yAxisStr = yAxisCols.length > 0 ? yAxisCols.map(c => `'${c}'`).join(', ') : "'value'";
   const { filters = [], aggregation = null, sortBy = '', sortOrder = 'desc', limit = 0, xAxisFormat = 'chart', xAxisLabel = '', yAxisLabel = '', chartName = '' } = transforms;
 
@@ -2473,6 +2558,109 @@ ${xAxisFormatCode}
   };
 
   return <ReactECharts option={option} style={{ height: '100%', width: '100%' }} theme="carbon-dark" />;
+};`;
+  }
+
+  if (chartType === 'dataview') {
+    // Generate DataTable component with column aliases support
+    const aliasesJson = JSON.stringify(columnAliases);
+    return `const Component = () => {
+  const { data, loading, error } = useData({
+    datasourceId: '${datasourceId}',
+    query: {
+      raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
+      type: '${queryType}',
+      params: ${JSON.stringify(queryParams)}
+    },
+    refreshInterval: 30000
+  });
+
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>;
+  if (error) return <div style={{ color: '#da1e28', padding: '1rem' }}>Error: {error.message}</div>;
+  if (!data?.rows?.length) return <div style={{ color: '#6f6f6f', padding: '1rem' }}>No data</div>;
+${transformsConfig}
+
+  // Column aliases for display names
+  const columnAliases = ${aliasesJson};
+  const getDisplayName = (col) => columnAliases[col] || col;
+
+  // Format cell value for display
+  const formatValue = (val, colName) => {
+    if (val === null || val === undefined) return '—';
+    if (colName === 'timestamp' || colName.includes('time') || colName.includes('Time')) {
+      return new Date(val).toLocaleString();
+    }
+    if (typeof val === 'number') {
+      return val.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    }
+    if (typeof val === 'object') {
+      return JSON.stringify(val);
+    }
+    return String(val);
+  };
+
+  const columns = ${hasTransforms ? 'transformed' : 'data'}.columns;
+
+  return (
+    <div style={{
+      height: '100%',
+      width: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      backgroundColor: 'transparent',
+      color: '#f4f4f4',
+      overflow: 'hidden'
+    }}>
+      ${transforms.chartName ? `<div style={{
+        textAlign: 'center',
+        fontSize: '1rem',
+        fontWeight: '600',
+        padding: '0.75rem',
+        color: '#f4f4f4'
+      }}>
+        ${transforms.chartName.replace(/'/g, "\\'")}
+      </div>` : ''}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        <table style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontSize: '0.875rem'
+        }}>
+          <thead>
+            <tr style={{ backgroundColor: '#262626' }}>
+              {columns.map((col, i) => (
+                <th key={i} style={{
+                  padding: '0.5rem 0.75rem',
+                  textAlign: 'left',
+                  borderBottom: '1px solid #525252',
+                  color: '#c6c6c6',
+                  fontWeight: '600',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {getDisplayName(col)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, rowIdx) => (
+              <tr key={rowIdx} style={{ backgroundColor: rowIdx % 2 === 0 ? '#161616' : '#1c1c1c' }}>
+                {row.map((cell, cellIdx) => (
+                  <td key={cellIdx} style={{
+                    padding: '0.5rem 0.75rem',
+                    borderBottom: '1px solid #393939',
+                    color: '#f4f4f4'
+                  }}>
+                    {formatValue(cell, columns[cellIdx])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 };`;
   }
 

@@ -50,6 +50,30 @@
     color: #f4f4f4;
   }
 
+  // Component type selector (Chart vs Control)
+  .component-type-section {
+    margin-bottom: spacing.$spacing-05;
+    max-width: 300px;
+
+    .component-type-switcher {
+      background-color: var(--cds-layer-01);
+
+      button {
+        background-color: var(--cds-layer-01);
+        color: var(--cds-text-secondary);
+
+        &[aria-selected="true"] {
+          background-color: var(--cds-interactive);
+          color: var(--cds-text-on-color);
+        }
+
+        &:hover:not([aria-selected="true"]) {
+          background-color: var(--cds-layer-hover-01);
+        }
+      }
+    }
+  }
+
   // Chart metadata section (name, type, description)
   .chart-metadata-section {
     margin-bottom: spacing.$spacing-05;
@@ -265,6 +289,65 @@
       color: var(--cds-text-secondary);
       font-size: 0.875rem;
       margin: 0;
+    }
+
+    // Dataview config section
+    .dataview-config {
+      .column-aliases-section {
+        margin-top: spacing.$spacing-05;
+        padding-top: spacing.$spacing-04;
+        border-top: 1px solid var(--cds-border-subtle-01);
+
+        h5 {
+          color: var(--cds-text-primary);
+          font-size: 0.875rem;
+          font-weight: 600;
+          margin: 0 0 spacing.$spacing-02 0;
+        }
+
+        .aliases-hint {
+          color: var(--cds-text-secondary);
+          font-size: 0.75rem;
+          margin: 0 0 spacing.$spacing-04 0;
+        }
+
+        .aliases-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: spacing.$spacing-03;
+          max-height: 300px;
+          overflow-y: auto;
+
+          .alias-row {
+            display: flex;
+            align-items: center;
+            gap: spacing.$spacing-03;
+            background-color: var(--cds-layer-02);
+            padding: spacing.$spacing-03;
+            border-radius: 4px;
+
+            .column-name {
+              flex: 0 0 auto;
+              min-width: 100px;
+              max-width: 150px;
+              font-size: 0.75rem;
+              font-family: 'IBM Plex Mono', monospace;
+              color: var(--cds-text-secondary);
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+
+            .cds--text-input-wrapper {
+              flex: 1;
+            }
+
+            .cds--text-input {
+              background-color: var(--cds-layer-01);
+            }
+          }
+        }
+      }
     }
 
     // Grid should use full width - remove Carbon Grid padding

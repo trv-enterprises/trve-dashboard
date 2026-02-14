@@ -33,7 +33,8 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
-	_ "github.com/tviviano/dashboard/docs" // Swagger docs
+	_ "github.com/tviviano/dashboard/docs"       // Swagger docs
+	_ "github.com/tviviano/dashboard/internal/datasource" // Register adapters via init()
 )
 
 // @title GiVi-Solution Dashboard API
@@ -193,6 +194,8 @@ func main() {
 	configHandler := handlers.NewConfigHandler(configService)
 	authHandler := handlers.NewAuthHandler(userService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
+	commandHandler := handlers.NewCommandHandler(datasourceService, chartService)
+	registryHandler := handlers.NewRegistryHandler()
 
 	// Initialize auth middleware
 	authMiddleware := middleware.NewAuthMiddleware(userService)
@@ -225,7 +228,31 @@ func main() {
 			users.DELETE("/:id", authHandler.DeleteUser)
 		}
 
-		// Datasource routes
+		// Connection routes (new terminology - preferred)
+		connections := api.Group("/connections")
+		{
+			connections.POST("", datasourceHandler.CreateDatasource)
+			connections.GET("", datasourceHandler.ListDatasources)
+			connections.GET("/streams", streamHandler.ListActiveStreams) // Before /:id to avoid conflict
+			connections.GET("/:id", datasourceHandler.GetDatasource)
+			connections.PUT("/:id", datasourceHandler.UpdateDatasource)
+			connections.DELETE("/:id", datasourceHandler.DeleteDatasource)
+			connections.POST("/test", datasourceHandler.TestDatasource)
+			connections.POST("/:id/health", datasourceHandler.CheckDatasourceHealth)
+			connections.POST("/:id/query", datasourceHandler.QueryDatasource)
+			connections.GET("/:id/schema", datasourceHandler.GetDatasourceSchema)
+			connections.GET("/:id/prometheus/labels/:label/values", datasourceHandler.GetPrometheusLabelValues) // Prometheus label values
+			connections.GET("/:id/edgelake/databases", datasourceHandler.GetEdgeLakeDatabases)                     // EdgeLake databases
+			connections.GET("/:id/edgelake/tables", datasourceHandler.GetEdgeLakeTables)                           // EdgeLake tables
+			connections.GET("/:id/edgelake/schema", datasourceHandler.GetEdgeLakeSchema)                           // EdgeLake table schema
+			connections.GET("/:id/stream", streamHandler.StreamDatasource)                                      // SSE streaming
+			connections.GET("/:id/stream/status", streamHandler.GetStreamStatus)                 // Stream status
+			connections.POST("/:id/stream/aggregated", streamHandler.StreamAggregatedDatasource) // SSE aggregated streaming
+			connections.GET("/aggregators", streamHandler.GetAggregatorStats)                    // Aggregator stats
+			connections.POST("/:id/command", commandHandler.ExecuteCommand)                     // Bidirectional command execution
+		}
+
+		// Datasource routes (deprecated alias - kept for backwards compatibility)
 		datasources := api.Group("/datasources")
 		{
 			datasources.POST("", datasourceHandler.CreateDatasource)
@@ -246,6 +273,15 @@ func main() {
 			datasources.GET("/:id/stream/status", streamHandler.GetStreamStatus)                 // Stream status
 			datasources.POST("/:id/stream/aggregated", streamHandler.StreamAggregatedDatasource) // SSE aggregated streaming
 			datasources.GET("/aggregators", streamHandler.GetAggregatorStats)                    // Aggregator stats
+			datasources.POST("/:id/command", commandHandler.ExecuteCommand)                     // Bidirectional command execution
+		}
+
+		// Registry routes - list available connection types
+		registry := api.Group("/registry")
+		{
+			registry.GET("/connections", registryHandler.ListConnectionTypes)
+			registry.GET("/connections/:typeId", registryHandler.GetConnectionType)
+			registry.GET("/categories", registryHandler.ListCategories)
 		}
 
 		// Chart routes
@@ -264,6 +300,12 @@ func main() {
 			charts.GET("/:id/version-info", chartHandler.GetChartVersionInfo)
 			charts.GET("/:id/draft", chartHandler.GetChartDraft)
 			charts.DELETE("/:id/draft", chartHandler.DeleteChartDraft)
+		}
+
+		// Control routes (controls are stored as charts with component_type="control")
+		controls := api.Group("/controls")
+		{
+			controls.POST("/:id/execute", commandHandler.ExecuteControlCommand)
 		}
 
 		// Dashboard routes

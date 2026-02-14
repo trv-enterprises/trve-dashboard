@@ -1,0 +1,149 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
+@use '@carbon/react/scss/spacing' as spacing;
+
+.control-editor {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-06;
+  max-width: 900px;
+
+  h4 {
+    color: var(--cds-text-primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0 0 spacing.$spacing-04 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  // Control Type Selection
+  .control-type-section {
+    .control-type-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: spacing.$spacing-04;
+    }
+
+    .control-type-option {
+      padding: spacing.$spacing-04;
+      background-color: var(--cds-layer-01);
+      border: 2px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover {
+        background-color: var(--cds-layer-hover-01);
+        border-color: var(--cds-border-subtle-01);
+      }
+
+      &.selected {
+        background-color: rgba(15, 98, 254, 0.1);
+        border-color: var(--cds-interactive);
+      }
+
+      .type-label {
+        color: var(--cds-text-primary);
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-bottom: spacing.$spacing-02;
+      }
+
+      .type-description {
+        color: var(--cds-text-secondary);
+        font-size: 0.75rem;
+        line-height: 1.4;
+      }
+    }
+  }
+
+  // Connection Section
+  .connection-section {
+    .connection-info {
+      display: flex;
+      flex-direction: column;
+      gap: spacing.$spacing-02;
+      padding-top: 1.5rem; // Align with select label
+
+      .connection-description {
+        color: var(--cds-text-secondary);
+        font-size: 0.75rem;
+      }
+    }
+
+    .cds--inline-notification {
+      margin-top: spacing.$spacing-04;
+      max-width: none;
+    }
+  }
+
+  // Command Section
+  .command-section {
+    padding: spacing.$spacing-05;
+    background-color: rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--cds-border-subtle-01);
+    border-radius: 4px;
+
+    .cds--text-area {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8125rem;
+      background-color: var(--cds-field-01);
+    }
+  }
+
+  // UI Config Section
+  .ui-config-section {
+    padding: spacing.$spacing-05;
+    background-color: rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--cds-border-subtle-01);
+    border-radius: 4px;
+  }
+
+  // Preview Section
+  .preview-section {
+    .control-preview {
+      padding: spacing.$spacing-06;
+      background-color: var(--cds-layer-01);
+      border: 1px solid var(--cds-border-subtle-01);
+      border-radius: 4px;
+      min-height: 150px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      .preview-placeholder {
+        color: var(--cds-text-helper);
+        font-size: 0.875rem;
+        text-align: center;
+      }
+    }
+  }
+
+  // Form field styling overrides
+  .cds--label {
+    color: var(--cds-text-secondary);
+  }
+
+  .cds--text-input,
+  .cds--text-area,
+  .cds--select-input {
+    background-color: var(--cds-field-01);
+  }
+
+  .cds--form__helper-text {
+    color: var(--cds-text-helper);
+  }
+
+  // Number input styling
+  .cds--number-input input[type="number"] {
+    background-color: var(--cds-field-01);
+  }
+
+  .cds--number__controls button,
+  .cds--number-input__controls button {
+    background-color: var(--cds-layer-accent-01);
+  }
+}

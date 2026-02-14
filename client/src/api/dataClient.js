@@ -18,8 +18,8 @@ import apiClient from './client';
  */
 export async function queryData(datasourceId, query, useCache = true) {
   try {
-    // Use the existing datasource query endpoint
-    const response = await apiClient.request(`/api/datasources/${datasourceId}/query`, {
+    // Use the existing connection query endpoint
+    const response = await apiClient.request(`/api/connections/${datasourceId}/query`, {
       method: 'POST',
       body: JSON.stringify({ query: query })
     });

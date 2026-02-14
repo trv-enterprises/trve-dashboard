@@ -22,16 +22,16 @@ import './DesignModeNav.scss';
 function DesignModeNav({ location, navigate }) {
   const designNavItems = [
     {
-      path: '/design/datasources',
+      path: '/design/connections',
       icon: DataBase,
-      label: 'Data Sources',
+      label: 'Connections',
       description: 'Configure data connections'
     },
     {
       path: '/design/charts',
       icon: ChartLineSmooth,
-      label: 'Charts',
-      description: 'Create and edit chart components'
+      label: 'Components',
+      description: 'Create and edit charts and controls'
     },
     {
       path: '/design/dashboards',

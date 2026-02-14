@@ -196,7 +196,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
 
       // Use fetch with streaming for POST endpoint
       abortController = new AbortController();
-      const url = `${API_BASE}/api/datasources/${datasourceId}/stream/aggregated`;
+      const url = `${API_BASE}/api/connections/${datasourceId}/stream/aggregated`;
 
       try {
         // Build headers including user auth

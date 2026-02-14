@@ -28,21 +28,21 @@ import {
 } from '@carbon/react';
 import { TrashCan, DataBase, List, Grid, Edit, Information, Sql, Api, Document, NetworkEnterprise, ChartLineSmooth } from '@carbon/icons-react';
 import apiClient from '../api/client';
-import './DatasourcesPage.scss';
+import './ConnectionsPage.scss';
 
 /**
- * DatasourcesPage Component
+ * ConnectionsPage Component
  *
- * Displays list of all data sources with IBM Cloud-style design:
+ * Displays list of all connections with IBM Cloud-style design:
  * - Page header with title and description
  * - Search bar with filtering
  * - Sortable columns
  * - Click on row to edit, trash icon to delete
  */
-function DatasourcesPage() {
+function ConnectionsPage() {
   const navigate = useNavigate();
-  const [datasources, setDatasources] = useState([]);
-  const [chartCounts, setChartCounts] = useState({}); // Map of datasource_id -> chart count
+  const [connections, setConnections] = useState([]);
+  const [chartCounts, setChartCounts] = useState({}); // Map of connection_id -> chart count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,7 +50,7 @@ function DatasourcesPage() {
   const [sortDirection, setSortDirection] = useState('asc');
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'tile'
 
-  // Get icon for datasource type
+  // Get icon for connection type
   const getTypeIcon = (type) => {
     const icons = {
       'sql': Sql,
@@ -61,34 +61,37 @@ function DatasourcesPage() {
     return icons[type?.toLowerCase()] || DataBase;
   };
 
-  // Fetch data sources from API
+  // Fetch connections from API
   useEffect(() => {
-    fetchDatasources();
+    fetchConnections();
   }, []);
 
-  const fetchDatasources = async () => {
+  const fetchConnections = async () => {
     try {
       setLoading(true);
-      // Fetch data sources and charts in parallel
-      const [datasourcesData, chartsData] = await Promise.all([
-        apiClient.getDatasources(),
+      // Fetch connections and charts in parallel
+      const [connectionsData, chartsData] = await Promise.all([
+        apiClient.getConnections(),
         apiClient.getCharts()
       ]);
 
-      if (datasourcesData.datasources) {
-        setDatasources(datasourcesData.datasources);
-      } else if (datasourcesData.error) {
-        setError(datasourcesData.error);
+      // API returns 'datasources' key for backwards compatibility
+      if (connectionsData.datasources || connectionsData.connections) {
+        setConnections(connectionsData.datasources || connectionsData.connections);
+      } else if (connectionsData.error) {
+        setError(connectionsData.error);
       } else {
-        setDatasources([]);
+        setConnections([]);
       }
 
-      // Build chart count map by datasource_id
+      // Build chart count map by connection_id
       if (chartsData.charts) {
         const counts = {};
         chartsData.charts.forEach(chart => {
-          if (chart.datasource_id) {
-            counts[chart.datasource_id] = (counts[chart.datasource_id] || 0) + 1;
+          // API now returns connection_id instead of datasource_id
+          const connId = chart.connection_id || chart.datasource_id;
+          if (connId) {
+            counts[connId] = (counts[connId] || 0) + 1;
           }
         });
         setChartCounts(counts);
@@ -101,19 +104,19 @@ function DatasourcesPage() {
   };
 
   const handleCreate = () => {
-    navigate('/design/datasources/new');
+    navigate('/design/connections/new');
   };
 
-  const handleRowClick = (datasource) => {
-    navigate(`/design/datasources/${datasource.id}`);
+  const handleRowClick = (connection) => {
+    navigate(`/design/connections/${connection.id}`);
   };
 
-  const handleDelete = async (e, datasource) => {
+  const handleDelete = async (e, connection) => {
     e.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete "${datasource.name}"?`)) {
+    if (window.confirm(`Are you sure you want to delete "${connection.name}"?`)) {
       try {
-        await apiClient.deleteDatasource(datasource.id);
-        fetchDatasources();
+        await apiClient.deleteConnection(connection.id);
+        fetchConnections();
       } catch (err) {
         alert(`Error: ${err.message}`);
       }
@@ -146,17 +149,17 @@ function DatasourcesPage() {
     }
   };
 
-  // Filter and sort data sources
-  const filteredAndSortedDatasources = useMemo(() => {
-    let result = [...datasources];
+  // Filter and sort connections
+  const filteredAndSortedConnections = useMemo(() => {
+    let result = [...connections];
 
     // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(datasource =>
-        datasource.name?.toLowerCase().includes(term) ||
-        datasource.description?.toLowerCase().includes(term) ||
-        datasource.type?.toLowerCase().includes(term)
+      result = result.filter(connection =>
+        connection.name?.toLowerCase().includes(term) ||
+        connection.description?.toLowerCase().includes(term) ||
+        connection.type?.toLowerCase().includes(term)
       );
     }
 
@@ -188,7 +191,7 @@ function DatasourcesPage() {
     });
 
     return result;
-  }, [datasources, chartCounts, searchTerm, sortKey, sortDirection]);
+  }, [connections, chartCounts, searchTerm, sortKey, sortDirection]);
 
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
@@ -199,41 +202,41 @@ function DatasourcesPage() {
     { key: 'actions', header: '', isSortable: false }
   ];
 
-  const rows = filteredAndSortedDatasources.map((datasource) => ({
-    id: datasource.id,
-    name: datasource.name,
-    type: datasource.type,
-    charts: chartCounts[datasource.id] || 0,
-    description: datasource.description || '',
-    updated_at: formatDate(datasource.updated_at)
+  const rows = filteredAndSortedConnections.map((connection) => ({
+    id: connection.id,
+    name: connection.name,
+    type: connection.type,
+    charts: chartCounts[connection.id] || 0,
+    description: connection.description || '',
+    updated_at: formatDate(connection.updated_at)
   }));
 
-  const getDatasourceById = (id) => datasources.find(d => d.id === id);
+  const getConnectionById = (id) => connections.find(c => c.id === id);
 
   if (loading) {
     return (
-      <div className="datasources-page">
-        <Loading description="Loading data sources..." withOverlay={false} />
+      <div className="connections-page">
+        <Loading description="Loading connections..." withOverlay={false} />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="datasources-page">
+      <div className="connections-page">
         <div className="error-message">Error: {error}</div>
       </div>
     );
   }
 
   return (
-    <div className="datasources-page">
+    <div className="connections-page">
       {/* Page Header */}
       <div className="page-header">
-        <h1>Data Sources</h1>
+        <h1>Connections</h1>
         <p className="page-description">
           Configure connections to SQL databases, REST APIs, CSV files, and WebSocket streams.
-          Data sources provide the data that powers your chart visualizations.
+          Connections provide data for charts and receive commands from controls.
           {' '}<Link href="#" onClick={(e) => e.preventDefault()}>Learn more</Link>.
         </p>
       </div>
@@ -272,26 +275,26 @@ function DatasourcesPage() {
 
       {/* Tile View */}
       {viewMode === 'tile' && (
-        <div className="datasources-content">
-          {filteredAndSortedDatasources.length === 0 ? (
+        <div className="connections-content">
+          {filteredAndSortedConnections.length === 0 ? (
             <div className="empty-state">
               <DataBase size={64} />
-              <h3>No data sources available</h3>
+              <h3>No connections available</h3>
               <p>
-                Looks like you haven't added any data sources. Click{' '}
+                Looks like you haven't added any connections. Click{' '}
                 <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
                 {' '}to get started.
               </p>
             </div>
           ) : (
-            <div className="datasources-grid">
-              {filteredAndSortedDatasources.map((datasource) => {
-                const TypeIcon = getTypeIcon(datasource.type);
+            <div className="connections-grid">
+              {filteredAndSortedConnections.map((connection) => {
+                const TypeIcon = getTypeIcon(connection.type);
                 return (
                   <Tile
-                    key={datasource.id}
-                    className="datasource-tile"
-                    onClick={() => handleRowClick(datasource)}
+                    key={connection.id}
+                    className="connection-tile"
+                    onClick={() => handleRowClick(connection)}
                   >
                     {/* Icon Header */}
                     <div className="tile-icon-header">
@@ -301,9 +304,9 @@ function DatasourcesPage() {
                     {/* Content */}
                     <div className="tile-content">
                       <div className="tile-header">
-                        <h3>{datasource.name}</h3>
-                        {datasource.description && (
-                          <Tooltip label={datasource.description} align="bottom">
+                        <h3>{connection.name}</h3>
+                        {connection.description && (
+                          <Tooltip label={connection.description} align="bottom">
                             <button type="button" className="info-button" onClick={(e) => e.stopPropagation()}>
                               <Information size={16} />
                             </button>
@@ -312,20 +315,20 @@ function DatasourcesPage() {
                       </div>
 
                       <div className="tile-meta">
-                        <Tag type={getTypeColor(datasource.type)} size="sm">
-                          {datasource.type?.toUpperCase() || 'N/A'}
+                        <Tag type={getTypeColor(connection.type)} size="sm">
+                          {connection.type?.toUpperCase() || 'N/A'}
                         </Tag>
                       </div>
 
-                      {chartCounts[datasource.id] > 0 && (
+                      {chartCounts[connection.id] > 0 && (
                         <div className="tile-charts">
                           <ChartLineSmooth size={14} />
-                          <span>{chartCounts[datasource.id]} chart{chartCounts[datasource.id] !== 1 ? 's' : ''}</span>
+                          <span>{chartCounts[connection.id]} chart{chartCounts[connection.id] !== 1 ? 's' : ''}</span>
                         </div>
                       )}
 
                       <div className="tile-date">
-                        Updated: {formatDate(datasource.updated_at)}
+                        Updated: {formatDate(connection.updated_at)}
                       </div>
                     </div>
 
@@ -334,7 +337,7 @@ function DatasourcesPage() {
                       <IconButton
                         kind="ghost"
                         label="Edit"
-                        onClick={(e) => { e.stopPropagation(); handleRowClick(datasource); }}
+                        onClick={(e) => { e.stopPropagation(); handleRowClick(connection); }}
                         size="sm"
                       >
                         <Edit size={16} />
@@ -342,7 +345,7 @@ function DatasourcesPage() {
                       <IconButton
                         kind="ghost"
                         label="Delete"
-                        onClick={(e) => handleDelete(e, datasource)}
+                        onClick={(e) => handleDelete(e, connection)}
                         size="sm"
                       >
                         <TrashCan size={16} />
@@ -384,9 +387,9 @@ function DatasourcesPage() {
                       <TableCell colSpan={headers.length}>
                         <div className="empty-state">
                           <DataBase size={64} />
-                          <h3>No data sources available</h3>
+                          <h3>No connections available</h3>
                           <p>
-                            Looks like you haven't added any data sources. Click{' '}
+                            Looks like you haven't added any connections. Click{' '}
                             <Link href="#" onClick={(e) => { e.preventDefault(); handleCreate(); }}>Create</Link>
                             {' '}to get started.
                           </p>
@@ -395,12 +398,12 @@ function DatasourcesPage() {
                     </TableRow>
                   ) : (
                     rows.map((row) => {
-                      const datasource = getDatasourceById(row.id);
+                      const connection = getConnectionById(row.id);
                       return (
                         <TableRow
                           {...getRowProps({ row })}
                           key={row.id}
-                          onClick={() => handleRowClick(datasource)}
+                          onClick={() => handleRowClick(connection)}
                           className="clickable-row"
                         >
                           {row.cells.map((cell) => {
@@ -419,7 +422,7 @@ function DatasourcesPage() {
                                   <IconButton
                                     kind="ghost"
                                     label="Delete"
-                                    onClick={(e) => handleDelete(e, datasource)}
+                                    onClick={(e) => handleDelete(e, connection)}
                                     size="sm"
                                   >
                                     <TrashCan size={16} />
@@ -443,4 +446,4 @@ function DatasourcesPage() {
   );
 }
 
-export default DatasourcesPage;
+export default ConnectionsPage;

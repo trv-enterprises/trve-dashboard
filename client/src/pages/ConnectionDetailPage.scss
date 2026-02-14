@@ -4,7 +4,7 @@
 
 @use '@carbon/react/scss/spacing' as spacing;
 
-.datasource-detail-page {
+.connection-detail-page {
   background-color: var(--cds-background);
   height: 100%;
   display: flex;
@@ -374,7 +374,7 @@
 }
 
 // Test Connection styles
-.datasource-detail-page {
+.connection-detail-page {
   .test-connection-section {
     margin-top: spacing.$spacing-05;
     padding-top: spacing.$spacing-05;

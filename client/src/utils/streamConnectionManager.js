@@ -126,7 +126,7 @@ class StreamConnectionManager {
 
     // Build URL with optional user ID
     const userGuid = apiClient.getCurrentUserGuid();
-    let url = `${API_BASE}/api/datasources/${datasourceId}/stream`;
+    let url = `${API_BASE}/api/connections/${datasourceId}/stream`;
     if (userGuid) {
       url += `?user_id=${encodeURIComponent(userGuid)}`;
     }

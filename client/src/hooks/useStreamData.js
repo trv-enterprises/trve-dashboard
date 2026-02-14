@@ -71,7 +71,7 @@ export function useStreamData({ datasourceId, maxBuffer = 1000 }) {
     const connect = () => {
       if (!mountedRef.current) return;
 
-      const url = `${API_BASE}/api/datasources/${datasourceId}/stream`;
+      const url = `${API_BASE}/api/connections/${datasourceId}/stream`;
       const eventSource = new EventSource(url);
       eventSourceRef.current = eventSource;
 

@@ -226,6 +226,19 @@
             height: calc(100% - 40px);
           }
 
+          // Control components don't need the absolute positioning
+          &.control-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            > .control-renderer {
+              position: relative;
+              width: 100%;
+              height: 100%;
+            }
+          }
+
           // Wrapper div from DynamicComponentLoader
           > div {
             position: absolute;
