@@ -2,8 +2,9 @@
 // Licensed under Apache 2.0
 // See LICENSE file for details.
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getFilters, setFilters } from '../utils/filterStore';
 import {
   DataTable,
   TableContainer,
@@ -26,9 +27,10 @@ import {
   Switch,
   Tooltip,
   InlineNotification,
-  Dropdown
+  Dropdown,
+  Checkbox
 } from '@carbon/react';
-import { TrashCan, ChartLineSmooth, List, Grid, Edit, DataBase, Information, Dashboard, Keyboard } from '@carbon/icons-react';
+import { TrashCan, ChartLineSmooth, ChartBar, ChartArea, ChartPie, Meter, TableSplit, Code, List, Grid, Edit, DataBase, Information, Dashboard, Keyboard, TouchInteraction, Filter, ChevronDown, ChevronRight } from '@carbon/icons-react';
 import AiIcon from '../components/icons/AiIcon';
 import apiClient from '../api/client';
 import ChartDeleteDialog from '../components/ChartDeleteDialog';
@@ -47,40 +49,211 @@ import './ChartsListPage.scss';
  */
 function ChartsListPage() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Initialize state from URL params (persist filters across navigation)
+  // Get saved filters from session store
+  const savedFilters = getFilters('charts');
+
+  // Initialize state from saved filters (persist across navigation within session)
   const [charts, setCharts] = useState([]);
   const [connections, setConnections] = useState({});
   const [dashboardCounts, setDashboardCounts] = useState({}); // Map of chart_id -> dashboard count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
-  const [sortKey, setSortKey] = useState(searchParams.get('sortKey') || 'name');
-  const [sortDirection, setSortDirection] = useState(searchParams.get('sortDir') || 'asc');
+  const [searchTerm, setSearchTerm] = useState(savedFilters.search || '');
+  const [sortKey, setSortKey] = useState(savedFilters.sortKey || 'name');
+  const [sortDirection, setSortDirection] = useState(savedFilters.sortDir || 'asc');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [chartToDelete, setChartToDelete] = useState(null);
-  const [viewMode, setViewMode] = useState(searchParams.get('view') || 'list'); // 'list' or 'tile'
+  const [viewMode, setViewMode] = useState(savedFilters.view || 'list'); // 'list' or 'tile'
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerCategory, setPickerCategory] = useState('chart');
-  const [controlNotice, setControlNotice] = useState(null);
-  const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || 'all'); // 'all', 'chart', 'control'
-  const [connectionFilter, setConnectionFilter] = useState(searchParams.get('ds') || 'all'); // 'all' or connection id
+  const [connectionFilter, setConnectionFilter] = useState(savedFilters.ds || 'all'); // 'all' or connection id
+  const [typeFilterOpen, setTypeFilterOpen] = useState(false);
+  const [collapsedTypes, setCollapsedTypes] = useState(new Set(['display', 'control'])); // Start collapsed
+  const typeFilterRef = useRef(null); // Ref for click-outside detection
 
-  // Update URL params when filters change
-  const updateSearchParams = useCallback((updates) => {
-    setSearchParams(prev => {
-      const newParams = new URLSearchParams(prev);
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value && value !== 'all' && value !== 'name' && value !== 'asc' && value !== 'list' && value !== '') {
-          newParams.set(key, value);
-        } else {
-          newParams.delete(key);
-        }
-      });
-      return newParams;
-    }, { replace: true });
-  }, [setSearchParams]);
+  // Hierarchical type filter - tracks selected types
+  // null = all selected (no filter), Set = specific selection (empty Set = nothing selected)
+  // Chart subtypes: bar, line, area, pie, scatter, gauge, dataview, number, custom
+  // Control subtypes: button, toggle, slider, text_input
+  const [selectedTypes, setSelectedTypes] = useState(() => {
+    if (savedFilters.types) {
+      return new Set(savedFilters.types.split(',').filter(t => t)); // Filter out empty strings
+    }
+    return null; // null = all selected
+  });
+
+  // Type hierarchy definition
+  // Note: DB stores 'chart' but UI shows 'display'. We use 'display' for filtering keys.
+  const TYPE_HIERARCHY = {
+    display: {
+      label: 'Displays',
+      dbValue: 'chart', // What's stored in DB (component_type)
+      subtypes: [
+        { id: 'bar', label: 'Bar Chart' },
+        { id: 'line', label: 'Line Chart' },
+        { id: 'area', label: 'Area Chart' },
+        { id: 'pie', label: 'Pie Chart' },
+        { id: 'scatter', label: 'Scatter Plot' },
+        { id: 'gauge', label: 'Gauge' },
+        { id: 'dataview', label: 'Data Table' },
+        { id: 'number', label: 'Number' },
+        { id: 'custom', label: 'Custom' }
+      ]
+    },
+    control: {
+      label: 'Controls',
+      subtypes: [
+        { id: 'button', label: 'Button' },
+        { id: 'toggle', label: 'Toggle' },
+        { id: 'slider', label: 'Slider' },
+        { id: 'text_input', label: 'Text Input' }
+      ]
+    }
+  };
+
+  // Get all subtypes for a parent type
+  const getSubtypes = (parentType) => {
+    return TYPE_HIERARCHY[parentType]?.subtypes.map(s => `${parentType}:${s.id}`) || [];
+  };
+
+  // Check if a parent type is fully selected (all subtypes selected)
+  const isParentFullySelected = (parentType) => {
+    if (selectedTypes === null) return true; // All selected
+    const subtypes = getSubtypes(parentType);
+    return subtypes.every(st => selectedTypes.has(st));
+  };
+
+  // Check if a parent type is partially selected (some but not all subtypes)
+  const isParentPartiallySelected = (parentType) => {
+    if (selectedTypes === null) return false;
+    const subtypes = getSubtypes(parentType);
+    const selectedCount = subtypes.filter(st => selectedTypes.has(st)).length;
+    return selectedCount > 0 && selectedCount < subtypes.length;
+  };
+
+  // Check if a subtype is selected
+  const isSubtypeSelected = (parentType, subtypeId) => {
+    if (selectedTypes === null) return true; // All selected
+    return selectedTypes.has(`${parentType}:${subtypeId}`);
+  };
+
+  // Toggle parent type (select/deselect all subtypes)
+  const toggleParentType = (parentType) => {
+    const subtypes = getSubtypes(parentType);
+    const allSelected = isParentFullySelected(parentType);
+
+    setSelectedTypes(prev => {
+      if (prev === null) {
+        // Currently "all" - switching to specific selection
+        // Add all types except this parent's subtypes (deselect this parent)
+        const newSet = new Set();
+        Object.keys(TYPE_HIERARCHY).forEach(pt => {
+          if (pt !== parentType) {
+            getSubtypes(pt).forEach(st => newSet.add(st));
+          }
+        });
+        return newSet;
+      }
+
+      const newSet = new Set(prev);
+
+      if (allSelected) {
+        // Deselect all subtypes of this parent
+        subtypes.forEach(st => newSet.delete(st));
+        // Allow empty set - will show nothing, which is valid
+        return newSet;
+      } else {
+        // Select all subtypes of this parent
+        subtypes.forEach(st => newSet.add(st));
+      }
+
+      // If all types are now selected, set to null to represent "all"
+      const allSubtypes = Object.keys(TYPE_HIERARCHY).flatMap(pt => getSubtypes(pt));
+      if (allSubtypes.every(st => newSet.has(st))) {
+        return null;
+      }
+
+      return newSet;
+    });
+  };
+
+  // Toggle individual subtype
+  const toggleSubtype = (parentType, subtypeId) => {
+    const key = `${parentType}:${subtypeId}`;
+
+    setSelectedTypes(prev => {
+      if (prev === null) {
+        // Currently "all" - switching to specific selection
+        // Add all types except this one
+        const newSet = new Set();
+        Object.keys(TYPE_HIERARCHY).forEach(pt => {
+          getSubtypes(pt).forEach(st => {
+            if (st !== key) newSet.add(st);
+          });
+        });
+        return newSet;
+      }
+
+      const newSet = new Set(prev);
+
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+
+      // If all types are now selected, set to null to represent "all"
+      const allSubtypes = Object.keys(TYPE_HIERARCHY).flatMap(pt => getSubtypes(pt));
+      if (allSubtypes.every(st => newSet.has(st))) {
+        return null;
+      }
+
+      return newSet;
+    });
+  };
+
+  // Get filter label for display
+  const getTypeFilterLabel = () => {
+    if (selectedTypes === null) return 'All Types';
+    if (selectedTypes.size === 0) return 'None Selected';
+    if (selectedTypes.size === 1) {
+      const [type] = selectedTypes;
+      const [parent, subtype] = type.split(':');
+      const subtypeInfo = TYPE_HIERARCHY[parent]?.subtypes.find(s => s.id === subtype);
+      return subtypeInfo?.label || type;
+    }
+    return `${selectedTypes.size} types selected`;
+  };
+
+  // Save filters to session store when they change
+  useEffect(() => {
+    setFilters('charts', {
+      search: searchTerm,
+      sortKey,
+      sortDir: sortDirection,
+      view: viewMode,
+      ds: connectionFilter,
+      types: selectedTypes !== null && selectedTypes.size > 0 ? Array.from(selectedTypes).join(',') : ''
+    });
+  }, [searchTerm, sortKey, sortDirection, viewMode, connectionFilter, selectedTypes]);
+
+  // Close type filter popover when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (typeFilterRef.current && !typeFilterRef.current.contains(event.target)) {
+        setTypeFilterOpen(false);
+      }
+    };
+
+    if (typeFilterOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [typeFilterOpen]);
 
   // Fetch charts and data sources from API
   useEffect(() => {
@@ -163,13 +336,13 @@ function ChartsListPage() {
     }
   };
 
-  // Control handlers (future routes)
+  // Control handlers - navigate to chart editor with component_type=control
   const handleCreateControl = () => {
-    setControlNotice('Controls feature is coming soon.');
+    navigate('/design/charts/new?type=control');
   };
 
   const handleCreateControlAI = () => {
-    setControlNotice('Controls feature is coming soon.');
+    navigate('/design/ai-builder?type=control');
   };
 
   const handleSelectControl = () => {
@@ -217,9 +390,30 @@ function ChartsListPage() {
       'pie': 'purple',
       'scatter': 'magenta',
       'gauge': 'cyan',
+      'dataview': 'purple',
+      'number': 'teal',
       'custom': 'gray'
     };
     return colors[chartType?.toLowerCase()] || 'gray';
+  };
+
+  // Get icon component for chart type
+  const getChartTypeIcon = (chartType, componentType) => {
+    // Controls get a special icon
+    if (componentType === 'control') {
+      return TouchInteraction;
+    }
+    const icons = {
+      'bar': ChartBar,
+      'line': ChartLineSmooth,
+      'area': ChartArea,
+      'pie': ChartPie,
+      'gauge': Meter,
+      'dataview': TableSplit,
+      'number': Meter,
+      'custom': Code
+    };
+    return icons[chartType?.toLowerCase()] || ChartLineSmooth;
   };
 
   // Handle column sorting
@@ -235,16 +429,25 @@ function ChartsListPage() {
     updateSearchParams({ sortKey: key, sortDir: newDirection });
   };
 
-  // Filter and sort components (charts + controls)
+  // Filter and sort components (displays + controls)
   const filteredAndSortedCharts = useMemo(() => {
     let result = [...charts];
 
-    // Filter by component type (chart vs control)
-    if (typeFilter !== 'all') {
+    // Filter by hierarchical type selection
+    // null = all selected (no filter), Set = specific selection
+    if (selectedTypes !== null) {
+      if (selectedTypes.size === 0) {
+        // Nothing selected - return empty array
+        return [];
+      }
       result = result.filter(item => {
-        // For now, all items are charts. Controls will have component_type: 'control'
-        const componentType = item.component_type || 'chart';
-        return componentType === typeFilter;
+        // Map legacy 'chart' to 'display' for filtering
+        const componentType = item.component_type === 'control' ? 'control' : 'display';
+        const subtype = componentType === 'control'
+          ? (item.control_config?.control_type || 'button')
+          : (item.chart_type || 'custom');
+        const typeKey = `${componentType}:${subtype}`;
+        return selectedTypes.has(typeKey);
       });
     }
 
@@ -304,7 +507,7 @@ function ChartsListPage() {
     });
 
     return result;
-  }, [charts, connections, dashboardCounts, searchTerm, sortKey, sortDirection, typeFilter, connectionFilter]);
+  }, [charts, connections, dashboardCounts, searchTerm, sortKey, sortDirection, selectedTypes, connectionFilter]);
 
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
@@ -372,24 +575,84 @@ function ChartsListPage() {
             persistent
             value={searchTerm}
           />
-          <Dropdown
-            id="type-filter"
-            label="Filter by type"
-            titleText=""
-            items={[
-              { id: 'all', text: 'All Components' },
-              { id: 'chart', text: 'Charts' },
-              { id: 'control', text: 'Controls' }
-            ]}
-            itemToString={(item) => item?.text || ''}
-            selectedItem={{ id: typeFilter, text: typeFilter === 'all' ? 'All Components' : typeFilter === 'chart' ? 'Charts' : 'Controls' }}
-            onChange={({ selectedItem }) => {
-              const newType = selectedItem?.id || 'all';
-              setTypeFilter(newType);
-              updateSearchParams({ type: newType });
-            }}
-            size="md"
-          />
+          <div ref={typeFilterRef} className="type-filter-dropdown">
+            <button
+              type="button"
+              className={`type-filter-button${typeFilterOpen ? ' type-filter-button--open' : ''}`}
+              onClick={() => setTypeFilterOpen(!typeFilterOpen)}
+            >
+              <span>{getTypeFilterLabel()}</span>
+              <ChevronDown size={16} />
+            </button>
+            {typeFilterOpen && (
+            <div className="type-filter-content">
+              <div className="type-filter-header">
+                <span>Filter by Type</span>
+                {selectedTypes !== null && (
+                  <button
+                    type="button"
+                    className="clear-filter-button"
+                    onClick={() => setSelectedTypes(null)}
+                  >
+                    Select All
+                  </button>
+                )}
+              </div>
+              <div className="type-filter-list">
+                {Object.entries(TYPE_HIERARCHY).map(([parentType, config]) => {
+                  const isCollapsed = collapsedTypes.has(parentType);
+                  return (
+                    <div key={parentType} className="type-filter-group">
+                      <div className="type-filter-parent">
+                        <button
+                          type="button"
+                          className="collapse-toggle"
+                          onClick={() => {
+                            setCollapsedTypes(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has(parentType)) {
+                                newSet.delete(parentType);
+                              } else {
+                                newSet.add(parentType);
+                              }
+                              return newSet;
+                            });
+                          }}
+                        >
+                          {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                        <Checkbox
+                          id={`filter-${parentType}`}
+                          labelText={config.label}
+                          checked={isParentFullySelected(parentType)}
+                          indeterminate={isParentPartiallySelected(parentType)}
+                          onChange={(_, { checked }) => {
+                            toggleParentType(parentType);
+                          }}
+                        />
+                      </div>
+                      {!isCollapsed && (
+                        <div className="type-filter-subtypes">
+                          {config.subtypes.map(subtype => (
+                            <Checkbox
+                              key={subtype.id}
+                              id={`filter-${parentType}-${subtype.id}`}
+                              labelText={subtype.label}
+                              checked={isSubtypeSelected(parentType, subtype.id)}
+                              onChange={(_, { checked }) => {
+                                toggleSubtype(parentType, subtype.id);
+                              }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            )}
+          </div>
           <Dropdown
             id="connection-filter"
             label="Filter by connection"
@@ -449,99 +712,91 @@ function ChartsListPage() {
               </p>
             </div>
           ) : (
-            <div className="charts-grid">
-              {filteredAndSortedCharts.map((chart) => (
-                <Tile
-                  key={chart.id}
-                  className="chart-tile"
-                  onClick={() => handleRowClick(chart)}
-                >
-                  {/* Thumbnail */}
-                  <div className="tile-thumbnail">
-                    {chart.thumbnail ? (
-                      <img src={chart.thumbnail} alt={chart.name} />
-                    ) : (
-                      <div className="tile-thumbnail-placeholder">
-                        <ChartLineSmooth size={48} />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="tile-content">
-                    <div className="tile-header">
-                      <h3>{chart.name}</h3>
-                      {chart.description && (
-                        <Tooltip label={chart.description} align="bottom">
-                          <button type="button" className="info-button" onClick={(e) => e.stopPropagation()}>
-                            <Information size={16} />
-                          </button>
-                        </Tooltip>
-                      )}
+            <div className="charts-rows">
+              {filteredAndSortedCharts.map((chart) => {
+                const TypeIcon = getChartTypeIcon(chart.chart_type, chart.component_type);
+                return (
+                  <Tile
+                    key={chart.id}
+                    className="chart-row-tile"
+                    onClick={() => handleRowClick(chart)}
+                  >
+                    {/* Icon */}
+                    <div className={`tile-icon tile-icon--${getChartTypeColor(chart.chart_type)}`}>
+                      <TypeIcon size={32} />
                     </div>
 
-                    <div className="tile-meta">
-                      <Tag type={(chart.component_type || 'chart') === 'chart' ? 'blue' : 'purple'} size="sm">
-                        {(chart.component_type || 'chart') === 'chart' ? 'CHART' : 'CONTROL'}
-                      </Tag>
-                      <Tag type={getChartTypeColor(chart.chart_type)} size="sm">
-                        {chart.chart_type?.toUpperCase() || 'N/A'}
-                      </Tag>
-                      <Tag type={chart.status === 'final' ? 'green' : 'gray'} size="sm">
-                        {chart.status === 'draft'
-                          ? (chart.version > 0 ? `DRAFT (v${chart.version} saved)` : 'DRAFT')
-                          : `V${chart.version || 0}`}
-                      </Tag>
+                    {/* Content */}
+                    <div className="tile-content">
+                      <div className="tile-header">
+                        <h3>{chart.name}</h3>
+                        <div className="tile-meta">
+                          <Tag type={chart.component_type === 'control' ? 'purple' : 'blue'} size="sm">
+                            {chart.component_type === 'control' ? 'CONTROL' : 'DISPLAY'}
+                          </Tag>
+                          <Tag type={getChartTypeColor(chart.chart_type)} size="sm">
+                            {chart.chart_type?.toUpperCase() || 'N/A'}
+                          </Tag>
+                          <Tag type={chart.status === 'final' ? 'green' : 'gray'} size="sm">
+                            {chart.status === 'draft'
+                              ? (chart.version > 0 ? `DRAFT (v${chart.version} saved)` : 'DRAFT')
+                              : `V${chart.version || 0}`}
+                          </Tag>
+                        </div>
+                      </div>
+
+                      <div className="tile-details">
+                        {chart.description && (
+                          <span className="tile-description">{chart.description}</span>
+                        )}
+                        {connections[chart.connection_id || chart.datasource_id] && (
+                          <span className="tile-connection">
+                            <DataBase size={14} />
+                            {connections[chart.connection_id || chart.datasource_id]}
+                          </span>
+                        )}
+                        {dashboardCounts[chart.id] > 0 && (
+                          <span className="tile-dashboards">
+                            <Dashboard size={14} />
+                            {dashboardCounts[chart.id]} dashboard{dashboardCounts[chart.id] !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        <span className="tile-date">
+                          Updated: {formatDate(chart.updated)}
+                        </span>
+                      </div>
                     </div>
 
-                    {connections[chart.connection_id || chart.datasource_id] && (
-                      <div className="tile-connection">
-                        <DataBase size={14} />
-                        <span>{connections[chart.connection_id || chart.datasource_id]}</span>
-                      </div>
-                    )}
-
-                    {dashboardCounts[chart.id] > 0 && (
-                      <div className="tile-dashboards">
-                        <Dashboard size={14} />
-                        <span>{dashboardCounts[chart.id]} dashboard{dashboardCounts[chart.id] !== 1 ? 's' : ''}</span>
-                      </div>
-                    )}
-
-                    <div className="tile-date">
-                      Updated: {formatDate(chart.updated)}
+                    {/* Actions */}
+                    <div className="tile-actions">
+                      <IconButton
+                        kind="ghost"
+                        label="Edit"
+                        onClick={(e) => { e.stopPropagation(); handleRowClick(chart); }}
+                        size="sm"
+                      >
+                        <Edit size={16} />
+                      </IconButton>
+                      <IconButton
+                        kind="ghost"
+                        label="Edit with AI"
+                        onClick={(e) => handleAIEdit(e, chart)}
+                        size="sm"
+                      >
+                        <AiIcon size={16} />
+                      </IconButton>
+                      <IconButton
+                        kind="ghost"
+                        label="Delete"
+                        onClick={(e) => handleDelete(e, chart)}
+                        size="sm"
+                      >
+                        <TrashCan size={16} />
+                      </IconButton>
                     </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="tile-actions">
-                    <IconButton
-                      kind="ghost"
-                      label="Edit"
-                      onClick={(e) => { e.stopPropagation(); handleRowClick(chart); }}
-                      size="sm"
-                    >
-                      <Edit size={16} />
-                    </IconButton>
-                    <IconButton
-                      kind="ghost"
-                      label="Edit with AI"
-                      onClick={(e) => handleAIEdit(e, chart)}
-                      size="sm"
-                    >
-                      <AiIcon size={16} />
-                    </IconButton>
-                    <IconButton
-                      kind="ghost"
-                      label="Delete"
-                      onClick={(e) => handleDelete(e, chart)}
-                      size="sm"
-                    >
-                      <TrashCan size={16} />
-                    </IconButton>
-                  </div>
-                </Tile>
-              ))}
+                  </Tile>
+                );
+              })}
             </div>
           )}
         </div>
@@ -596,11 +851,11 @@ function ChartsListPage() {
                         >
                           {row.cells.map((cell) => {
                             if (cell.info.header === 'component_type') {
-                              const isChart = cell.value === 'chart';
+                              const isControl = cell.value === 'control';
                               return (
                                 <TableCell key={cell.id}>
-                                  <Tag type={isChart ? 'blue' : 'purple'} size="md">
-                                    {isChart ? 'CHART' : 'CONTROL'}
+                                  <Tag type={isControl ? 'purple' : 'blue'} size="md">
+                                    {isControl ? 'CONTROL' : 'DISPLAY'}
                                   </Tag>
                                 </TableCell>
                               );
@@ -683,18 +938,6 @@ function ChartsListPage() {
         category={pickerCategory}
       />
 
-      {/* Controls Coming Soon Notice */}
-      {controlNotice && (
-        <div className="control-notice">
-          <InlineNotification
-            kind="info"
-            title="Coming Soon"
-            subtitle={controlNotice}
-            onCloseButtonClick={() => setControlNotice(null)}
-            lowContrast
-          />
-        </div>
-      )}
     </div>
   );
 }

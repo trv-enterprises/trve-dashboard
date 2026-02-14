@@ -116,17 +116,48 @@ function AppContent() {
     apiClient.setCurrentUser(user.guid);
   };
 
+  // Fetch default dashboard (user preference or first alphabetically)
+  const fetchDefaultDashboard = async () => {
+    try {
+      // First check if user has a configured default dashboard
+      const userGuid = apiClient.getCurrentUserGuid();
+      if (userGuid) {
+        try {
+          const userConfig = await apiClient.getUserConfig(userGuid);
+          if (userConfig.settings?.default_dashboard_id) {
+            return userConfig.settings.default_dashboard_id;
+          }
+        } catch {
+          // Ignore errors - user may not have config yet
+        }
+      }
+
+      // Fall back to first dashboard alphabetically
+      const response = await fetch(`${API_BASE}/api/dashboards?page=1&page_size=1`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.dashboards && data.dashboards.length > 0) {
+          return data.dashboards[0].id;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch default dashboard:', err);
+    }
+    return null;
+  };
+
   // Handle mode change and persist to localStorage
-  const handleModeChange = (newMode) => {
+  const handleModeChange = async (newMode) => {
     setCurrentMode(newMode);
     localStorage.setItem('dashboardMode', newMode);
     // Navigate to appropriate default route for the mode
     if (newMode === MODES.DESIGN) {
       navigate('/design/dashboards');
     } else if (newMode === MODES.VIEW) {
-      // Navigate to first dashboard if available, otherwise to dashboard list
-      if (firstDashboardId) {
-        navigate(`/view/dashboards/${firstDashboardId}`);
+      // Fetch fresh default dashboard when switching to View mode
+      const defaultId = await fetchDefaultDashboard();
+      if (defaultId) {
+        navigate(`/view/dashboards/${defaultId}`);
       } else {
         navigate('/view/dashboards');
       }
@@ -135,24 +166,14 @@ function AppContent() {
     }
   };
 
-  // Fetch first dashboard for default redirect
+  // Initial fetch of default dashboard for app load redirect
   useEffect(() => {
-    const fetchFirstDashboard = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/dashboards?page=1&page_size=1`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.dashboards && data.dashboards.length > 0) {
-            setFirstDashboardId(data.dashboards[0].id);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch first dashboard:', err);
-      } finally {
-        setDashboardsLoaded(true);
-      }
+    const loadDefaultDashboard = async () => {
+      const defaultId = await fetchDefaultDashboard();
+      setFirstDashboardId(defaultId);
+      setDashboardsLoaded(true);
     };
-    fetchFirstDashboard();
+    loadDefaultDashboard();
   }, []);
 
   // Render navigation based on current mode

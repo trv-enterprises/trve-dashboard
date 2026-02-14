@@ -59,6 +59,12 @@
         background-color: var(--cds-layer-01);
       }
 
+      // Type filter dropdown
+      #type-filter {
+        min-width: 180px;
+        background-color: var(--cds-layer-01);
+      }
+
       // Content switcher for view toggle
       .cds--content-switcher {
         flex-shrink: 100;

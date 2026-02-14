@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getFilters, setFilters } from '../utils/filterStore';
 import {
   DataTable,
   TableContainer,
@@ -24,7 +25,8 @@ import {
   Tile,
   ContentSwitcher,
   Switch,
-  Tooltip
+  Tooltip,
+  Dropdown
 } from '@carbon/react';
 import { TrashCan, DataBase, List, Grid, Edit, Information, Sql, Api, Document, NetworkEnterprise, ChartLineSmooth } from '@carbon/icons-react';
 import apiClient from '../api/client';
@@ -41,14 +43,42 @@ import './ConnectionsPage.scss';
  */
 function ConnectionsPage() {
   const navigate = useNavigate();
+
+  // Get saved filters from session store
+  const savedFilters = getFilters('connections');
+
   const [connections, setConnections] = useState([]);
   const [chartCounts, setChartCounts] = useState({}); // Map of connection_id -> chart count
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortKey, setSortKey] = useState('name');
-  const [sortDirection, setSortDirection] = useState('asc');
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'tile'
+  const [searchTerm, setSearchTerm] = useState(savedFilters.search || '');
+  const [sortKey, setSortKey] = useState(savedFilters.sortKey || 'name');
+  const [sortDirection, setSortDirection] = useState(savedFilters.sortDir || 'asc');
+  const [viewMode, setViewMode] = useState(savedFilters.view || 'list'); // 'list' or 'tile'
+  const [typeFilter, setTypeFilter] = useState(savedFilters.type || 'all'); // 'all' or specific type
+
+  // Save filters to session store when they change
+  useEffect(() => {
+    setFilters('connections', {
+      search: searchTerm,
+      sortKey,
+      sortDir: sortDirection,
+      view: viewMode,
+      type: typeFilter
+    });
+  }, [searchTerm, sortKey, sortDirection, viewMode, typeFilter]);
+
+  // Connection types for filter dropdown
+  const CONNECTION_TYPES = [
+    { id: 'all', text: 'All Types' },
+    { id: 'sql', text: 'SQL Database' },
+    { id: 'api', text: 'REST API' },
+    { id: 'csv', text: 'CSV File' },
+    { id: 'socket', text: 'WebSocket' },
+    { id: 'tsstore', text: 'TS-Store' },
+    { id: 'prometheus', text: 'Prometheus' },
+    { id: 'edgelake', text: 'EdgeLake' }
+  ];
 
   // Get icon for connection type
   const getTypeIcon = (type) => {
@@ -153,6 +183,11 @@ function ConnectionsPage() {
   const filteredAndSortedConnections = useMemo(() => {
     let result = [...connections];
 
+    // Filter by type
+    if (typeFilter !== 'all') {
+      result = result.filter(connection => connection.type?.toLowerCase() === typeFilter);
+    }
+
     // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -191,7 +226,7 @@ function ConnectionsPage() {
     });
 
     return result;
-  }, [connections, chartCounts, searchTerm, sortKey, sortDirection]);
+  }, [connections, chartCounts, searchTerm, sortKey, sortDirection, typeFilter]);
 
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
@@ -248,6 +283,16 @@ function ConnectionsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search"
             persistent
+          />
+          <Dropdown
+            id="type-filter"
+            label="Filter by type"
+            titleText=""
+            items={CONNECTION_TYPES}
+            itemToString={(item) => item?.text || ''}
+            selectedItem={CONNECTION_TYPES.find(t => t.id === typeFilter) || CONNECTION_TYPES[0]}
+            onChange={({ selectedItem }) => setTypeFilter(selectedItem?.id || 'all')}
+            size="md"
           />
           <ContentSwitcher
             onChange={(e) => setViewMode(e.name)}

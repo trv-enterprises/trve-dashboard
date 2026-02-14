@@ -18,9 +18,10 @@ import {
   Minimize,
   Renew,
   Time,
-  Edit,
+  OverflowMenuVertical,
   FitToScreen,
-  CenterToFit
+  CenterToFit,
+  StarFilled
 } from '@carbon/icons-react';
 import html2canvas from 'html2canvas';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
@@ -56,6 +57,7 @@ function DashboardViewerPage({ canDesign = false }) {
   const [dataModalOpen, setDataModalOpen] = useState(false);
   const [selectedChart, setSelectedChart] = useState(null);
   const [configRefreshInterval, setConfigRefreshInterval] = useState(120); // Default 120s for dashboard/chart config refresh
+  const [isDefaultDashboard, setIsDefaultDashboard] = useState(false);
 
   // Grid configuration - fixed 64x36px cells (16:9 aspect ratio)
   // Must match DashboardDetailPage.jsx
@@ -128,6 +130,37 @@ function DashboardViewerPage({ canDesign = false }) {
   useEffect(() => {
     fetchDashboard();
   }, [fetchDashboard]);
+
+  // Check if this dashboard is the user's default
+  useEffect(() => {
+    const checkIfDefault = async () => {
+      const userGuid = apiClient.getCurrentUserGuid();
+      if (!userGuid || !id) return;
+
+      try {
+        const config = await apiClient.getUserConfig(userGuid);
+        setIsDefaultDashboard(config.settings?.default_dashboard_id === id);
+      } catch {
+        // User may not have config yet
+      }
+    };
+    checkIfDefault();
+  }, [id]);
+
+  // Handle setting this dashboard as default
+  const handleSetAsDefault = async () => {
+    const userGuid = apiClient.getCurrentUserGuid();
+    if (!userGuid) return;
+
+    try {
+      await apiClient.updateUserConfig(userGuid, {
+        default_dashboard_id: id
+      });
+      setIsDefaultDashboard(true);
+    } catch (err) {
+      console.error('Failed to set default dashboard:', err);
+    }
+  };
 
   // Auto-refresh dashboard/chart config from database (configRefreshInterval from system config)
   // This is separate from data refresh which is controlled per-chart
@@ -296,23 +329,35 @@ function DashboardViewerPage({ canDesign = false }) {
           >
             {reduceToFit ? <CenterToFit size={20} /> : <FitToScreen size={20} />}
           </IconButton>
-          {canDesign && (
-            <OverflowMenu
-              renderIcon={() => <Edit size={20} />}
-              flipped
-              direction="bottom"
-              iconDescription="Dashboard actions"
-            >
+          <OverflowMenu
+            renderIcon={() => <OverflowMenuVertical size={20} />}
+            flipped
+            direction="bottom"
+            iconDescription="Dashboard actions"
+          >
+            {canDesign && (
               <OverflowMenuItem
                 itemText="Edit"
                 onClick={() => navigate(`/design/dashboards/${id}`, { state: { from: `/view/dashboards/${id}` } })}
               />
+            )}
+            {canDesign && (
               <OverflowMenuItem
                 itemText="Save Thumbnail"
                 onClick={saveThumbnail}
               />
-            </OverflowMenu>
-          )}
+            )}
+            <OverflowMenuItem
+              itemText={isDefaultDashboard ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <StarFilled size={16} style={{ color: '#f1c21b' }} />
+                  Default Dashboard
+                </span>
+              ) : 'Set as Default'}
+              disabled={isDefaultDashboard}
+              onClick={handleSetAsDefault}
+            />
+          </OverflowMenu>
         </div>
       </div>
 

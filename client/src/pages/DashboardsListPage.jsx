@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getFilters, setFilters } from '../utils/filterStore';
 import {
   DataTable,
   TableContainer,
@@ -41,15 +42,29 @@ import './DashboardsListPage.scss';
  */
 function DashboardsListPage() {
   const navigate = useNavigate();
+
+  // Get saved filters from session store
+  const savedFilters = getFilters('dashboards');
+
   const [dashboards, setDashboards] = useState([]);
   const [charts, setCharts] = useState({});
   const [datasources, setDatasources] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortKey, setSortKey] = useState('name');
-  const [sortDirection, setSortDirection] = useState('asc');
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'tile'
+  const [searchTerm, setSearchTerm] = useState(savedFilters.search || '');
+  const [sortKey, setSortKey] = useState(savedFilters.sortKey || 'name');
+  const [sortDirection, setSortDirection] = useState(savedFilters.sortDir || 'asc');
+  const [viewMode, setViewMode] = useState(savedFilters.view || 'list'); // 'list' or 'tile'
+
+  // Save filters to session store when they change
+  useEffect(() => {
+    setFilters('dashboards', {
+      search: searchTerm,
+      sortKey,
+      sortDir: sortDirection,
+      view: viewMode
+    });
+  }, [searchTerm, sortKey, sortDirection, viewMode]);
 
   // Fetch dashboards, charts, and datasources from API
   useEffect(() => {

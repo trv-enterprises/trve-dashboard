@@ -7,12 +7,15 @@ import { useNavigate } from 'react-router-dom';
 import {
   Loading,
   Tag,
-  Search
+  Search,
+  OverflowMenu,
+  OverflowMenuItem
 } from '@carbon/react';
 import {
   Dashboard,
   Time,
-  DataBase
+  DataBase,
+  StarFilled
 } from '@carbon/icons-react';
 import apiClient from '../api/client';
 import './DashboardTileViewPage.scss';
@@ -36,10 +39,41 @@ function DashboardTileViewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [defaultDashboardId, setDefaultDashboardId] = useState(null);
 
   useEffect(() => {
     fetchData();
+    fetchUserConfig();
   }, []);
+
+  const fetchUserConfig = async () => {
+    const userGuid = apiClient.getCurrentUserGuid();
+    if (!userGuid) return;
+
+    try {
+      const config = await apiClient.getUserConfig(userGuid);
+      if (config.settings?.default_dashboard_id) {
+        setDefaultDashboardId(config.settings.default_dashboard_id);
+      }
+    } catch {
+      // User may not have config yet
+    }
+  };
+
+  const handleSetDefault = async (e, dashboardId) => {
+    e.stopPropagation();
+    const userGuid = apiClient.getCurrentUserGuid();
+    if (!userGuid) return;
+
+    try {
+      await apiClient.updateUserConfig(userGuid, {
+        default_dashboard_id: dashboardId
+      });
+      setDefaultDashboardId(dashboardId);
+    } catch (err) {
+      console.error('Failed to set default dashboard:', err);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -151,7 +185,7 @@ function DashboardTileViewPage() {
           {filteredDashboards.map((dashboard) => (
             <div
               key={dashboard.id}
-              className="dashboard-tile"
+              className={`dashboard-tile ${defaultDashboardId === dashboard.id ? 'dashboard-tile--default' : ''}`}
               onClick={() => handleTileClick(dashboard.id)}
             >
               <div className="tile-thumbnail">
@@ -168,24 +202,43 @@ function DashboardTileViewPage() {
                 {dashboard.description && (
                   <p className="tile-description">{dashboard.description}</p>
                 )}
-                <div className="tile-tags">
-                  {dashboard.settings?.refresh_interval > 0 && (
-                    <Tag type="green" size="sm">
-                      <Time size={12} />
-                      {dashboard.settings.refresh_interval}s
-                    </Tag>
-                  )}
-                  {dashboard.panels?.length > 0 && (
-                    <Tag type="gray" size="sm">
-                      {dashboard.panels.length} panel{dashboard.panels.length !== 1 ? 's' : ''}
-                    </Tag>
-                  )}
-                  {getDatasourceNames(dashboard).map(dsName => (
-                    <Tag key={dsName} type="blue" size="sm">
-                      <DataBase size={12} />
-                      {dsName}
-                    </Tag>
-                  ))}
+                <div className="tile-footer">
+                  <div className="tile-tags">
+                    {dashboard.settings?.refresh_interval > 0 && (
+                      <Tag type="green" size="sm">
+                        <Time size={12} />
+                        {dashboard.settings.refresh_interval}s
+                      </Tag>
+                    )}
+                    {dashboard.panels?.length > 0 && (
+                      <Tag type="gray" size="sm">
+                        {dashboard.panels.length} panel{dashboard.panels.length !== 1 ? 's' : ''}
+                      </Tag>
+                    )}
+                    {getDatasourceNames(dashboard).map(dsName => (
+                      <Tag key={dsName} type="blue" size="sm">
+                        <DataBase size={12} />
+                        {dsName}
+                      </Tag>
+                    ))}
+                  </div>
+                  <div className="tile-actions">
+                    {defaultDashboardId === dashboard.id ? (
+                      <StarFilled size={16} className="default-star" />
+                    ) : (
+                      <OverflowMenu
+                        flipped
+                        size="sm"
+                        className="tile-menu"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <OverflowMenuItem
+                          itemText="Set as Default"
+                          onClick={(e) => handleSetDefault(e, dashboard.id)}
+                        />
+                      </OverflowMenu>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

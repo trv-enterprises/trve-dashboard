@@ -443,6 +443,88 @@ button.cds--overflow-menu {
   min-width: 160px;
 }
 
+// Popover z-index fix for type filter
+.cds--popover {
+  z-index: 9100 !important;
+}
+
+.cds--popover-content {
+  z-index: 9100 !important;
+}
+
+// ContentSwitcher dark theme styling - use blue for selected state
+.cds--content-switcher {
+  .cds--content-switcher-btn {
+    background-color: var(--cds-layer-01);
+    color: var(--cds-text-secondary);
+
+    &::after {
+      background-color: transparent;
+    }
+
+    &:hover:not(.cds--content-switcher--selected) {
+      background-color: var(--cds-layer-hover-01);
+    }
+  }
+
+  .cds--content-switcher--selected {
+    background-color: var(--cds-interactive) !important;
+    color: #ffffff !important;
+
+    &::after {
+      background-color: var(--cds-interactive) !important;
+    }
+  }
+}
+
+// Search box styling - remove border to match dropdowns
+.cds--search {
+  height: 40px !important;
+
+  .cds--search-input {
+    border: none !important;
+    outline: none !important;
+    height: 40px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  // Remove the outer border/outline
+  &.cds--search--lg,
+  &.cds--search--md,
+  &.cds--search--sm {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    height: 40px !important;
+  }
+
+  // Close button - show but keep height consistent
+  .cds--search-close {
+    height: 40px !important;
+    width: 40px !important;
+    min-height: 40px !important;
+
+    svg {
+      fill: #c6c6c6;
+    }
+
+    &:hover {
+      background-color: #393939;
+    }
+  }
+
+  // Magnifier icon sizing
+  .cds--search-magnifier-icon {
+    height: 40px !important;
+  }
+
+  // The search wrapper/container
+  .cds--search-input-wrapper {
+    height: 40px !important;
+  }
+}
+
 // Toggle dark theme styling
 .cds--toggle {
   .cds--toggle__label-text {
