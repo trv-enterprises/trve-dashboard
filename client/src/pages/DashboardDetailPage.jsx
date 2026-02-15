@@ -16,31 +16,25 @@ import {
   Checkbox,
   NumberInput,
   IconButton,
-  OverflowMenu,
-  OverflowMenuItem,
-  MenuButton,
-  MenuItem,
   Tooltip,
   Slider
 } from '@carbon/react';
 import {
   Save,
   Close,
-  Add,
   TrashCan,
   Edit,
   View,
   ChartBar,
-  Catalog,
   Information,
   ZoomIn,
   ZoomOut,
-  FitToScreen,
   ArrowLeft
 } from '@carbon/icons-react';
-import AiIcon from '../components/icons/AiIcon';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import ChartEditorModal from '../components/ChartEditorModal';
+import PanelEditMenu from '../components/PanelEditMenu';
+import ComponentPickerModal from '../components/ComponentPickerModal';
 import apiClient from '../api/client';
 import './DashboardDetailPage.scss';
 
@@ -103,10 +97,15 @@ function DashboardDetailPage() {
   const [editingPanelId, setEditingPanelId] = useState(null);
   const [editingChart, setEditingChart] = useState(null);
 
-  // Chart selector modal state
+  // Chart selector modal state (legacy - being replaced by component picker)
   const [chartSelectorOpen, setChartSelectorOpen] = useState(false);
   const [selectingPanelId, setSelectingPanelId] = useState(null);
   const [availableCharts, setAvailableCharts] = useState([]);
+
+  // Component picker modal state (for selecting displays or controls)
+  const [componentPickerOpen, setComponentPickerOpen] = useState(false);
+  const [componentPickerCategory, setComponentPickerCategory] = useState('chart'); // 'chart' or 'control'
+  const [componentPickerPanelId, setComponentPickerPanelId] = useState(null);
 
   // Layout editing state
   const [draggingPanel, setDraggingPanel] = useState(null);
@@ -423,6 +422,60 @@ function DashboardDetailPage() {
 
     setHasChanges(true);
     closeChartSelector();
+  };
+
+  // Component picker operations (unified for displays and controls)
+  const openComponentPicker = (panelId, category) => {
+    setComponentPickerPanelId(panelId);
+    setComponentPickerCategory(category);
+    setComponentPickerOpen(true);
+  };
+
+  const closeComponentPicker = () => {
+    setComponentPickerOpen(false);
+    setComponentPickerPanelId(null);
+  };
+
+  const handleComponentSelect = async (component) => {
+    if (!componentPickerPanelId) return;
+
+    // Add component to chartsMap (both displays and controls use the same storage)
+    if (!chartsMap[component.id]) {
+      setChartsMap(prev => ({ ...prev, [component.id]: component }));
+    }
+
+    // Update panel to reference this component
+    setPanels(prev => prev.map(p =>
+      p.id === componentPickerPanelId ? { ...p, chart_id: component.id } : p
+    ));
+
+    setHasChanges(true);
+    closeComponentPicker();
+  };
+
+  // Control editor operations
+  const openControlEditor = (panelId, control = undefined) => {
+    // For now, controls use the same editor as charts
+    // Future: separate ControlEditorModal
+    setEditingPanelId(panelId);
+    if (control === undefined) {
+      const panel = panels.find(p => p.id === panelId);
+      setEditingChart(panel?.chart_id ? chartsMap[panel.chart_id] : null);
+    } else {
+      setEditingChart(control);
+    }
+    setChartEditorOpen(true);
+  };
+
+  const openControlAIEditor = (panelId) => {
+    const panel = panels.find(p => p.id === panelId);
+    const chartId = panel?.chart_id;
+    const returnUrl = isCreateMode ? '/design/dashboards' : `/design/dashboards/${id}`;
+    if (chartId) {
+      navigate(`/design/charts/ai/${chartId}`, { state: { from: returnUrl, panelId, componentType: 'control' } });
+    } else {
+      navigate('/design/charts/ai/new', { state: { from: returnUrl, panelId, componentType: 'control' } });
+    }
   };
 
   // Grid mouse handlers for Layout Mode
@@ -1212,68 +1265,43 @@ function DashboardDetailPage() {
                               <ChartBar size={20} />
                               <span className="chart-name">{chart.title || chart.name}</span>
                             </div>
-                            <MenuButton
-                              label="Edit"
-                              size="sm"
-                              kind="secondary"
-                            >
-                              <MenuItem
-                                label="Edit Chart"
-                                onClick={() => openChartEditor(panel.id)}
-                              />
-                              <MenuItem
-                                label="Edit Chart with AI"
-                                renderIcon={AiIcon}
-                                onClick={() => openAIEditor(panel.id)}
-                              />
-                              <MenuItem
-                                label="New Chart"
-                                renderIcon={Add}
-                                onClick={() => {
-                                  // Clear the chart reference and open editor for new chart
-                                  // Pass null explicitly to avoid stale state from React batching
-                                  updatePanel(panel.id, { chart_id: null });
-                                  openChartEditor(panel.id, null);
-                                }}
-                              />
-                              <MenuItem
-                                label="New Chart with AI"
-                                renderIcon={AiIcon}
-                                onClick={() => {
-                                  // Clear the chart reference first, then open AI editor for new chart
-                                  updatePanel(panel.id, { chart_id: null });
-                                  openAIEditor(panel.id);
-                                }}
-                              />
-                              <MenuItem
-                                label="Select Existing"
-                                renderIcon={Catalog}
-                                onClick={() => openChartSelector(panel.id)}
-                              />
-                            </MenuButton>
+                            <PanelEditMenu
+                              buttonLabel="Edit"
+                              hasExisting={true}
+                              onEditDisplay={() => openChartEditor(panel.id)}
+                              onCreateDisplay={() => {
+                                updatePanel(panel.id, { chart_id: null });
+                                openChartEditor(panel.id, null);
+                              }}
+                              onCreateDisplayAI={() => {
+                                updatePanel(panel.id, { chart_id: null });
+                                openAIEditor(panel.id);
+                              }}
+                              onSelectDisplay={() => openComponentPicker(panel.id, 'chart')}
+                              onEditControl={() => openControlEditor(panel.id)}
+                              onCreateControl={() => {
+                                updatePanel(panel.id, { chart_id: null });
+                                openControlEditor(panel.id, null);
+                              }}
+                              onCreateControlAI={() => {
+                                updatePanel(panel.id, { chart_id: null });
+                                openControlAIEditor(panel.id);
+                              }}
+                              onSelectControl={() => openComponentPicker(panel.id, 'control')}
+                            />
                           </div>
                         ) : (
                           <div className="empty-panel-actions">
-                            <MenuButton
-                              label="New Chart"
-                              size="sm"
-                              kind="secondary"
-                            >
-                              <MenuItem
-                                label="New Chart"
-                                onClick={() => openChartEditor(panel.id, null)}
-                              />
-                              <MenuItem
-                                label="New Chart with AI"
-                                renderIcon={AiIcon}
-                                onClick={() => openAIEditor(panel.id)}
-                              />
-                              <MenuItem
-                                label="Select Existing"
-                                renderIcon={Catalog}
-                                onClick={() => openChartSelector(panel.id)}
-                              />
-                            </MenuButton>
+                            <PanelEditMenu
+                              buttonLabel="Add"
+                              hasExisting={false}
+                              onCreateDisplay={() => openChartEditor(panel.id, null)}
+                              onCreateDisplayAI={() => openAIEditor(panel.id)}
+                              onSelectDisplay={() => openComponentPicker(panel.id, 'chart')}
+                              onCreateControl={() => openControlEditor(panel.id, null)}
+                              onCreateControlAI={() => openControlAIEditor(panel.id)}
+                              onSelectControl={() => openComponentPicker(panel.id, 'control')}
+                            />
                           </div>
                         )}
                       </div>
@@ -1390,6 +1418,14 @@ function DashboardDetailPage() {
           </div>
         </Modal>
       )}
+
+      {/* Component Picker Modal (for selecting displays or controls) */}
+      <ComponentPickerModal
+        open={componentPickerOpen}
+        onClose={closeComponentPicker}
+        onSelect={handleComponentSelect}
+        category={componentPickerCategory}
+      />
 
       {/* Cancel confirmation modal */}
       {showCancelModal && (
