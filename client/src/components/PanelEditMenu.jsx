@@ -3,6 +3,7 @@
 // See LICENSE file for details.
 
 import { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@carbon/react';
 import { ChevronDown, Edit, Add, ChartLineSmooth, Keyboard, Catalog } from '@carbon/icons-react';
 import AiIcon from './icons/AiIcon';
@@ -49,36 +50,58 @@ function PanelEditMenu({
   const dropdownRef = useRef(null);
 
   // Calculate dropdown position when opened
+  // Use requestAnimationFrame to ensure we get the correct position after render
   useEffect(() => {
     if (isOpen && buttonRef.current) {
-      const buttonRect = buttonRef.current.getBoundingClientRect();
-      const dropdownWidth = 320; // min-width from CSS
+      const updatePosition = () => {
+        const buttonRect = buttonRef.current.getBoundingClientRect();
+        const dropdownWidth = 320; // min-width from CSS
+        const dropdownHeight = 220; // estimated height
 
-      // Position below the button, centered horizontally
-      let left = buttonRect.left + (buttonRect.width / 2) - (dropdownWidth / 2);
-      let top = buttonRect.bottom + 4;
+        // Position below the button, centered horizontally
+        // getBoundingClientRect() returns visual (screen) coordinates, which is what we want for fixed positioning
+        let left = buttonRect.left + (buttonRect.width / 2) - (dropdownWidth / 2);
+        let top = buttonRect.bottom + 4;
 
-      // Keep dropdown within viewport bounds
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
+        // Keep dropdown within viewport bounds
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
 
-      // Adjust horizontal position if needed
-      if (left < 8) {
-        left = 8;
-      } else if (left + dropdownWidth > viewportWidth - 8) {
-        left = viewportWidth - dropdownWidth - 8;
+        // Adjust horizontal position if needed
+        if (left < 8) {
+          left = 8;
+        } else if (left + dropdownWidth > viewportWidth - 8) {
+          left = viewportWidth - dropdownWidth - 8;
+        }
+
+        // If dropdown would go below viewport, position above button instead
+        if (top + dropdownHeight > viewportHeight - 8) {
+          top = buttonRect.top - dropdownHeight - 4;
+        }
+
+        setDropdownStyle({
+          top: `${top}px`,
+          left: `${left}px`
+        });
+      };
+
+      // Update position immediately and on scroll/resize
+      updatePosition();
+
+      // Also update if the grid scrolls (the panel-grid-container)
+      const handleScroll = () => updatePosition();
+      const container = buttonRef.current.closest('.panel-grid-container');
+      if (container) {
+        container.addEventListener('scroll', handleScroll);
       }
+      window.addEventListener('resize', handleScroll);
 
-      // If dropdown would go below viewport, position above button instead
-      const estimatedDropdownHeight = 200; // rough estimate
-      if (top + estimatedDropdownHeight > viewportHeight - 8) {
-        top = buttonRect.top - estimatedDropdownHeight - 4;
-      }
-
-      setDropdownStyle({
-        top: `${top}px`,
-        left: `${left}px`
-      });
+      return () => {
+        if (container) {
+          container.removeEventListener('scroll', handleScroll);
+        }
+        window.removeEventListener('resize', handleScroll);
+      };
     }
   }, [isOpen]);
 
@@ -110,21 +133,9 @@ function PanelEditMenu({
     if (action) action();
   };
 
-  return (
-    <div className="panel-edit-menu" ref={menuRef}>
-      <div ref={buttonRef}>
-        <Button
-          kind={buttonKind}
-          size={buttonSize}
-          onClick={() => setIsOpen(!isOpen)}
-          renderIcon={() => <ChevronDown size={16} className={`panel-edit-menu-chevron ${isOpen ? 'open' : ''}`} />}
-        >
-          {buttonLabel}
-        </Button>
-      </div>
-
-      {isOpen && (
-        <div className="panel-edit-menu-dropdown" ref={dropdownRef} style={dropdownStyle}>
+  // Render dropdown content
+  const dropdownContent = isOpen ? (
+    <div className="panel-edit-menu-dropdown" ref={dropdownRef} style={dropdownStyle}>
           {/* Displays Column */}
           <div className="panel-edit-menu-column">
             <div className="panel-edit-menu-header">
@@ -201,7 +212,23 @@ function PanelEditMenu({
             </button>
           </div>
         </div>
-      )}
+  ) : null;
+
+  return (
+    <div className="panel-edit-menu" ref={menuRef}>
+      <div ref={buttonRef}>
+        <Button
+          kind={buttonKind}
+          size={buttonSize}
+          onClick={() => setIsOpen(!isOpen)}
+          renderIcon={() => <ChevronDown size={16} className={`panel-edit-menu-chevron ${isOpen ? 'open' : ''}`} />}
+        >
+          {buttonLabel}
+        </Button>
+      </div>
+
+      {/* Render dropdown via portal to escape transformed parents */}
+      {dropdownContent && createPortal(dropdownContent, document.body)}
     </div>
   );
 }
