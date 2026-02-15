@@ -212,7 +212,7 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
 
 ## Project Overview
 
-**GiVi-Solution Dashboard** - A full-stack application for creating, managing, and viewing dynamic data visualization dashboards. The application features:
+**TRVE Dashboards** - A full-stack application for creating, managing, and viewing dynamic data visualization dashboards. The application features:
 
 1. **Three Operating Modes**: Design, View, and Manage
 2. **Dynamic Chart Builder**: Create React components with ECharts visualizations

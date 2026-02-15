@@ -1,7 +1,7 @@
 # Dashboard Server (Go) - Development Status
 
 ## Project Overview
-Go-based backend server for the GiVi-Solution Dashboard refactoring project. Replacing Node.js server with Go + MongoDB + Redis + Asynq architecture.
+Go-based backend server for the TRVE Dashboards project. Replacing Node.js server with Go + MongoDB + Redis + Asynq architecture.
 
 ## Current Status (2025-11-20)
 

@@ -39,7 +39,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CreateAISessionRequest"
+                            "$ref": "#/definitions/models.CreateAISessionRequest"
                         }
                     }
                 ],
@@ -47,7 +47,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.AISessionResponse"
+                            "$ref": "#/definitions/models.AISessionResponse"
                         }
                     },
                     "400": {
@@ -90,7 +90,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.AISessionResponse"
+                            "$ref": "#/definitions/models.AISessionResponse"
                         }
                     },
                     "404": {
@@ -172,7 +172,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SendMessageRequest"
+                            "$ref": "#/definitions/models.SendMessageRequest"
                         }
                     }
                 ],
@@ -235,7 +235,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.SaveSessionRequest"
+                            "$ref": "#/definitions/handlers.SaveSessionRequest"
                         }
                     }
                 ],
@@ -243,7 +243,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     },
                     "400": {
@@ -344,6 +344,214 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/controls/{id}/execute": {
+            "post": {
+                "description": "Executes the command configured on a control component, interpolating the value into the payload template",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "controls"
+                ],
+                "summary": "Execute a control component command",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Control (Chart) ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Control value",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ExecuteControlRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ExecuteCommandResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - not a control or missing connection",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Control not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/datasources/{id}/command": {
+            "post": {
+                "description": "Send a command to a datasource that supports write operations (e.g., stream.websocket-bidir)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "datasources"
+                ],
+                "summary": "Execute a command on a bidirectional datasource",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Datasource ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Command to execute",
+                        "name": "command",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ExecuteCommandRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ExecuteCommandResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - connection does not support write",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Datasource not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/registry/categories": {
+            "get": {
+                "description": "Get all available categories with their type counts",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "registry"
+                ],
+                "summary": "List all connection type categories",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ListCategoriesResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/registry/connections": {
+            "get": {
+                "description": "Get all registered adapter types with their capabilities and configuration schema",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "registry"
+                ],
+                "summary": "List all available connection types",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by category (e.g., 'db', 'stream', 'api')",
+                        "name": "category",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ListConnectionTypesResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/registry/connections/{typeId}": {
+            "get": {
+                "description": "Get details about a specific adapter type including configuration schema",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "registry"
+                ],
+                "summary": "Get a specific connection type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Type ID (e.g., 'db.postgres', 'stream.websocket-bidir')",
+                        "name": "typeId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/registry.TypeInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "Type not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/settings": {
             "get": {
                 "description": "Get all settings that can be modified by administrators",
@@ -361,7 +569,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SettingsListResponse"
+                            "$ref": "#/definitions/models.SettingsListResponse"
                         }
                     },
                     "500": {
@@ -402,7 +610,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ConfigItem"
+                            "$ref": "#/definitions/models.ConfigItem"
                         }
                     },
                     "404": {
@@ -451,7 +659,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateSettingRequest"
+                            "$ref": "#/definitions/models.UpdateSettingRequest"
                         }
                     }
                 ],
@@ -459,7 +667,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ConfigItem"
+                            "$ref": "#/definitions/models.ConfigItem"
                         }
                     },
                     "400": {
@@ -506,7 +714,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UserCapabilitiesResponse"
+                            "$ref": "#/definitions/models.UserCapabilitiesResponse"
                         }
                     },
                     "401": {
@@ -575,7 +783,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartListResponse"
+                            "$ref": "#/definitions/models.ChartListResponse"
                         }
                     },
                     "400": {
@@ -613,7 +821,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CreateChartRequest"
+                            "$ref": "#/definitions/models.CreateChartRequest"
                         }
                     }
                 ],
@@ -621,7 +829,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     },
                     "400": {
@@ -666,7 +874,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartSummary"
+                                "$ref": "#/definitions/models.ChartSummary"
                             }
                         }
                     },
@@ -703,7 +911,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     },
                     "404": {
@@ -748,7 +956,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateChartRequest"
+                            "$ref": "#/definitions/models.UpdateChartRequest"
                         }
                     }
                 ],
@@ -756,7 +964,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     },
                     "400": {
@@ -841,7 +1049,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     },
                     "404": {
@@ -919,7 +1127,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartVersionInfo"
+                            "$ref": "#/definitions/models.ChartVersionInfo"
                         }
                     },
                     "404": {
@@ -1013,7 +1221,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     },
                     "404": {
@@ -1089,7 +1297,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SystemConfigResponse"
+                            "$ref": "#/definitions/models.SystemConfigResponse"
                         }
                     },
                     "500": {
@@ -1122,7 +1330,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateConfigRequest"
+                            "$ref": "#/definitions/models.UpdateConfigRequest"
                         }
                     }
                 ],
@@ -1130,7 +1338,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SystemConfigResponse"
+                            "$ref": "#/definitions/models.SystemConfigResponse"
                         }
                     },
                     "400": {
@@ -1177,7 +1385,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UserConfigResponse"
+                            "$ref": "#/definitions/models.UserConfigResponse"
                         }
                     },
                     "500": {
@@ -1217,7 +1425,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateConfigRequest"
+                            "$ref": "#/definitions/models.UpdateConfigRequest"
                         }
                     }
                 ],
@@ -1225,7 +1433,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UserConfigResponse"
+                            "$ref": "#/definitions/models.UserConfigResponse"
                         }
                     },
                     "400": {
@@ -1297,7 +1505,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Response when include_datasources=true",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSummaryListResponse"
+                            "$ref": "#/definitions/models.DashboardSummaryListResponse"
                         }
                     },
                     "400": {
@@ -1335,7 +1543,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CreateDashboardRequest"
+                            "$ref": "#/definitions/models.CreateDashboardRequest"
                         }
                     }
                 ],
@@ -1343,7 +1551,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard"
+                            "$ref": "#/definitions/models.Dashboard"
                         }
                     },
                     "400": {
@@ -1386,7 +1594,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard"
+                            "$ref": "#/definitions/models.Dashboard"
                         }
                     },
                     "404": {
@@ -1431,7 +1639,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateDashboardRequest"
+                            "$ref": "#/definitions/models.UpdateDashboardRequest"
                         }
                     }
                 ],
@@ -1439,7 +1647,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard"
+                            "$ref": "#/definitions/models.Dashboard"
                         }
                     },
                     "400": {
@@ -1562,7 +1770,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CreateDatasourceRequest"
+                            "$ref": "#/definitions/models.CreateDatasourceRequest"
                         }
                     }
                 ],
@@ -1570,7 +1778,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Datasource"
+                            "$ref": "#/definitions/models.Datasource"
                         }
                     },
                     "400": {
@@ -1652,7 +1860,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.TestDatasourceRequest"
+                            "$ref": "#/definitions/models.TestDatasourceRequest"
                         }
                     }
                 ],
@@ -1660,7 +1868,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.TestDatasourceResponse"
+                            "$ref": "#/definitions/models.TestDatasourceResponse"
                         }
                     },
                     "400": {
@@ -1696,7 +1904,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Datasource"
+                            "$ref": "#/definitions/models.Datasource"
                         }
                     },
                     "400": {
@@ -1741,7 +1949,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateDatasourceRequest"
+                            "$ref": "#/definitions/models.UpdateDatasourceRequest"
                         }
                     }
                 ],
@@ -1749,7 +1957,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Datasource"
+                            "$ref": "#/definitions/models.Datasource"
                         }
                     },
                     "400": {
@@ -1987,7 +2195,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.HealthInfo"
+                            "$ref": "#/definitions/models.HealthInfo"
                         }
                     },
                     "400": {
@@ -2085,7 +2293,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.QueryRequest"
+                            "$ref": "#/definitions/models.QueryRequest"
                         }
                     }
                 ],
@@ -2093,7 +2301,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.QueryResponse"
+                            "$ref": "#/definitions/models.QueryResponse"
                         }
                     },
                     "400": {
@@ -2136,7 +2344,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SchemaResponse"
+                            "$ref": "#/definitions/models.SchemaResponse"
                         }
                     },
                     "400": {
@@ -2233,7 +2441,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.StreamAggregatedRequest"
+                            "$ref": "#/definitions/handlers.StreamAggregatedRequest"
                         }
                     }
                 ],
@@ -2291,7 +2499,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_streaming.StreamStatus"
+                            "$ref": "#/definitions/streaming.StreamStatus"
                         }
                     },
                     "404": {
@@ -2352,7 +2560,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_mcp.JSONRPCRequest"
+                            "$ref": "#/definitions/mcp.JSONRPCRequest"
                         }
                     }
                 ],
@@ -2360,19 +2568,19 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_mcp.JSONRPCResponse"
+                            "$ref": "#/definitions/mcp.JSONRPCResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_mcp.JSONRPCResponse"
+                            "$ref": "#/definitions/mcp.JSONRPCResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_mcp.JSONRPCResponse"
+                            "$ref": "#/definitions/mcp.JSONRPCResponse"
                         }
                     }
                 }
@@ -2428,7 +2636,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UserListResponse"
+                            "$ref": "#/definitions/models.UserListResponse"
                         }
                     },
                     "403": {
@@ -2461,7 +2669,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CreateUserRequest"
+                            "$ref": "#/definitions/models.CreateUserRequest"
                         }
                     }
                 ],
@@ -2469,7 +2677,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.User"
+                            "$ref": "#/definitions/models.User"
                         }
                     },
                     "400": {
@@ -2507,7 +2715,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.User"
+                            "$ref": "#/definitions/models.User"
                         }
                     },
                     "404": {
@@ -2547,7 +2755,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.UpdateUserRequest"
+                            "$ref": "#/definitions/models.UpdateUserRequest"
                         }
                     }
                 ],
@@ -2555,7 +2763,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.User"
+                            "$ref": "#/definitions/models.User"
                         }
                     },
                     "400": {
@@ -2611,7 +2819,179 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "github_com_tviviano_dashboard_internal_models.AIMessage": {
+        "handlers.CategoryInfo": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "type_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.ExecuteCommandRequest": {
+            "type": "object",
+            "required": [
+                "action"
+            ],
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "payload": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "target": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.ExecuteCommandResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.ExecuteControlRequest": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "description": "The value from the control (bool, number, string, or null for buttons)"
+                }
+            }
+        },
+        "handlers.ListCategoriesResponse": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.CategoryInfo"
+                    }
+                }
+            }
+        },
+        "handlers.ListConnectionTypesResponse": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "count": {
+                    "type": "integer"
+                },
+                "types": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/registry.TypeInfo"
+                    }
+                }
+            }
+        },
+        "handlers.SaveSessionRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.StreamAggregatedRequest": {
+            "type": "object",
+            "required": [
+                "function",
+                "interval",
+                "timestamp_col",
+                "value_cols"
+            ],
+            "properties": {
+                "function": {
+                    "description": "avg, min, max, sum, count",
+                    "type": "string"
+                },
+                "interval": {
+                    "description": "Bucket interval in seconds",
+                    "type": "integer"
+                },
+                "series_col": {
+                    "description": "Column to partition by (e.g., \"location\") - optional",
+                    "type": "string"
+                },
+                "timestamp_col": {
+                    "description": "Timestamp column",
+                    "type": "string"
+                },
+                "value_cols": {
+                    "description": "Columns to aggregate",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "mcp.JSONRPCError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {},
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "mcp.JSONRPCRequest": {
+            "type": "object",
+            "properties": {
+                "id": {},
+                "jsonrpc": {
+                    "type": "string"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "params": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "mcp.JSONRPCResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/mcp.JSONRPCError"
+                },
+                "id": {},
+                "jsonrpc": {
+                    "type": "string"
+                },
+                "result": {}
+            }
+        },
+        "models.AIMessage": {
             "description": "A message in the AI conversation",
             "type": "object",
             "properties": {
@@ -2631,12 +3011,12 @@ const docTemplate = `{
                 "tool_calls": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ToolCall"
+                        "$ref": "#/definitions/models.ToolCall"
                     }
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.AISession": {
+        "models.AISession": {
             "description": "AI session for chart creation/editing",
             "type": "object",
             "properties": {
@@ -2659,7 +3039,7 @@ const docTemplate = `{
                     "description": "Conversation history",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.AIMessage"
+                        "$ref": "#/definitions/models.AIMessage"
                     }
                 },
                 "status": {
@@ -2671,7 +3051,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.AISessionResponse": {
+        "models.AISessionResponse": {
             "description": "Response containing AI session state",
             "type": "object",
             "properties": {
@@ -2679,16 +3059,16 @@ const docTemplate = `{
                     "description": "Current chart state (draft)",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                            "$ref": "#/definitions/models.Chart"
                         }
                     ]
                 },
                 "session": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.AISession"
+                    "$ref": "#/definitions/models.AISession"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.APIConfig": {
+        "models.APIConfig": {
             "type": "object",
             "required": [
                 "url"
@@ -2730,7 +3110,7 @@ const docTemplate = `{
                     "description": "Response parsing config",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.APIResponseConfig"
+                            "$ref": "#/definitions/models.APIResponseConfig"
                         }
                     ]
                 },
@@ -2751,7 +3131,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.APIResponseConfig": {
+        "models.APIResponseConfig": {
             "type": "object",
             "properties": {
                 "data_path": {
@@ -2760,7 +3140,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.CSVConfig": {
+        "models.CSVConfig": {
             "type": "object",
             "required": [
                 "path"
@@ -2793,7 +3173,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.Capability": {
+        "models.Capability": {
             "type": "string",
             "enum": [
                 "view",
@@ -2806,8 +3186,8 @@ const docTemplate = `{
                 "CapabilityManage"
             ]
         },
-        "github_com_tviviano_dashboard_internal_models.Chart": {
-            "description": "Chart with data source binding, query config, and visualization settings",
+        "models.Chart": {
+            "description": "Chart/Control with data source binding, query config, and visualization settings",
             "type": "object",
             "required": [
                 "name"
@@ -2818,27 +3198,39 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "chart_type": {
-                    "description": "bar, line, pie, gauge, etc.",
+                    "description": "bar, line, pie, gauge, etc. (charts only)",
                     "type": "string"
                 },
                 "component_code": {
                     "description": "React component code",
                     "type": "string"
                 },
+                "component_type": {
+                    "description": "\"chart\" (default) | \"control\"",
+                    "type": "string"
+                },
+                "connection_id": {
+                    "description": "Reference to connection",
+                    "type": "string"
+                },
+                "control_config": {
+                    "description": "Control configuration (controls only)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.ControlConfig"
+                        }
+                    ]
+                },
                 "created": {
                     "type": "string"
                 },
                 "data_mapping": {
-                    "description": "How to map data to chart",
+                    "description": "How to map data to chart (charts only)",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartDataMapping"
+                            "$ref": "#/definitions/models.ChartDataMapping"
                         }
                     ]
-                },
-                "datasource_id": {
-                    "description": "Reference to data source",
-                    "type": "string"
                 },
                 "description": {
                     "type": "string"
@@ -2852,15 +3244,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "options": {
-                    "description": "ECharts options overrides",
+                    "description": "ECharts options overrides (charts only)",
                     "type": "object",
                     "additionalProperties": true
                 },
                 "query_config": {
-                    "description": "How to query data",
+                    "description": "How to query data (charts only)",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartQueryConfig"
+                            "$ref": "#/definitions/models.ChartQueryConfig"
                         }
                     ]
                 },
@@ -2896,7 +3288,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ChartDataMapping": {
+        "models.ChartDataMapping": {
             "description": "Mapping configuration from data columns to chart axes/series",
             "type": "object",
             "properties": {
@@ -2904,15 +3296,22 @@ const docTemplate = `{
                     "description": "Aggregation to apply (first, last, avg, etc.)",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DataAggregation"
+                            "$ref": "#/definitions/models.DataAggregation"
                         }
                     ]
+                },
+                "column_aliases": {
+                    "description": "Display names for columns (column name -\u003e display name), primarily for dataview",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 },
                 "filters": {
                     "description": "Client-side filters applied after data fetch",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DataFilter"
+                        "$ref": "#/definitions/models.DataFilter"
                     }
                 },
                 "group_by": {
@@ -2935,7 +3334,7 @@ const docTemplate = `{
                     "description": "Time-based sliding window (e.g., last 5 minutes)",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SlidingWindow"
+                            "$ref": "#/definitions/models.SlidingWindow"
                         }
                     ]
                 },
@@ -2951,7 +3350,7 @@ const docTemplate = `{
                     "description": "Time-bucketed aggregation for streaming data",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.TimeBucket"
+                            "$ref": "#/definitions/models.TimeBucket"
                         }
                     ]
                 },
@@ -2980,14 +3379,14 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ChartListResponse": {
+        "models.ChartListResponse": {
             "description": "Response containing a list of charts with pagination",
             "type": "object",
             "properties": {
                 "charts": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Chart"
+                        "$ref": "#/definitions/models.Chart"
                     }
                 },
                 "page": {
@@ -3001,7 +3400,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ChartQueryConfig": {
+        "models.ChartQueryConfig": {
             "description": "Query configuration for fetching chart data",
             "type": "object",
             "properties": {
@@ -3020,14 +3419,17 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ChartSummary": {
+        "models.ChartSummary": {
             "description": "Minimal chart info for selection cards and lists",
             "type": "object",
             "properties": {
                 "chart_type": {
                     "type": "string"
                 },
-                "datasource_id": {
+                "component_type": {
+                    "type": "string"
+                },
+                "connection_id": {
                     "type": "string"
                 },
                 "description": {
@@ -3056,7 +3458,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ChartVersionInfo": {
+        "models.ChartVersionInfo": {
             "description": "Version info for a chart",
             "type": "object",
             "properties": {
@@ -3079,7 +3481,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ColumnInfo": {
+        "models.ColumnInfo": {
             "type": "object",
             "properties": {
                 "default": {
@@ -3104,7 +3506,26 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ConfigItem": {
+        "models.CommandConfig": {
+            "description": "Configuration for sending commands via a connection",
+            "type": "object",
+            "properties": {
+                "action": {
+                    "description": "Command action name",
+                    "type": "string"
+                },
+                "payload_template": {
+                    "description": "Template with {{value}} placeholder",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "target": {
+                    "description": "Optional target identifier",
+                    "type": "string"
+                }
+            }
+        },
+        "models.ConfigItem": {
             "type": "object",
             "properties": {
                 "category": {
@@ -3134,7 +3555,30 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.CreateAISessionRequest": {
+        "models.ControlConfig": {
+            "description": "Configuration for interactive control components (buttons, toggles, etc.)",
+            "type": "object",
+            "properties": {
+                "command_config": {
+                    "description": "How to send commands",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.CommandConfig"
+                        }
+                    ]
+                },
+                "control_type": {
+                    "description": "button, toggle, slider, text_input",
+                    "type": "string"
+                },
+                "ui_config": {
+                    "description": "Type-specific UI configuration",
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "models.CreateAISessionRequest": {
             "description": "Request body for creating a new AI session",
             "type": "object",
             "properties": {
@@ -3148,8 +3592,8 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.CreateChartRequest": {
-            "description": "Request body for creating a new chart",
+        "models.CreateChartRequest": {
+            "description": "Request body for creating a new chart or control",
             "type": "object",
             "required": [
                 "name"
@@ -3161,11 +3605,18 @@ const docTemplate = `{
                 "component_code": {
                     "type": "string"
                 },
-                "data_mapping": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartDataMapping"
-                },
-                "datasource_id": {
+                "component_type": {
+                    "description": "\"chart\" (default) | \"control\"",
                     "type": "string"
+                },
+                "connection_id": {
+                    "type": "string"
+                },
+                "control_config": {
+                    "$ref": "#/definitions/models.ControlConfig"
+                },
+                "data_mapping": {
+                    "$ref": "#/definitions/models.ChartDataMapping"
                 },
                 "description": {
                     "type": "string"
@@ -3178,7 +3629,7 @@ const docTemplate = `{
                     "additionalProperties": true
                 },
                 "query_config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartQueryConfig"
+                    "$ref": "#/definitions/models.ChartQueryConfig"
                 },
                 "tags": {
                     "type": "array",
@@ -3197,7 +3648,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.CreateDashboardRequest": {
+        "models.CreateDashboardRequest": {
             "description": "Request body for creating a new dashboard",
             "type": "object",
             "required": [
@@ -3218,24 +3669,22 @@ const docTemplate = `{
                     "description": "Panels with optional chart_id",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardPanel"
+                        "$ref": "#/definitions/models.DashboardPanel"
                     }
                 },
                 "settings": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSettings"
+                    "$ref": "#/definitions/models.DashboardSettings"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.CreateDatasourceRequest": {
+        "models.CreateDatasourceRequest": {
             "type": "object",
             "required": [
-                "config",
-                "name",
-                "type"
+                "name"
             ],
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig"
+                    "$ref": "#/definitions/models.DatasourceConfig"
                 },
                 "description": {
                     "type": "string"
@@ -3254,24 +3703,24 @@ const docTemplate = `{
                     }
                 },
                 "type": {
-                    "enum": [
-                        "sql",
-                        "csv",
-                        "socket",
-                        "api",
-                        "tsstore",
-                        "prometheus",
-                        "edgelake"
-                    ],
+                    "description": "LEGACY: Keep for backwards compatibility",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceType"
+                            "$ref": "#/definitions/models.DatasourceType"
                         }
                     ]
+                },
+                "type_config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "type_id": {
+                    "description": "NEW: Registry-based type system (preferred)",
+                    "type": "string"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.CreateUserRequest": {
+        "models.CreateUserRequest": {
             "description": "Request body for creating a new user",
             "type": "object",
             "required": [
@@ -3281,7 +3730,7 @@ const docTemplate = `{
                 "capabilities": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Capability"
+                        "$ref": "#/definitions/models.Capability"
                     }
                 },
                 "email": {
@@ -3292,7 +3741,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.Dashboard": {
+        "models.Dashboard": {
             "description": "Dashboard with panels that reference standalone charts",
             "type": "object",
             "required": [
@@ -3319,11 +3768,11 @@ const docTemplate = `{
                     "description": "Panels with chart_id references",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardPanel"
+                        "$ref": "#/definitions/models.DashboardPanel"
                     }
                 },
                 "settings": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSettings"
+                    "$ref": "#/definitions/models.DashboardSettings"
                 },
                 "thumbnail": {
                     "description": "Base64 encoded thumbnail image",
@@ -3334,14 +3783,14 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DashboardListResponse": {
+        "models.DashboardListResponse": {
             "description": "Response containing a list of dashboards with pagination",
             "type": "object",
             "properties": {
                 "dashboards": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Dashboard"
+                        "$ref": "#/definitions/models.Dashboard"
                     }
                 },
                 "page": {
@@ -3355,7 +3804,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DashboardPanel": {
+        "models.DashboardPanel": {
             "description": "Panel position and size in the grid with optional chart reference",
             "type": "object",
             "properties": {
@@ -3380,7 +3829,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DashboardSettings": {
+        "models.DashboardSettings": {
             "description": "Dashboard settings and preferences",
             "type": "object",
             "properties": {
@@ -3411,7 +3860,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DashboardSummary": {
+        "models.DashboardSummary": {
             "description": "Dashboard info with optional data source names for display in tiles",
             "type": "object",
             "properties": {
@@ -3438,7 +3887,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "settings": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSettings"
+                    "$ref": "#/definitions/models.DashboardSettings"
                 },
                 "thumbnail": {
                     "type": "string"
@@ -3448,14 +3897,14 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DashboardSummaryListResponse": {
+        "models.DashboardSummaryListResponse": {
             "description": "Response containing dashboard summaries with optional data source info",
             "type": "object",
             "properties": {
                 "dashboards": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSummary"
+                        "$ref": "#/definitions/models.DashboardSummary"
                     }
                 },
                 "page": {
@@ -3469,7 +3918,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DataAggregation": {
+        "models.DataAggregation": {
             "description": "Aggregation configuration for data transformation",
             "type": "object",
             "properties": {
@@ -3491,7 +3940,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DataFilter": {
+        "models.DataFilter": {
             "description": "Filter condition for data transformation",
             "type": "object",
             "properties": {
@@ -3508,16 +3957,14 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.Datasource": {
+        "models.Datasource": {
             "type": "object",
             "required": [
-                "config",
-                "name",
-                "type"
+                "name"
             ],
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig"
+                    "$ref": "#/definitions/models.DatasourceConfig"
                 },
                 "created_at": {
                     "type": "string"
@@ -3526,7 +3973,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "health": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.HealthInfo"
+                    "$ref": "#/definitions/models.HealthInfo"
                 },
                 "id": {
                     "type": "string"
@@ -3545,53 +3992,53 @@ const docTemplate = `{
                     }
                 },
                 "type": {
-                    "enum": [
-                        "sql",
-                        "csv",
-                        "socket",
-                        "api",
-                        "tsstore",
-                        "prometheus",
-                        "edgelake"
-                    ],
+                    "description": "LEGACY: Keep for backwards compatibility during migration",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceType"
+                            "$ref": "#/definitions/models.DatasourceType"
                         }
                     ]
+                },
+                "type_config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "type_id": {
+                    "description": "NEW: Registry-based type system (preferred)\nTypeID format: \"category.name\" (e.g., \"db.postgres\", \"stream.websocket-bidir\")",
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DatasourceConfig": {
+        "models.DatasourceConfig": {
             "type": "object",
             "properties": {
                 "api": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.APIConfig"
+                    "$ref": "#/definitions/models.APIConfig"
                 },
                 "csv": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.CSVConfig"
+                    "$ref": "#/definitions/models.CSVConfig"
                 },
                 "edgelake": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.EdgeLakeConfig"
+                    "$ref": "#/definitions/models.EdgeLakeConfig"
                 },
                 "prometheus": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.PrometheusConfig"
+                    "$ref": "#/definitions/models.PrometheusConfig"
                 },
                 "socket": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SocketConfig"
+                    "$ref": "#/definitions/models.SocketConfig"
                 },
                 "sql": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SQLConfig"
+                    "$ref": "#/definitions/models.SQLConfig"
                 },
                 "tsstore": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.TSStoreConfig"
+                    "$ref": "#/definitions/models.TSStoreConfig"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.DatasourceType": {
+        "models.DatasourceType": {
             "type": "string",
             "enum": [
                 "sql",
@@ -3612,7 +4059,7 @@ const docTemplate = `{
                 "DatasourceTypeEdgeLake"
             ]
         },
-        "github_com_tviviano_dashboard_internal_models.EdgeLakeConfig": {
+        "models.EdgeLakeConfig": {
             "type": "object",
             "required": [
                 "host",
@@ -3637,7 +4084,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.HealthInfo": {
+        "models.HealthInfo": {
             "type": "object",
             "properties": {
                 "error_message": {
@@ -3654,11 +4101,11 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "status": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.HealthStatus"
+                    "$ref": "#/definitions/models.HealthStatus"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.HealthStatus": {
+        "models.HealthStatus": {
             "type": "string",
             "enum": [
                 "unknown",
@@ -3673,7 +4120,7 @@ const docTemplate = `{
                 "HealthStatusDegraded"
             ]
         },
-        "github_com_tviviano_dashboard_internal_models.LayoutDimensionDTO": {
+        "models.LayoutDimensionDTO": {
             "type": "object",
             "properties": {
                 "max_height": {
@@ -3687,7 +4134,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.PrometheusConfig": {
+        "models.PrometheusConfig": {
             "type": "object",
             "required": [
                 "url"
@@ -3711,7 +4158,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.PrometheusMetricInfo": {
+        "models.PrometheusMetricInfo": {
             "type": "object",
             "properties": {
                 "help": {
@@ -3735,7 +4182,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.PrometheusSchemaInfo": {
+        "models.PrometheusSchemaInfo": {
             "type": "object",
             "properties": {
                 "labels": {
@@ -3749,12 +4196,12 @@ const docTemplate = `{
                     "description": "Available metrics",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.PrometheusMetricInfo"
+                        "$ref": "#/definitions/models.PrometheusMetricInfo"
                     }
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.Query": {
+        "models.Query": {
             "type": "object",
             "properties": {
                 "params": {
@@ -3770,24 +4217,24 @@ const docTemplate = `{
                     "description": "Query type",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.QueryType"
+                            "$ref": "#/definitions/models.QueryType"
                         }
                     ]
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.QueryRequest": {
+        "models.QueryRequest": {
             "type": "object",
             "required": [
                 "query"
             ],
             "properties": {
                 "query": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Query"
+                    "$ref": "#/definitions/models.Query"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.QueryResponse": {
+        "models.QueryResponse": {
             "type": "object",
             "properties": {
                 "duration": {
@@ -3798,14 +4245,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "result_set": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ResultSet"
+                    "$ref": "#/definitions/models.ResultSet"
                 },
                 "success": {
                     "type": "boolean"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.QueryType": {
+        "models.QueryType": {
             "type": "string",
             "enum": [
                 "sql",
@@ -3826,7 +4273,7 @@ const docTemplate = `{
                 "QueryTypeEdgeLake"
             ]
         },
-        "github_com_tviviano_dashboard_internal_models.ResultSet": {
+        "models.ResultSet": {
             "type": "object",
             "properties": {
                 "columns": {
@@ -3851,7 +4298,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SQLConfig": {
+        "models.SQLConfig": {
             "type": "object",
             "required": [
                 "driver"
@@ -3898,7 +4345,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SchemaInfo": {
+        "models.SchemaInfo": {
             "type": "object",
             "properties": {
                 "database": {
@@ -3909,12 +4356,12 @@ const docTemplate = `{
                     "description": "Tables in the database",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.TableInfo"
+                        "$ref": "#/definitions/models.TableInfo"
                     }
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SchemaResponse": {
+        "models.SchemaResponse": {
             "type": "object",
             "properties": {
                 "duration": {
@@ -3928,7 +4375,7 @@ const docTemplate = `{
                     "description": "For Prometheus datasources",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.PrometheusSchemaInfo"
+                            "$ref": "#/definitions/models.PrometheusSchemaInfo"
                         }
                     ]
                 },
@@ -3936,7 +4383,7 @@ const docTemplate = `{
                     "description": "For SQL datasources",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SchemaInfo"
+                            "$ref": "#/definitions/models.SchemaInfo"
                         }
                     ]
                 },
@@ -3945,7 +4392,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SendMessageRequest": {
+        "models.SendMessageRequest": {
             "description": "Request body for sending a user message",
             "type": "object",
             "required": [
@@ -3958,18 +4405,18 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SettingsListResponse": {
+        "models.SettingsListResponse": {
             "type": "object",
             "properties": {
                 "settings": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ConfigItem"
+                        "$ref": "#/definitions/models.ConfigItem"
                     }
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SlidingWindow": {
+        "models.SlidingWindow": {
             "description": "Time window configuration for limiting data to recent entries",
             "type": "object",
             "properties": {
@@ -3983,7 +4430,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SocketConfig": {
+        "models.SocketConfig": {
             "type": "object",
             "required": [
                 "protocol",
@@ -4008,7 +4455,7 @@ const docTemplate = `{
                     "description": "parser configuration",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.SocketParserConfig"
+                            "$ref": "#/definitions/models.SocketParserConfig"
                         }
                     ]
                 },
@@ -4036,7 +4483,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SocketParserConfig": {
+        "models.SocketParserConfig": {
             "type": "object",
             "properties": {
                 "data_path": {
@@ -4074,7 +4521,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.SystemConfigResponse": {
+        "models.SystemConfigResponse": {
             "type": "object",
             "properties": {
                 "config_refresh_interval": {
@@ -4087,7 +4534,7 @@ const docTemplate = `{
                 "layout_dimensions": {
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.LayoutDimensionDTO"
+                        "$ref": "#/definitions/models.LayoutDimensionDTO"
                     }
                 },
                 "settings": {
@@ -4096,7 +4543,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.TSStoreConfig": {
+        "models.TSStoreConfig": {
             "type": "object",
             "required": [
                 "host",
@@ -4113,7 +4560,7 @@ const docTemplate = `{
                     "description": "Store data type: json, schema, text (default: json)",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.TSStoreDataType"
+                            "$ref": "#/definitions/models.TSStoreDataType"
                         }
                     ]
                 },
@@ -4140,7 +4587,7 @@ const docTemplate = `{
                     ],
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.TSStoreProtocol"
+                            "$ref": "#/definitions/models.TSStoreProtocol"
                         }
                     ]
                 },
@@ -4148,7 +4595,7 @@ const docTemplate = `{
                     "description": "Push connection configuration for streaming (ts-store v0.2.2+)\nWhen streaming is enabled, dashboard calls ts-store API to create a push connection\nand ts-store dials out to dashboard's inbound WebSocket endpoint",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.TSStorePushConfig"
+                            "$ref": "#/definitions/models.TSStorePushConfig"
                         }
                     ]
                 },
@@ -4162,7 +4609,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.TSStoreDataType": {
+        "models.TSStoreDataType": {
             "type": "string",
             "enum": [
                 "json",
@@ -4180,7 +4627,7 @@ const docTemplate = `{
                 "TSStoreDataTypeText"
             ]
         },
-        "github_com_tviviano_dashboard_internal_models.TSStoreProtocol": {
+        "models.TSStoreProtocol": {
             "type": "string",
             "enum": [
                 "http",
@@ -4195,7 +4642,7 @@ const docTemplate = `{
                 "TSStoreProtocolHTTPS"
             ]
         },
-        "github_com_tviviano_dashboard_internal_models.TSStorePushConfig": {
+        "models.TSStorePushConfig": {
             "type": "object",
             "properties": {
                 "agg_default": {
@@ -4232,14 +4679,14 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.TableInfo": {
+        "models.TableInfo": {
             "type": "object",
             "properties": {
                 "columns": {
                     "description": "Columns in the table",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ColumnInfo"
+                        "$ref": "#/definitions/models.ColumnInfo"
                     }
                 },
                 "name": {
@@ -4252,35 +4699,31 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.TestDatasourceRequest": {
+        "models.TestDatasourceRequest": {
             "type": "object",
-            "required": [
-                "config",
-                "type"
-            ],
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig"
+                    "$ref": "#/definitions/models.DatasourceConfig"
                 },
                 "type": {
-                    "enum": [
-                        "sql",
-                        "csv",
-                        "socket",
-                        "api",
-                        "tsstore",
-                        "prometheus",
-                        "edgelake"
-                    ],
+                    "description": "LEGACY: Keep for backwards compatibility",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceType"
+                            "$ref": "#/definitions/models.DatasourceType"
                         }
                     ]
+                },
+                "type_config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "type_id": {
+                    "description": "NEW: Registry-based type system (preferred)",
+                    "type": "string"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.TestDatasourceResponse": {
+        "models.TestDatasourceResponse": {
             "type": "object",
             "properties": {
                 "data": {},
@@ -4292,14 +4735,14 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "status": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.HealthStatus"
+                    "$ref": "#/definitions/models.HealthStatus"
                 },
                 "success": {
                     "type": "boolean"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.TimeBucket": {
+        "models.TimeBucket": {
             "description": "Time bucket configuration for aggregating streaming data into intervals",
             "type": "object",
             "properties": {
@@ -4324,7 +4767,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.ToolCall": {
+        "models.ToolCall": {
             "description": "A tool call made by the AI",
             "type": "object",
             "properties": {
@@ -4344,8 +4787,8 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UpdateChartRequest": {
-            "description": "Request body for updating an existing chart",
+        "models.UpdateChartRequest": {
+            "description": "Request body for updating an existing chart or control",
             "type": "object",
             "properties": {
                 "chart_type": {
@@ -4354,11 +4797,17 @@ const docTemplate = `{
                 "component_code": {
                     "type": "string"
                 },
-                "data_mapping": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartDataMapping"
-                },
-                "datasource_id": {
+                "component_type": {
                     "type": "string"
+                },
+                "connection_id": {
+                    "type": "string"
+                },
+                "control_config": {
+                    "$ref": "#/definitions/models.ControlConfig"
+                },
+                "data_mapping": {
+                    "$ref": "#/definitions/models.ChartDataMapping"
                 },
                 "description": {
                     "type": "string"
@@ -4371,7 +4820,7 @@ const docTemplate = `{
                     "additionalProperties": true
                 },
                 "query_config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.ChartQueryConfig"
+                    "$ref": "#/definitions/models.ChartQueryConfig"
                 },
                 "tags": {
                     "type": "array",
@@ -4390,7 +4839,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UpdateConfigRequest": {
+        "models.UpdateConfigRequest": {
             "type": "object",
             "required": [
                 "settings"
@@ -4402,7 +4851,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UpdateDashboardRequest": {
+        "models.UpdateDashboardRequest": {
             "description": "Request body for updating an existing dashboard",
             "type": "object",
             "properties": {
@@ -4420,22 +4869,27 @@ const docTemplate = `{
                     "description": "Panels with optional chart_id",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardPanel"
+                        "$ref": "#/definitions/models.DashboardPanel"
                     }
                 },
                 "settings": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DashboardSettings"
+                    "$ref": "#/definitions/models.DashboardSettings"
                 },
                 "thumbnail": {
                     "type": "string"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UpdateDatasourceRequest": {
+        "models.UpdateDatasourceRequest": {
             "type": "object",
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.DatasourceConfig"
+                    "description": "LEGACY: Keep for backwards compatibility",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.DatasourceConfig"
+                        }
+                    ]
                 },
                 "description": {
                     "type": "string"
@@ -4452,10 +4906,18 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "type_config": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "type_id": {
+                    "description": "NEW: Registry-based type system",
+                    "type": "string"
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UpdateSettingRequest": {
+        "models.UpdateSettingRequest": {
             "type": "object",
             "required": [
                 "value"
@@ -4464,7 +4926,7 @@ const docTemplate = `{
                 "value": {}
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UpdateUserRequest": {
+        "models.UpdateUserRequest": {
             "description": "Request body for updating an existing user",
             "type": "object",
             "properties": {
@@ -4474,7 +4936,7 @@ const docTemplate = `{
                 "capabilities": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Capability"
+                        "$ref": "#/definitions/models.Capability"
                     }
                 },
                 "email": {
@@ -4485,7 +4947,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.User": {
+        "models.User": {
             "description": "User account with authentication and capabilities",
             "type": "object",
             "properties": {
@@ -4497,7 +4959,7 @@ const docTemplate = `{
                     "description": "User capabilities",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Capability"
+                        "$ref": "#/definitions/models.Capability"
                     }
                 },
                 "created": {
@@ -4523,7 +4985,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UserCapabilitiesResponse": {
+        "models.UserCapabilitiesResponse": {
             "description": "Current user's capabilities and access permissions",
             "type": "object",
             "properties": {
@@ -4536,7 +4998,7 @@ const docTemplate = `{
                 "capabilities": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.Capability"
+                        "$ref": "#/definitions/models.Capability"
                     }
                 },
                 "name": {
@@ -4547,7 +5009,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UserConfigResponse": {
+        "models.UserConfigResponse": {
             "type": "object",
             "properties": {
                 "settings": {
@@ -4559,7 +5021,7 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_models.UserListResponse": {
+        "models.UserListResponse": {
             "description": "Response containing a list of users with pagination",
             "type": "object",
             "properties": {
@@ -4575,12 +5037,79 @@ const docTemplate = `{
                 "users": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_tviviano_dashboard_internal_models.User"
+                        "$ref": "#/definitions/models.User"
                     }
                 }
             }
         },
-        "github_com_tviviano_dashboard_internal_streaming.StreamStatus": {
+        "registry.Capabilities": {
+            "type": "object",
+            "properties": {
+                "can_read": {
+                    "description": "All adapters support reading",
+                    "type": "boolean"
+                },
+                "can_stream": {
+                    "description": "Real-time subscription support",
+                    "type": "boolean"
+                },
+                "can_write": {
+                    "description": "Bidirectional adapters only",
+                    "type": "boolean"
+                }
+            }
+        },
+        "registry.ConfigField": {
+            "type": "object",
+            "properties": {
+                "default": {},
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "options": {
+                    "description": "For select type",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "type": {
+                    "description": "string, int, bool, password, select",
+                    "type": "string"
+                }
+            }
+        },
+        "registry.TypeInfo": {
+            "type": "object",
+            "properties": {
+                "capabilities": {
+                    "$ref": "#/definitions/registry.Capabilities"
+                },
+                "category": {
+                    "description": "e.g., \"db\", \"stream\", \"api\", \"file\", \"store\"",
+                    "type": "string"
+                },
+                "config_schema": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/registry.ConfigField"
+                    }
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "type_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "streaming.StreamStatus": {
             "type": "object",
             "properties": {
                 "bufferCount": {
@@ -4597,89 +5126,6 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
-        },
-        "internal_handlers.SaveSessionRequest": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_handlers.StreamAggregatedRequest": {
-            "type": "object",
-            "required": [
-                "function",
-                "interval",
-                "timestamp_col",
-                "value_cols"
-            ],
-            "properties": {
-                "function": {
-                    "description": "avg, min, max, sum, count",
-                    "type": "string"
-                },
-                "interval": {
-                    "description": "Bucket interval in seconds",
-                    "type": "integer"
-                },
-                "series_col": {
-                    "description": "Column to partition by (e.g., \"location\") - optional",
-                    "type": "string"
-                },
-                "timestamp_col": {
-                    "description": "Timestamp column",
-                    "type": "string"
-                },
-                "value_cols": {
-                    "description": "Columns to aggregate",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "internal_mcp.JSONRPCError": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {},
-                "message": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_mcp.JSONRPCRequest": {
-            "type": "object",
-            "properties": {
-                "id": {},
-                "jsonrpc": {
-                    "type": "string"
-                },
-                "method": {
-                    "type": "string"
-                },
-                "params": {
-                    "type": "object",
-                    "additionalProperties": true
-                }
-            }
-        },
-        "internal_mcp.JSONRPCResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "$ref": "#/definitions/internal_mcp.JSONRPCError"
-                },
-                "id": {},
-                "jsonrpc": {
-                    "type": "string"
-                },
-                "result": {}
-            }
         }
     }
 }`
@@ -4690,7 +5136,7 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:3001",
 	BasePath:         "/api",
 	Schemes:          []string{},
-	Title:            "GiVi-Solution Dashboard API",
+	Title:            "TRVE Dashboards API",
 	Description:      "Dashboard system with AI-powered chart generation",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,

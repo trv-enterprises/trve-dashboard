@@ -1,8 +1,8 @@
-# GiVi-Solution Dashboard Architecture
+# TRVE Dashboards Architecture
 
 ## System Overview
 
-GiVi-Solution Dashboard is a full-stack application for creating, managing, and viewing dynamic data visualization dashboards. The application supports real-time data from multiple sources and features an AI-powered chart generation system.
+TRVE Dashboards is a full-stack application for creating, managing, and viewing dynamic data visualization dashboards. The application supports real-time data from multiple sources and features an AI-powered chart generation system.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐

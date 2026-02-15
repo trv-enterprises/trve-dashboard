@@ -37,7 +37,7 @@ import (
 	_ "github.com/tviviano/dashboard/internal/datasource" // Register adapters via init()
 )
 
-// @title GiVi-Solution Dashboard API
+// @title TRVE Dashboards API
 // @version 1.0
 // @description Dashboard system with AI-powered chart generation
 // @contact.name Dashboard Team
