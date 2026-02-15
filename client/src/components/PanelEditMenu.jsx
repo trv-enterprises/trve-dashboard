@@ -43,12 +43,50 @@ function PanelEditMenu({
   onSelectControl
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState({});
   const menuRef = useRef(null);
+  const buttonRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  // Calculate dropdown position when opened
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect();
+      const dropdownWidth = 320; // min-width from CSS
+
+      // Position below the button, centered horizontally
+      let left = buttonRect.left + (buttonRect.width / 2) - (dropdownWidth / 2);
+      let top = buttonRect.bottom + 4;
+
+      // Keep dropdown within viewport bounds
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Adjust horizontal position if needed
+      if (left < 8) {
+        left = 8;
+      } else if (left + dropdownWidth > viewportWidth - 8) {
+        left = viewportWidth - dropdownWidth - 8;
+      }
+
+      // If dropdown would go below viewport, position above button instead
+      const estimatedDropdownHeight = 200; // rough estimate
+      if (top + estimatedDropdownHeight > viewportHeight - 8) {
+        top = buttonRect.top - estimatedDropdownHeight - 4;
+      }
+
+      setDropdownStyle({
+        top: `${top}px`,
+        left: `${left}px`
+      });
+    }
+  }, [isOpen]);
 
   // Close on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
+      if (menuRef.current && !menuRef.current.contains(e.target) &&
+          dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setIsOpen(false);
       }
     };
@@ -74,17 +112,19 @@ function PanelEditMenu({
 
   return (
     <div className="panel-edit-menu" ref={menuRef}>
-      <Button
-        kind={buttonKind}
-        size={buttonSize}
-        onClick={() => setIsOpen(!isOpen)}
-        renderIcon={() => <ChevronDown size={16} className={`panel-edit-menu-chevron ${isOpen ? 'open' : ''}`} />}
-      >
-        {buttonLabel}
-      </Button>
+      <div ref={buttonRef}>
+        <Button
+          kind={buttonKind}
+          size={buttonSize}
+          onClick={() => setIsOpen(!isOpen)}
+          renderIcon={() => <ChevronDown size={16} className={`panel-edit-menu-chevron ${isOpen ? 'open' : ''}`} />}
+        >
+          {buttonLabel}
+        </Button>
+      </div>
 
       {isOpen && (
-        <div className="panel-edit-menu-dropdown">
+        <div className="panel-edit-menu-dropdown" ref={dropdownRef} style={dropdownStyle}>
           {/* Displays Column */}
           <div className="panel-edit-menu-column">
             <div className="panel-edit-menu-header">

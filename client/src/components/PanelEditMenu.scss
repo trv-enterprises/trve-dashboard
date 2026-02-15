@@ -19,16 +19,13 @@
 }
 
 .panel-edit-menu-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
   display: flex;
   background-color: var(--cds-layer-02);
   border: 1px solid var(--cds-border-subtle-01);
   border-radius: 4px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  z-index: 9000;
+  z-index: 9100;
   min-width: 320px;
 }
 
