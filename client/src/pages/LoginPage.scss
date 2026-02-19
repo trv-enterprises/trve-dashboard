@@ -1,0 +1,85 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
+@use '@carbon/styles/scss/spacing' as spacing;
+@use '@carbon/styles/scss/type' as type;
+
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--cds-background);
+  padding: spacing.$spacing-05;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 400px;
+}
+
+.login-tile {
+  padding: spacing.$spacing-07;
+  background-color: var(--cds-layer-01);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: spacing.$spacing-06;
+
+  svg {
+    color: var(--cds-icon-primary);
+    margin-bottom: spacing.$spacing-04;
+  }
+
+  h1 {
+    @include type.type-style('heading-04');
+    color: var(--cds-text-primary);
+    margin: 0 0 spacing.$spacing-03 0;
+  }
+
+  .login-subtitle {
+    @include type.type-style('body-01');
+    color: var(--cds-text-secondary);
+    margin: 0;
+  }
+}
+
+.login-error {
+  margin-bottom: spacing.$spacing-05;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-05;
+
+  .cds--text-input-wrapper {
+    width: 100%;
+  }
+
+  .login-button {
+    width: 100%;
+    max-width: none;
+    justify-content: center;
+    margin-top: spacing.$spacing-03;
+
+    .cds--loading {
+      margin-right: spacing.$spacing-03;
+    }
+  }
+}
+
+.login-footer {
+  margin-top: spacing.$spacing-06;
+  padding-top: spacing.$spacing-05;
+  border-top: 1px solid var(--cds-border-subtle-01);
+  text-align: center;
+
+  p {
+    @include type.type-style('helper-text-01');
+    color: var(--cds-text-secondary);
+    margin: 0;
+  }
+}

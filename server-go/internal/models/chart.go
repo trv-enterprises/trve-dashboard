@@ -31,9 +31,17 @@ const (
 // ControlConfig defines configuration for control components
 // @Description Configuration for interactive control components (buttons, toggles, etc.)
 type ControlConfig struct {
-	ControlType   string                 `json:"control_type" bson:"control_type"`     // button, toggle, slider, text_input
-	CommandConfig *CommandConfig         `json:"command_config" bson:"command_config"` // How to send commands
-	UIConfig      map[string]interface{} `json:"ui_config" bson:"ui_config"`           // Type-specific UI configuration
+	ControlType string `json:"control_type" bson:"control_type"` // button, toggle, slider, text_input
+
+	// Schema-based control configuration (preferred - Phase 3)
+	SchemaID string `json:"schema_id,omitempty" bson:"schema_id,omitempty"` // Reference to control_schema
+	Target   string `json:"target,omitempty" bson:"target,omitempty"`       // Device/endpoint identifier for schema interpolation
+
+	// Legacy command configuration (deprecated, use schema instead)
+	CommandConfig *CommandConfig `json:"command_config,omitempty" bson:"command_config,omitempty"` // How to send commands
+
+	// UI configuration
+	UIConfig map[string]interface{} `json:"ui_config" bson:"ui_config"` // Type-specific UI configuration
 }
 
 // CommandConfig defines how a control sends commands to a connection

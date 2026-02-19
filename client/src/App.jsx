@@ -13,7 +13,8 @@ import {
   SideNav,
   Content,
   OverflowMenu,
-  OverflowMenuItem
+  OverflowMenuItem,
+  Loading
 } from '@carbon/react';
 import {
   Help,
@@ -23,9 +24,13 @@ import {
   ChartMultitype,
   Menu,
   Close,
-  Checkmark
+  Checkmark,
+  Logout
 } from '@carbon/icons-react';
 import apiClient, { API_BASE } from './api/client';
+import { isElectron } from './utils/electron';
+import { getCredentials, clearCredentials } from './utils/secureStorage';
+import LoginPage from './pages/LoginPage';
 import ConnectionsPage from './pages/ConnectionsPage';
 import ConnectionDetailPage from './pages/ConnectionDetailPage';
 import ChartsListPage from './pages/ChartsListPage';
@@ -46,7 +51,7 @@ import { MODES } from './config/layoutConfig';
 import buildInfo from '../build.json';
 import './App.scss';
 
-function AppContent() {
+function AppContent({ onDisconnect }) {
   const [isSideNavExpanded, setIsSideNavExpanded] = useState(true);
   const [currentMode, setCurrentMode] = useState(() => {
     // Load mode from localStorage or default to VIEW
@@ -60,6 +65,7 @@ function AppContent() {
   const [userCapabilities, setUserCapabilities] = useState({ can_design: false, can_manage: false });
   const location = useLocation();
   const navigate = useNavigate();
+  const electronMode = isElectron();
 
   // Fetch users list on mount
   useEffect(() => {
@@ -191,7 +197,7 @@ function AppContent() {
   };
 
   return (
-    <>
+    <div className={electronMode ? 'electron-mode' : ''}>
       <HeaderContainer
         render={() => (
           <Header aria-label="My Dashboard">
@@ -229,27 +235,58 @@ function AppContent() {
               <HeaderGlobalAction aria-label="Notifications">
                 <Notification size={20} />
               </HeaderGlobalAction>
-              <OverflowMenu
-                aria-label="User Account"
-                renderIcon={() => <UserAvatar size={20} />}
-                flipped
-                menuOptionsClass="user-menu-options"
-              >
-                {users.map((user) => (
+              {electronMode ? (
+                // Electron mode: Show current user with disconnect option
+                <OverflowMenu
+                  aria-label="User Account"
+                  renderIcon={() => <UserAvatar size={20} />}
+                  flipped
+                  menuOptionsClass="user-menu-options"
+                >
                   <OverflowMenuItem
-                    key={user.guid}
                     itemText={
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {currentUser?.guid === user.guid && <Checkmark size={16} />}
-                        <span style={{ marginLeft: currentUser?.guid === user.guid ? 0 : '1.5rem' }}>
-                          {user.name}
-                        </span>
+                        <UserAvatar size={16} />
+                        <span>{currentUser?.name || 'Connected'}</span>
                       </span>
                     }
-                    onClick={() => handleUserChange(user)}
+                    disabled
                   />
-                ))}
-              </OverflowMenu>
+                  <OverflowMenuItem
+                    itemText={
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Logout size={16} />
+                        <span>Disconnect</span>
+                      </span>
+                    }
+                    onClick={onDisconnect}
+                    hasDivider
+                  />
+                </OverflowMenu>
+              ) : (
+                // Browser mode: Show user selection dropdown
+                <OverflowMenu
+                  aria-label="User Account"
+                  renderIcon={() => <UserAvatar size={20} />}
+                  flipped
+                  menuOptionsClass="user-menu-options"
+                >
+                  {users.map((user) => (
+                    <OverflowMenuItem
+                      key={user.guid}
+                      itemText={
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          {currentUser?.guid === user.guid && <Checkmark size={16} />}
+                          <span style={{ marginLeft: currentUser?.guid === user.guid ? 0 : '1.5rem' }}>
+                            {user.name}
+                          </span>
+                        </span>
+                      }
+                      onClick={() => handleUserChange(user)}
+                    />
+                  ))}
+                </OverflowMenu>
+              )}
             </HeaderGlobalBar>
           </Header>
         )}
@@ -311,14 +348,90 @@ function AppContent() {
           <Route path="/chart-design" element={<Navigate to="/design/charts" replace />} />
         </Routes>
       </Content>
-    </>
+    </div>
   );
 }
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [connectedUser, setConnectedUser] = useState(null);
+  const electronMode = isElectron();
+
+  // Check for stored credentials on startup (Electron mode only)
+  useEffect(() => {
+    const checkCredentials = async () => {
+      if (!electronMode) {
+        // Browser mode - always authenticated (uses user dropdown)
+        setIsAuthenticated(true);
+        setIsCheckingAuth(false);
+        return;
+      }
+
+      // Electron mode - check for stored credentials
+      try {
+        const creds = await getCredentials();
+        if (creds && creds.serverUrl && creds.key) {
+          // Try to validate the stored credentials
+          apiClient.setServerUrl(creds.serverUrl);
+          try {
+            const user = await apiClient.login(creds.key);
+            setConnectedUser(user);
+            setIsAuthenticated(true);
+          } catch (err) {
+            console.error('Stored credentials invalid:', err);
+            // Clear invalid credentials
+            await clearCredentials();
+            apiClient.clearCredentials();
+          }
+        }
+      } catch (err) {
+        console.error('Error checking credentials:', err);
+      }
+      setIsCheckingAuth(false);
+    };
+
+    checkCredentials();
+  }, [electronMode]);
+
+  // Handle successful login from LoginPage
+  const handleLoginSuccess = (loginData) => {
+    setConnectedUser(loginData.user);
+    setIsAuthenticated(true);
+  };
+
+  // Handle disconnect (Electron mode)
+  const handleDisconnect = async () => {
+    await clearCredentials();
+    apiClient.clearCredentials();
+    setConnectedUser(null);
+    setIsAuthenticated(false);
+  };
+
+  // Show loading while checking credentials
+  if (isCheckingAuth) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        backgroundColor: 'var(--cds-background)'
+      }}>
+        <Loading withOverlay={false} description="Checking credentials..." />
+      </div>
+    );
+  }
+
+  // Show login page if in Electron mode and not authenticated
+  if (electronMode && !isAuthenticated) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // Show main app
   return (
     <Router>
-      <AppContent />
+      <AppContent onDisconnect={handleDisconnect} />
     </Router>
   );
 }

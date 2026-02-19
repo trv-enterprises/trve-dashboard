@@ -1,0 +1,68 @@
+{
+  "name": "trve-dashboards",
+  "version": "1.0.0",
+  "description": "TRVE Dashboards Desktop Client",
+  "main": "main.js",
+  "author": "TRV Enterprises LLC",
+  "license": "Apache-2.0",
+  "scripts": {
+    "start": "electron .",
+    "dev": "ELECTRON_DEV=true electron .",
+    "build": "npm run build:client && electron-builder",
+    "build:client": "cd ../client && npm run build",
+    "package": "electron-builder --mac",
+    "package:dir": "electron-builder --mac --dir"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.trv.dashboards",
+    "productName": "TRVE Dashboards",
+    "directories": {
+      "output": "dist",
+      "buildResources": "resources"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../client/dist",
+        "to": "app",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["universal"]
+        }
+      ],
+      "icon": "resources/icon.icns"
+    },
+    "dmg": {
+      "title": "TRVE Dashboards",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  }
+}

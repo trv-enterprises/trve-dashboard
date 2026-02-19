@@ -290,6 +290,54 @@ class APIClient {
     });
   }
 
+  // Control Schema endpoints
+  async getControlSchemas(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.protocol_type) params.append('protocol_type', filters.protocol_type);
+    if (filters.control_type) params.append('control_type', filters.control_type);
+    if (filters.built_in_only) params.append('built_in_only', 'true');
+    if (filters.page) params.append('page', filters.page);
+    if (filters.page_size) params.append('page_size', filters.page_size);
+    const queryString = params.toString();
+    return this.request(`/api/control-schemas${queryString ? '?' + queryString : ''}`);
+  }
+
+  async getControlSchema(id) {
+    return this.request(`/api/control-schemas/${id}`);
+  }
+
+  async createControlSchema(schema) {
+    return this.request('/api/control-schemas', {
+      method: 'POST',
+      body: JSON.stringify(schema),
+    });
+  }
+
+  async updateControlSchema(id, updates) {
+    return this.request(`/api/control-schemas/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteControlSchema(id) {
+    return this.request(`/api/control-schemas/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getControlSchemaTypes() {
+    return this.request('/api/control-schemas/types');
+  }
+
+  async getControlSchemasForProtocol(protocolType) {
+    return this.request(`/api/control-schemas/by-protocol/${encodeURIComponent(protocolType)}`);
+  }
+
+  async getControlSchemasForControlType(controlType) {
+    return this.request(`/api/control-schemas/by-control-type/${encodeURIComponent(controlType)}`);
+  }
+
   // Deprecated aliases - keep for backwards compatibility
   async getDatasources(filters = {}) {
     return this.getConnections(filters);
@@ -391,7 +439,54 @@ class APIClient {
     });
   }
 
+  // Server configuration (for Electron/remote connections)
+  setServerUrl(url) {
+    this.baseURL = url;
+    localStorage.setItem('serverUrl', url);
+  }
+
+  getServerUrl() {
+    return this.baseURL;
+  }
+
+  // Restore server URL from storage (call on app init)
+  restoreServerUrl() {
+    const savedUrl = localStorage.getItem('serverUrl');
+    if (savedUrl) {
+      this.baseURL = savedUrl;
+    }
+  }
+
+  // Clear all stored credentials (for logout/disconnect)
+  clearCredentials() {
+    this.currentUserGuid = null;
+    localStorage.removeItem('currentUserGuid');
+    localStorage.removeItem('serverUrl');
+    // Reset to default
+    this.baseURL = API_BASE_URL;
+  }
+
+  // Check if credentials are stored
+  hasStoredCredentials() {
+    return !!(localStorage.getItem('currentUserGuid') && localStorage.getItem('serverUrl'));
+  }
+
   // User/Auth endpoints
+
+  // Login with a key (GUID) - validates key and returns user info
+  // This endpoint does not require authentication
+  async login(key) {
+    const response = await this.request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ key }),
+    });
+    // On successful login, store the key
+    if (response.guid) {
+      this.setCurrentUser(response.guid);
+    }
+    return response;
+  }
+
   async getUsers() {
     return this.request('/api/users');
   }

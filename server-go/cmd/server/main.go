@@ -108,6 +108,7 @@ func main() {
 	configRepo := repository.NewConfigRepository(mongodb.Database)
 	userRepo := repository.NewUserRepository(mongodb.Database)
 	settingsRepo := repository.NewSettingsItemRepository(mongodb.Database)
+	controlSchemaRepo := repository.NewControlSchemaRepository(mongodb.Database)
 
 	// Create chart indexes
 	if err := chartRepo.CreateIndexes(ctx); err != nil {
@@ -129,6 +130,11 @@ func main() {
 		log.Printf("Warning: Failed to create settings indexes: %v", err)
 	}
 
+	// Create control schema indexes
+	if err := controlSchemaRepo.CreateIndexes(ctx); err != nil {
+		log.Printf("Warning: Failed to create control schema indexes: %v", err)
+	}
+
 	// Initialize services
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	chartService := service.NewChartService(chartRepo)
@@ -136,6 +142,7 @@ func main() {
 	aiSessionService := service.NewAISessionService(aiSessionRepo, chartRepo)
 	configService := service.NewConfigService(configRepo, cfg)
 	userService := service.NewUserService(userRepo)
+	controlSchemaService := service.NewControlSchemaService(controlSchemaRepo)
 
 	// Load user-configurable settings from separate YAML file
 	userConfig, err := config.LoadUserConfigurableSettings()
@@ -157,6 +164,13 @@ func main() {
 		log.Printf("Warning: Failed to seed pseudo users: %v", err)
 	} else {
 		fmt.Println("✓ Pseudo users seeded (Admin, Designer, Support)")
+	}
+
+	// Seed built-in control schemas
+	if err := controlSchemaService.SeedBuiltInSchemas(ctx); err != nil {
+		log.Printf("Warning: Failed to seed built-in control schemas: %v", err)
+	} else {
+		fmt.Println("✓ Built-in control schemas seeded (json-rpc-switch, json-rpc-scalar)")
 	}
 
 	// Get the global ChartHub for real-time chart update broadcasts
@@ -194,8 +208,9 @@ func main() {
 	configHandler := handlers.NewConfigHandler(configService)
 	authHandler := handlers.NewAuthHandler(userService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
-	commandHandler := handlers.NewCommandHandler(datasourceService, chartService)
+	commandHandler := handlers.NewCommandHandler(datasourceService, chartService, controlSchemaService)
 	registryHandler := handlers.NewRegistryHandler()
+	controlSchemaHandler := handlers.NewControlSchemaHandler(controlSchemaService)
 
 	// Initialize auth middleware
 	authMiddleware := middleware.NewAuthMiddleware(userService)
@@ -203,6 +218,13 @@ func main() {
 	// Initialize MCP
 	mcpRegistry := mcp.NewToolRegistry(datasourceService, dashboardService, chartService)
 	mcpHandler := mcp.NewHandler(mcpRegistry)
+
+	// Public API routes (no authentication required)
+	publicAPI := router.Group("/api")
+	{
+		// Login endpoint - validates key and returns user info
+		publicAPI.POST("/auth/login", authHandler.Login)
+	}
 
 	// API routes with authentication and authorization middleware
 	api := router.Group("/api")
@@ -306,6 +328,19 @@ func main() {
 		controls := api.Group("/controls")
 		{
 			controls.POST("/:id/execute", commandHandler.ExecuteControlCommand)
+		}
+
+		// Control Schema routes
+		controlSchemas := api.Group("/control-schemas")
+		{
+			controlSchemas.GET("", controlSchemaHandler.ListSchemas)
+			controlSchemas.POST("", controlSchemaHandler.CreateSchema)
+			controlSchemas.GET("/types", controlSchemaHandler.GetValidControlTypes)
+			controlSchemas.GET("/by-protocol/:protocol_type", controlSchemaHandler.GetSchemasForProtocol)
+			controlSchemas.GET("/by-control-type/:control_type", controlSchemaHandler.GetSchemasForControlType)
+			controlSchemas.GET("/:id", controlSchemaHandler.GetSchema)
+			controlSchemas.PUT("/:id", controlSchemaHandler.UpdateSchema)
+			controlSchemas.DELETE("/:id", controlSchemaHandler.DeleteSchema)
 		}
 
 		// Dashboard routes

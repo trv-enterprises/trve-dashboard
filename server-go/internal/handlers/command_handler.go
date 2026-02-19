@@ -18,15 +18,17 @@ import (
 
 // CommandHandler handles command execution for bidirectional datasources and controls
 type CommandHandler struct {
-	datasourceService *service.DatasourceService
-	chartService      *service.ChartService
+	datasourceService    *service.DatasourceService
+	chartService         *service.ChartService
+	controlSchemaService *service.ControlSchemaService
 }
 
 // NewCommandHandler creates a new command handler
-func NewCommandHandler(datasourceService *service.DatasourceService, chartService *service.ChartService) *CommandHandler {
+func NewCommandHandler(datasourceService *service.DatasourceService, chartService *service.ChartService, controlSchemaService *service.ControlSchemaService) *CommandHandler {
 	return &CommandHandler{
-		datasourceService: datasourceService,
-		chartService:      chartService,
+		datasourceService:    datasourceService,
+		chartService:         chartService,
+		controlSchemaService: controlSchemaService,
 	}
 }
 
@@ -126,7 +128,7 @@ type ExecuteControlRequest struct {
 
 // ExecuteControlCommand godoc
 // @Summary Execute a control component command
-// @Description Executes the command configured on a control component, interpolating the value into the payload template
+// @Description Executes the command configured on a control component, using either schema-based or legacy template interpolation
 // @Tags controls
 // @Accept json
 // @Produce json
@@ -163,8 +165,8 @@ func (h *CommandHandler) ExecuteControlCommand(c *gin.Context) {
 	}
 
 	// Validate control has configuration
-	if chart.ControlConfig == nil || chart.ControlConfig.CommandConfig == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "control has no command configuration"})
+	if chart.ControlConfig == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "control has no configuration"})
 		return
 	}
 
@@ -205,15 +207,29 @@ func (h *CommandHandler) ExecuteControlCommand(c *gin.Context) {
 		return
 	}
 
-	// Build payload by interpolating {{value}} in the template
-	cmdConfig := chart.ControlConfig.CommandConfig
-	payload := interpolatePayload(cmdConfig.PayloadTemplate, req.Value)
+	// Build the command - use schema if available, otherwise use legacy command config
+	var cmd registry.Command
+	controlConfig := chart.ControlConfig
 
-	// Execute the command
-	cmd := registry.Command{
-		Action:  cmdConfig.Action,
-		Target:  cmdConfig.Target,
-		Payload: payload,
+	if controlConfig.SchemaID != "" {
+		// Schema-based control (Phase 3)
+		cmd, err = h.buildCommandFromSchema(c, controlConfig, req.Value)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	} else if controlConfig.CommandConfig != nil {
+		// Legacy command config
+		cmdConfig := controlConfig.CommandConfig
+		payload := interpolatePayload(cmdConfig.PayloadTemplate, req.Value)
+		cmd = registry.Command{
+			Action:  cmdConfig.Action,
+			Target:  cmdConfig.Target,
+			Payload: payload,
+		}
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "control has no schema or command configuration"})
+		return
 	}
 
 	result, err := adapter.Write(c.Request.Context(), cmd)
@@ -230,7 +246,102 @@ func (h *CommandHandler) ExecuteControlCommand(c *gin.Context) {
 	})
 }
 
+// buildCommandFromSchema builds a command using a control schema template
+func (h *CommandHandler) buildCommandFromSchema(c *gin.Context, controlConfig *models.ControlConfig, value interface{}) (registry.Command, error) {
+	// Get the schema
+	schema, err := h.controlSchemaService.GetSchema(c.Request.Context(), controlConfig.SchemaID)
+	if err != nil {
+		return registry.Command{}, fmt.Errorf("failed to load schema '%s': %w", controlConfig.SchemaID, err)
+	}
+
+	// Get the command definition for this control type
+	commandDef, ok := schema.Commands[controlConfig.ControlType]
+	if !ok {
+		return registry.Command{}, fmt.Errorf("schema '%s' does not support control type '%s'", schema.ID, controlConfig.ControlType)
+	}
+
+	// Apply value mapping if present
+	mappedValue := value
+	if commandDef.ValueMap != nil && value != nil {
+		valueStr := valueToString(value)
+		if mapped, ok := commandDef.ValueMap[valueStr]; ok {
+			mappedValue = mapped
+		}
+	}
+
+	// Interpolate the template with {{value}} and {{target}}
+	payload := interpolateSchemaTemplate(commandDef.Template, mappedValue, controlConfig.Target)
+
+	// Extract action from payload if present, otherwise use a default
+	action := "execute"
+	if actionVal, ok := payload["action"]; ok {
+		if actionStr, ok := actionVal.(string); ok {
+			action = actionStr
+		}
+	}
+
+	return registry.Command{
+		Action:  action,
+		Target:  controlConfig.Target,
+		Payload: payload,
+	}, nil
+}
+
+// interpolateSchemaTemplate replaces {{value}} and {{target}} placeholders in a schema template
+func interpolateSchemaTemplate(template map[string]interface{}, value interface{}, target string) map[string]interface{} {
+	if template == nil {
+		return map[string]interface{}{"value": value}
+	}
+
+	result := make(map[string]interface{})
+	for key, val := range template {
+		result[key] = interpolateSchemaValue(val, value, target)
+	}
+	return result
+}
+
+// interpolateSchemaValue recursively replaces {{value}} and {{target}} in nested structures
+func interpolateSchemaValue(templateVal interface{}, value interface{}, target string) interface{} {
+	switch v := templateVal.(type) {
+	case string:
+		// Check for exact placeholders first
+		if v == "{{value}}" {
+			return value
+		}
+		if v == "{{target}}" {
+			return target
+		}
+		// Check for substring replacements
+		result := v
+		if strings.Contains(result, "{{value}}") {
+			valueStr := valueToString(value)
+			result = strings.ReplaceAll(result, "{{value}}", valueStr)
+		}
+		if strings.Contains(result, "{{target}}") {
+			result = strings.ReplaceAll(result, "{{target}}", target)
+		}
+		return result
+	case map[string]interface{}:
+		// Recursively process nested maps
+		result := make(map[string]interface{})
+		for k, nestedVal := range v {
+			result[k] = interpolateSchemaValue(nestedVal, value, target)
+		}
+		return result
+	case []interface{}:
+		// Recursively process arrays
+		result := make([]interface{}, len(v))
+		for i, item := range v {
+			result[i] = interpolateSchemaValue(item, value, target)
+		}
+		return result
+	default:
+		return v
+	}
+}
+
 // interpolatePayload replaces {{value}} placeholders in the payload template with the actual value
+// (Legacy support for controls without schema_id)
 func interpolatePayload(template map[string]interface{}, value interface{}) map[string]interface{} {
 	if template == nil {
 		// If no template, just return the value as-is
@@ -245,6 +356,7 @@ func interpolatePayload(template map[string]interface{}, value interface{}) map[
 }
 
 // interpolateValue recursively replaces {{value}} in nested structures
+// (Legacy support for controls without schema_id)
 func interpolateValue(templateVal interface{}, value interface{}) interface{} {
 	switch v := templateVal.(type) {
 	case string:

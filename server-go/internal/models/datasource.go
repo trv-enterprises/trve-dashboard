@@ -94,8 +94,12 @@ type Datasource struct {
 	Health      HealthInfo `json:"health" bson:"health"`
 	Tags        []string   `json:"tags,omitempty" bson:"tags,omitempty"`
 	MaskSecrets bool       `json:"mask_secrets" bson:"mask_secrets"` // If true, secrets are masked in API responses
-	CreatedAt   time.Time  `json:"created_at" bson:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" bson:"updated_at"`
+
+	// Control schema support - which control schemas this connection supports
+	SupportedSchemas []string `json:"supported_schemas,omitempty" bson:"supported_schemas,omitempty"`
+
+	CreatedAt time.Time `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" bson:"updated_at"`
 }
 
 // IsRegistryBased returns true if this datasource uses the new registry-based type system
@@ -483,8 +487,9 @@ type CreateDatasourceRequest struct {
 	Type   DatasourceType   `json:"type,omitempty"`
 	Config DatasourceConfig `json:"config,omitempty"`
 
-	Tags        []string `json:"tags,omitempty"`
-	MaskSecrets *bool    `json:"mask_secrets,omitempty"` // If true, secrets are masked in API responses (default: true)
+	Tags             []string `json:"tags,omitempty"`
+	MaskSecrets      *bool    `json:"mask_secrets,omitempty"` // If true, secrets are masked in API responses (default: true)
+	SupportedSchemas []string `json:"supported_schemas,omitempty"`
 }
 
 // UpdateDatasourceRequest represents request to update a data source
@@ -499,8 +504,9 @@ type UpdateDatasourceRequest struct {
 	// LEGACY: Keep for backwards compatibility
 	Config DatasourceConfig `json:"config,omitempty"`
 
-	Tags        []string `json:"tags,omitempty"`
-	MaskSecrets *bool    `json:"mask_secrets,omitempty"` // If provided, updates secret masking setting
+	Tags             []string `json:"tags,omitempty"`
+	MaskSecrets      *bool    `json:"mask_secrets,omitempty"` // If provided, updates secret masking setting
+	SupportedSchemas []string `json:"supported_schemas,omitempty"`
 }
 
 // TestDatasourceRequest represents request to test a data source connection

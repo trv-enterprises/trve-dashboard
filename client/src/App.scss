@@ -87,6 +87,12 @@ body {
   border-bottom: 1px solid #393939;
   z-index: 8000;
   background-color: var(--cds-layer-01);
+
+  // Electron mode: Add padding for macOS traffic lights (close/min/max buttons)
+  // The hiddenInset titleBarStyle keeps traffic lights in content area
+  .electron-mode & {
+    padding-left: 78px; // Space for traffic lights (~70px) + small gap
+  }
 }
 
 .cds--header__name {

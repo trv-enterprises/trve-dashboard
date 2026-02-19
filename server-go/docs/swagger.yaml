@@ -59,6 +59,31 @@ definitions:
           $ref: '#/definitions/registry.TypeInfo'
         type: array
     type: object
+  handlers.LoginRequest:
+    properties:
+      key:
+        description: User GUID/key
+        type: string
+    required:
+    - key
+    type: object
+  handlers.LoginResponse:
+    properties:
+      can_design:
+        type: boolean
+      can_manage:
+        type: boolean
+      capabilities:
+        items:
+          type: string
+        type: array
+      email:
+        type: string
+      guid:
+        type: string
+      name:
+        type: string
+    type: object
   handlers.SaveSessionRequest:
     properties:
       name:
@@ -489,6 +514,18 @@ definitions:
         description: Optional target identifier
         type: string
     type: object
+  models.CommandDef:
+    description: Template for formatting control commands
+    properties:
+      template:
+        additionalProperties: true
+        description: Message template with {{value}}, {{target}} placeholders
+        type: object
+      value_map:
+        additionalProperties: true
+        description: Optional value mapping (e.g., true -> "ON", false -> "OFF")
+        type: object
+    type: object
   models.ConfigItem:
     properties:
       category:
@@ -517,14 +554,86 @@ definitions:
       command_config:
         allOf:
         - $ref: '#/definitions/models.CommandConfig'
-        description: How to send commands
+        description: Legacy command configuration (deprecated, use schema instead)
       control_type:
         description: button, toggle, slider, text_input
         type: string
+      schema_id:
+        description: Schema-based control configuration (preferred - Phase 3)
+        type: string
+      target:
+        description: Device/endpoint identifier for schema interpolation
+        type: string
       ui_config:
         additionalProperties: true
-        description: Type-specific UI configuration
+        description: UI configuration
         type: object
+    type: object
+  models.ControlSchema:
+    description: Schema that defines how controls communicate with connections
+    properties:
+      commands:
+        additionalProperties:
+          $ref: '#/definitions/models.CommandDef'
+        description: Command definitions keyed by control type
+        type: object
+      created:
+        type: string
+      description:
+        description: Schema description
+        type: string
+      id:
+        description: Unique identifier (e.g., "json-rpc-switch")
+        type: string
+      is_built_in:
+        description: True for system default schemas (cannot modify/delete)
+        type: boolean
+      metadata:
+        additionalProperties: true
+        description: Additional custom metadata
+        type: object
+      name:
+        description: Human-readable name
+        type: string
+      protocol_type:
+        description: Connection type this works with (e.g., "websocket-json", "mqtt",
+          "tcp-json")
+        type: string
+      response:
+        allOf:
+        - $ref: '#/definitions/models.ResponseDef'
+        description: How to parse responses (optional)
+      state_query:
+        allOf:
+        - $ref: '#/definitions/models.StateQueryDef'
+        description: How to query current state (optional)
+      supported_types:
+        description: Control UI types this schema supports (toggle, scalar, button,
+          text)
+        items:
+          type: string
+        type: array
+      updated:
+        type: string
+      version:
+        description: Schema version (e.g., "1.0")
+        type: string
+    required:
+    - name
+    type: object
+  models.ControlSchemaListResponse:
+    description: Response containing a list of control schemas
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      schemas:
+        items:
+          $ref: '#/definitions/models.ControlSchema'
+        type: array
+      total:
+        type: integer
     type: object
   models.CreateAISessionRequest:
     description: Request body for creating a new AI session
@@ -574,6 +683,53 @@ definitions:
     required:
     - name
     type: object
+  models.CreateControlSchemaRequest:
+    description: Request body for creating a new control schema
+    properties:
+      commands:
+        additionalProperties:
+          $ref: '#/definitions/models.CommandDef'
+        description: Command definitions
+        type: object
+      description:
+        description: Schema description
+        type: string
+      id:
+        description: Unique identifier
+        type: string
+      metadata:
+        additionalProperties: true
+        description: Custom metadata
+        type: object
+      name:
+        description: Human-readable name
+        type: string
+      protocol_type:
+        description: Connection protocol type
+        type: string
+      response:
+        allOf:
+        - $ref: '#/definitions/models.ResponseDef'
+        description: Response parsing config
+      state_query:
+        allOf:
+        - $ref: '#/definitions/models.StateQueryDef'
+        description: State query config
+      supported_types:
+        description: Supported control types
+        items:
+          type: string
+        type: array
+      version:
+        description: Schema version
+        type: string
+    required:
+    - commands
+    - id
+    - name
+    - protocol_type
+    - supported_types
+    type: object
   models.CreateDashboardRequest:
     description: Request body for creating a new dashboard
     properties:
@@ -605,6 +761,10 @@ definitions:
         type: boolean
       name:
         type: string
+      supported_schemas:
+        items:
+          type: string
+        type: array
       tags:
         items:
           type: string
@@ -803,6 +963,12 @@ definitions:
         type: boolean
       name:
         type: string
+      supported_schemas:
+        description: Control schema support - which control schemas this connection
+          supports
+        items:
+          type: string
+        type: array
       tags:
         items:
           type: string
@@ -1010,6 +1176,23 @@ definitions:
     - QueryTypeTSStore
     - QueryTypePrometheus
     - QueryTypeEdgeLake
+  models.ResponseDef:
+    description: Configuration for parsing connection responses
+    properties:
+      error_path:
+        description: JSONPath to error message (e.g., "$.error")
+        type: string
+      state_path:
+        description: JSONPath to current state value (e.g., "$.state")
+        type: string
+      success_path:
+        description: JSONPath to success flag (e.g., "$.success")
+        type: string
+      value_map:
+        additionalProperties: true
+        description: Reverse mapping (e.g., "ON" -> true, "OFF" -> false)
+        type: object
+    type: object
   models.ResultSet:
     properties:
       columns:
@@ -1185,6 +1368,17 @@ definitions:
           TimestampFormat is the Go time format string for parsing timestamps (default: RFC3339)
           Common formats: "2006-01-02T15:04:05Z07:00" (RFC3339), "2006-01-02 15:04:05", unix timestamp
         type: string
+    type: object
+  models.StateQueryDef:
+    description: Configuration for querying control state
+    properties:
+      interval_ms:
+        description: Auto-poll interval in milliseconds (0 = manual only)
+        type: integer
+      template:
+        additionalProperties: true
+        description: Query message template
+        type: object
     type: object
   models.SystemConfigResponse:
     properties:
@@ -1424,6 +1618,33 @@ definitions:
     required:
     - settings
     type: object
+  models.UpdateControlSchemaRequest:
+    description: Request body for updating an existing control schema
+    properties:
+      commands:
+        additionalProperties:
+          $ref: '#/definitions/models.CommandDef'
+        type: object
+      description:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      protocol_type:
+        type: string
+      response:
+        $ref: '#/definitions/models.ResponseDef'
+      state_query:
+        $ref: '#/definitions/models.StateQueryDef'
+      supported_types:
+        items:
+          type: string
+        type: array
+      version:
+        type: string
+    type: object
   models.UpdateDashboardRequest:
     description: Request body for updating an existing dashboard
     properties:
@@ -1457,6 +1678,10 @@ definitions:
         type: boolean
       name:
         type: string
+      supported_schemas:
+        items:
+          type: string
+        type: array
       tags:
         items:
           type: string
@@ -1846,8 +2071,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Executes the command configured on a control component, interpolating
-        the value into the payload template
+      description: Executes the command configured on a control component, using either
+        schema-based or legacy template interpolation
       parameters:
       - description: Control (Chart) ID
         in: path
@@ -2083,6 +2308,40 @@ paths:
       summary: Update a setting
       tags:
       - settings
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Validates a user key (GUID) and returns user info if valid
+      parameters:
+      - description: Login request with key
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login with key
+      tags:
+      - Auth
   /auth/me:
     get:
       description: Returns the authenticated user's ID, name, and capabilities
@@ -2595,6 +2854,254 @@ paths:
       summary: Update user configuration
       tags:
       - config
+  /control-schemas:
+    get:
+      description: List control schemas with optional filtering by protocol type or
+        control type
+      parameters:
+      - description: Filter by protocol type
+        in: query
+        name: protocol_type
+        type: string
+      - description: Filter by supported control type
+        in: query
+        name: control_type
+        type: string
+      - description: Show only built-in schemas
+        in: query
+        name: built_in_only
+        type: boolean
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (default 50, max 100)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ControlSchemaListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List control schemas
+      tags:
+      - control-schemas
+    post:
+      consumes:
+      - application/json
+      description: Create a new control schema defining how controls communicate with
+        connections
+      parameters:
+      - description: Schema data
+        in: body
+        name: schema
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateControlSchemaRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.ControlSchema'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Create a new control schema
+      tags:
+      - control-schemas
+  /control-schemas/{id}:
+    delete:
+      description: Delete a control schema. Built-in schemas cannot be deleted.
+      parameters:
+      - description: Schema ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Delete a control schema
+      tags:
+      - control-schemas
+    get:
+      description: Get a control schema by its ID
+      parameters:
+      - description: Schema ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ControlSchema'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get a control schema
+      tags:
+      - control-schemas
+    put:
+      consumes:
+      - application/json
+      description: Update an existing control schema. Built-in schemas cannot be modified.
+      parameters:
+      - description: Schema ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Schema updates
+        in: body
+        name: schema
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateControlSchemaRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ControlSchema'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Update a control schema
+      tags:
+      - control-schemas
+  /control-schemas/by-control-type/{control_type}:
+    get:
+      description: Get all control schemas that support a specific control type
+      parameters:
+      - description: Control type (toggle, scalar, button, text)
+        in: path
+        name: control_type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get schemas for control type
+      tags:
+      - control-schemas
+  /control-schemas/by-protocol/{protocol_type}:
+    get:
+      description: Get all control schemas compatible with a specific protocol type
+      parameters:
+      - description: Protocol type (e.g., websocket-json)
+        in: path
+        name: protocol_type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get schemas for protocol
+      tags:
+      - control-schemas
+  /control-schemas/types:
+    get:
+      description: Get the list of valid control UI types (toggle, scalar, button,
+        text)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get valid control types
+      tags:
+      - control-schemas
   /dashboards:
     get:
       description: Get a paginated list of dashboards with optional filtering. Use
