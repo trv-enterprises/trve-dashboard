@@ -211,6 +211,7 @@ func main() {
 	commandHandler := handlers.NewCommandHandler(datasourceService, chartService, controlSchemaService)
 	registryHandler := handlers.NewRegistryHandler()
 	controlSchemaHandler := handlers.NewControlSchemaHandler(controlSchemaService)
+	statusHandler := handlers.NewStatusHandler(mongodb, redisClient, streamManager)
 
 	// Initialize auth middleware
 	authMiddleware := middleware.NewAuthMiddleware(userService)
@@ -391,6 +392,9 @@ func main() {
 	// ts-store dials out to this endpoint to push data
 	router.GET("/api/streams/inbound/:datasourceId", inboundHandler.HandleInboundWebSocket)
 
+	// Status monitoring WebSocket (no auth required for monitoring tools)
+	router.GET("/api/ws/status", statusHandler.HandleStatusWebSocket)
+
 	// Swagger documentation
 	if cfg.Swagger.Enabled {
 		router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -400,6 +404,7 @@ func main() {
 	fmt.Println("✓ MCP SSE endpoint enabled at http://localhost:3001/mcp/sse")
 	fmt.Println("✓ AI Debug WebSocket enabled at ws://localhost:3001/api/ai/debug")
 	fmt.Println("✓ TSStore inbound WebSocket at ws://localhost:3001/api/streams/inbound/:datasourceId")
+	fmt.Println("✓ Status WebSocket at ws://localhost:3001/api/ws/status?interval=5s")
 
 	// Static file serving for SPA (production mode)
 	if cfg.StaticFiles.Enabled {

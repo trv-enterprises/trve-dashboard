@@ -183,15 +183,15 @@
         align-items: center;
         gap: spacing.$spacing-02;
         flex-shrink: 0;
+        min-width: 24px;
+        min-height: 24px;
 
         .default-star {
           fill: #f1c21b;
         }
 
         .tile-menu {
-          opacity: 0;
-          transition: opacity 0.15s ease;
-
+          // Always visible so users can discover the "Set as Default" option
           svg {
             fill: #c6c6c6 !important;
           }
@@ -205,11 +205,6 @@
           }
         }
       }
-    }
-
-    // Show overflow menu on tile hover
-    &:hover .tile-actions .tile-menu {
-      opacity: 1;
     }
   }
 }

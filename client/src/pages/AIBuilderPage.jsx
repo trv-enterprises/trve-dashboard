@@ -49,15 +49,27 @@ function AIBuilderPage() {
   const location = useLocation();
   const isNewChart = chartId === 'new';
 
+  // Extract pre-flight context from location.state
+  const preflightContext = location.state || {};
+  const {
+    componentType,
+    name: preflightName,
+    description: preflightDescription,
+    connectionId,
+    chartType,
+    controlType
+  } = preflightContext;
+
   // Determine return path - either from state (if coming from dashboard) or default to charts list
-  const returnPath = location.state?.from || '/design/charts';
+  const returnPath = preflightContext.from || '/design/charts';
 
   const [input, setInput] = useState('');
-  const [chartName, setChartName] = useState('');
-  const [chartNameInitialized, setChartNameInitialized] = useState(false);
+  const [chartName, setChartName] = useState(preflightName || '');
+  const [chartNameInitialized, setChartNameInitialized] = useState(!!preflightName);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [initialMessageSent, setInitialMessageSent] = useState(false);
   const messagesEndRef = useRef(null);
 
   const {
@@ -95,6 +107,45 @@ function AIBuilderPage() {
       setChartNameInitialized(true);
     }
   }, [chart?.name, chartNameInitialized]);
+
+  // Send initial message based on pre-flight context
+  useEffect(() => {
+    if (session && connected && !initialMessageSent && isNewChart && componentType) {
+      setInitialMessageSent(true);
+
+      // Build initial message from pre-flight context
+      const parts = [];
+
+      // Component type
+      const typeLabel = componentType === 'control' ? 'control' : 'display';
+      parts.push(`Create a new ${typeLabel}`);
+
+      // Specific type
+      if (componentType === 'chart' && chartType) {
+        parts.push(`of type "${chartType}"`);
+      } else if (componentType === 'control' && controlType) {
+        parts.push(`of type "${controlType}"`);
+      }
+
+      // Name
+      if (preflightName) {
+        parts.push(`named "${preflightName}"`);
+      }
+
+      // Description
+      if (preflightDescription) {
+        parts.push(`that ${preflightDescription}`);
+      }
+
+      // Connection
+      if (connectionId) {
+        parts.push(`using connection ID "${connectionId}"`);
+      }
+
+      const initialMessage = parts.join(' ') + '.';
+      sendMessage(initialMessage);
+    }
+  }, [session, connected, initialMessageSent, isNewChart, componentType, chartType, controlType, preflightName, preflightDescription, connectionId, sendMessage]);
 
   const handleSend = useCallback(() => {
     if (input.trim() && !sending) {
@@ -212,7 +263,9 @@ function AIBuilderPage() {
           </Button>
           <h1>
             <AiIcon size={24} />
-            {isNewChart ? 'Create Chart with AI' : 'Edit Chart with AI'}
+            {isNewChart
+              ? `Create ${componentType === 'control' ? 'Control' : 'Component'} with AI`
+              : 'Edit Component with AI'}
           </h1>
           {connected && <Tag type="green" size="sm">Connected</Tag>}
         </div>
@@ -232,7 +285,7 @@ function AIBuilderPage() {
             disabled={loading || !chart}
             size="md"
           >
-            Save Chart
+            Save Component
           </Button>
         </div>
       </div>
@@ -378,7 +431,7 @@ function AIBuilderPage() {
           open={true}
           onRequestClose={() => setShowSaveDialog(false)}
           onRequestSubmit={handleSave}
-          modalHeading="Save Chart"
+          modalHeading="Save Component"
           primaryButtonText={saving ? 'Saving...' : 'Save'}
           secondaryButtonText="Cancel"
           primaryButtonDisabled={!chartName.trim() || chartName.toLowerCase().startsWith('untitled') || saving}
@@ -386,15 +439,15 @@ function AIBuilderPage() {
         >
           <TextInput
             id="chart-name"
-            labelText="Chart Name"
-            placeholder="Enter a name for your chart"
+            labelText="Component Name"
+            placeholder="Enter a name for your component"
             value={chartName}
             onChange={(e) => setChartName(e.target.value)}
             invalid={chartName.toLowerCase().startsWith('untitled')}
-            invalidText="Please provide a proper name for the chart"
+            invalidText="Please provide a proper name for the component"
           />
           <p className="save-dialog-note">
-            This will save your chart and make it available in the charts library.
+            This will save your component and make it available in the components library.
           </p>
         </Modal>
       )}

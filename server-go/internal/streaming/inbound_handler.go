@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/tviviano/dashboard/internal/models"
+	clientreg "github.com/tviviano/dashboard/internal/registry"
 )
 
 // InboundHandler manages incoming WebSocket connections from external data sources (e.g., ts-store push)
@@ -25,9 +26,10 @@ type InboundHandler struct {
 
 // inboundConnection represents an active inbound WebSocket connection
 type inboundConnection struct {
-	conn         *websocket.Conn
-	datasourceID string
-	stopChan     chan struct{}
+	conn             *websocket.Conn
+	datasourceID     string
+	stopChan         chan struct{}
+	clientRegistryID uint64
 }
 
 // tsStorePushMessage represents a message from ts-store's outbound WebSocket push
@@ -84,10 +86,18 @@ func (h *InboundHandler) HandleInboundWebSocket(c *gin.Context) {
 		existing.conn.Close()
 	}
 
+	// Register with client registry
+	clientRegistry := clientreg.GetClientRegistry()
+	clientRegistryID := clientRegistry.Register(clientreg.ConnectionTypeInbound, map[string]interface{}{
+		"datasource_id": datasourceID,
+		"remote_addr":   c.Request.RemoteAddr,
+	})
+
 	ic := &inboundConnection{
-		conn:         conn,
-		datasourceID: datasourceID,
-		stopChan:     make(chan struct{}),
+		conn:             conn,
+		datasourceID:     datasourceID,
+		stopChan:         make(chan struct{}),
+		clientRegistryID: clientRegistryID,
 	}
 	h.connections[datasourceID] = ic
 	h.mu.Unlock()
@@ -104,6 +114,13 @@ func (h *InboundHandler) readLoop(ic *inboundConnection) {
 			delete(h.connections, ic.datasourceID)
 		}
 		h.mu.Unlock()
+
+		// Unregister from client registry
+		if ic.clientRegistryID > 0 {
+			clientRegistry := clientreg.GetClientRegistry()
+			clientRegistry.Unregister(ic.clientRegistryID)
+		}
+
 		ic.conn.Close()
 		log.Printf("[InboundHandler] Connection closed for datasource %s", ic.datasourceID)
 	}()

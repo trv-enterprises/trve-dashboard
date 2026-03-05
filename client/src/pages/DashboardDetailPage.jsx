@@ -35,6 +35,7 @@ import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import ChartEditorModal from '../components/ChartEditorModal';
 import PanelEditMenu from '../components/PanelEditMenu';
 import ComponentPickerModal from '../components/ComponentPickerModal';
+import AIPreflightModal from '../components/AIPreflightModal';
 import apiClient from '../api/client';
 import './DashboardDetailPage.scss';
 
@@ -106,6 +107,10 @@ function DashboardDetailPage() {
   const [componentPickerOpen, setComponentPickerOpen] = useState(false);
   const [componentPickerCategory, setComponentPickerCategory] = useState('chart'); // 'chart' or 'control'
   const [componentPickerPanelId, setComponentPickerPanelId] = useState(null);
+
+  // AI pre-flight modal state
+  const [aiPreflightOpen, setAiPreflightOpen] = useState(false);
+  const [aiPreflightPanelId, setAiPreflightPanelId] = useState(null);
 
   // Layout editing state
   const [draggingPanel, setDraggingPanel] = useState(null);
@@ -383,8 +388,9 @@ function DashboardDetailPage() {
     setEditingChart(null);
   };
 
-  // Chart selector operations
-  const openChartSelector = async (panelId) => {
+  // Chart selector operations (legacy - replaced by ComponentPickerModal)
+  // eslint-disable-next-line no-unused-vars
+  const _openChartSelector = async (panelId) => {
     setSelectingPanelId(panelId);
     try {
       const response = await apiClient.getChartSummaries(100);
@@ -453,29 +459,25 @@ function DashboardDetailPage() {
     closeComponentPicker();
   };
 
-  // Control editor operations
-  const openControlEditor = (panelId, control = undefined) => {
-    // For now, controls use the same editor as charts
-    // Future: separate ControlEditorModal
-    setEditingPanelId(panelId);
-    if (control === undefined) {
-      const panel = panels.find(p => p.id === panelId);
-      setEditingChart(panel?.chart_id ? chartsMap[panel.chart_id] : null);
-    } else {
-      setEditingChart(control);
-    }
-    setChartEditorOpen(true);
+  // AI pre-flight modal operations
+  const openAIPreflightModal = (panelId) => {
+    // Clear the panel's chart_id first (creating a new component)
+    updatePanel(panelId, { chart_id: null });
+    setAiPreflightPanelId(panelId);
+    setAiPreflightOpen(true);
   };
 
-  const openControlAIEditor = (panelId) => {
-    const panel = panels.find(p => p.id === panelId);
-    const chartId = panel?.chart_id;
+  const handleAIPreflightContinue = (context) => {
+    setAiPreflightOpen(false);
     const returnUrl = isCreateMode ? '/design/dashboards' : `/design/dashboards/${id}`;
-    if (chartId) {
-      navigate(`/design/charts/ai/${chartId}`, { state: { from: returnUrl, panelId, componentType: 'control' } });
-    } else {
-      navigate('/design/charts/ai/new', { state: { from: returnUrl, panelId, componentType: 'control' } });
-    }
+    navigate('/design/charts/ai/new', {
+      state: {
+        ...context,
+        from: returnUrl,
+        panelId: aiPreflightPanelId
+      }
+    });
+    setAiPreflightPanelId(null);
   };
 
   // Grid mouse handlers for Layout Mode
@@ -1268,26 +1270,14 @@ function DashboardDetailPage() {
                             <PanelEditMenu
                               buttonLabel="Edit"
                               hasExisting={true}
-                              onEditDisplay={() => openChartEditor(panel.id)}
-                              onCreateDisplay={() => {
+                              onEdit={() => openChartEditor(panel.id)}
+                              onEditWithAI={() => openAIEditor(panel.id)}
+                              onNew={() => {
                                 updatePanel(panel.id, { chart_id: null });
                                 openChartEditor(panel.id, null);
                               }}
-                              onCreateDisplayAI={() => {
-                                updatePanel(panel.id, { chart_id: null });
-                                openAIEditor(panel.id);
-                              }}
-                              onSelectDisplay={() => openComponentPicker(panel.id, 'chart')}
-                              onEditControl={() => openControlEditor(panel.id)}
-                              onCreateControl={() => {
-                                updatePanel(panel.id, { chart_id: null });
-                                openControlEditor(panel.id, null);
-                              }}
-                              onCreateControlAI={() => {
-                                updatePanel(panel.id, { chart_id: null });
-                                openControlAIEditor(panel.id);
-                              }}
-                              onSelectControl={() => openComponentPicker(panel.id, 'control')}
+                              onNewWithAI={() => openAIPreflightModal(panel.id)}
+                              onSelectExisting={() => openComponentPicker(panel.id, 'chart')}
                             />
                           </div>
                         ) : (
@@ -1295,12 +1285,9 @@ function DashboardDetailPage() {
                             <PanelEditMenu
                               buttonLabel="Add"
                               hasExisting={false}
-                              onCreateDisplay={() => openChartEditor(panel.id, null)}
-                              onCreateDisplayAI={() => openAIEditor(panel.id)}
-                              onSelectDisplay={() => openComponentPicker(panel.id, 'chart')}
-                              onCreateControl={() => openControlEditor(panel.id, null)}
-                              onCreateControlAI={() => openControlAIEditor(panel.id)}
-                              onSelectControl={() => openComponentPicker(panel.id, 'control')}
+                              onNew={() => openChartEditor(panel.id, null)}
+                              onNewWithAI={() => openAIPreflightModal(panel.id)}
+                              onSelectExisting={() => openComponentPicker(panel.id, 'chart')}
                             />
                           </div>
                         )}
@@ -1425,6 +1412,16 @@ function DashboardDetailPage() {
         onClose={closeComponentPicker}
         onSelect={handleComponentSelect}
         category={componentPickerCategory}
+      />
+
+      {/* AI Pre-flight Modal (for gathering context before AI session) */}
+      <AIPreflightModal
+        open={aiPreflightOpen}
+        onClose={() => {
+          setAiPreflightOpen(false);
+          setAiPreflightPanelId(null);
+        }}
+        onContinue={handleAIPreflightContinue}
       />
 
       {/* Cancel confirmation modal */}

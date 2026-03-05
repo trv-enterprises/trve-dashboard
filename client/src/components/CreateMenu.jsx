@@ -4,30 +4,26 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { Button } from '@carbon/react';
-import { ChevronDown, Edit, Add, ChartLineSmooth, Keyboard } from '@carbon/icons-react';
+import { ChevronDown, Edit, Add, Catalog } from '@carbon/icons-react';
 import AiIcon from './icons/AiIcon';
 import './CreateMenu.scss';
 
 /**
  * CreateMenu Component
  *
- * Custom two-column dropdown menu for creating Displays and Controls.
- * Each category has three actions: Edit manually, Build with AI, From existing.
+ * Simple dropdown menu for creating components with three options:
+ * - Create: Opens ChartEditor (which has ContentSwitcher for Display/Control)
+ * - Create with AI: Opens AI Pre-flight modal
+ * - From Existing: Opens ComponentPickerModal
  *
- * @param {Function} onCreateChart - Handler for creating a new display manually
- * @param {Function} onCreateChartAI - Handler for creating a display with AI
- * @param {Function} onSelectChart - Handler for selecting an existing display
- * @param {Function} onCreateControl - Handler for creating a new control manually
- * @param {Function} onCreateControlAI - Handler for creating a control with AI
- * @param {Function} onSelectControl - Handler for selecting an existing control
+ * @param {Function} onCreate - Handler for creating a new component manually
+ * @param {Function} onCreateWithAI - Handler for creating with AI (opens pre-flight modal)
+ * @param {Function} onSelectExisting - Handler for selecting an existing component
  */
 function CreateMenu({
-  onCreateChart,
-  onCreateChartAI,
-  onSelectChart,
-  onCreateControl,
-  onCreateControlAI,
-  onSelectControl
+  onCreate,
+  onCreateWithAI,
+  onSelectExisting
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
@@ -72,63 +68,27 @@ function CreateMenu({
 
       {isOpen && (
         <div className="create-menu-dropdown">
-          {/* Displays Column */}
-          <div className="create-menu-column">
-            <div className="create-menu-header">
-              <ChartLineSmooth size={16} />
-              <span>Displays</span>
-            </div>
-            <button
-              className="create-menu-item"
-              onClick={() => handleAction(onCreateChart)}
-            >
-              <Edit size={16} />
-              <span>Edit manually</span>
-            </button>
-            <button
-              className="create-menu-item"
-              onClick={() => handleAction(onCreateChartAI)}
-            >
-              <AiIcon size={16} />
-              <span>Build with AI</span>
-            </button>
-            <button
-              className="create-menu-item"
-              onClick={() => handleAction(onSelectChart)}
-            >
-              <Add size={16} />
-              <span>From existing...</span>
-            </button>
-          </div>
-
-          {/* Controls Column */}
-          <div className="create-menu-column">
-            <div className="create-menu-header">
-              <Keyboard size={16} />
-              <span>Controls</span>
-            </div>
-            <button
-              className="create-menu-item"
-              onClick={() => handleAction(onCreateControl)}
-            >
-              <Edit size={16} />
-              <span>Edit manually</span>
-            </button>
-            <button
-              className="create-menu-item"
-              onClick={() => handleAction(onCreateControlAI)}
-            >
-              <AiIcon size={16} />
-              <span>Build with AI</span>
-            </button>
-            <button
-              className="create-menu-item"
-              onClick={() => handleAction(onSelectControl)}
-            >
-              <Add size={16} />
-              <span>From existing...</span>
-            </button>
-          </div>
+          <button
+            className="create-menu-item"
+            onClick={() => handleAction(onCreate)}
+          >
+            <Edit size={16} />
+            <span>Create</span>
+          </button>
+          <button
+            className="create-menu-item"
+            onClick={() => handleAction(onCreateWithAI)}
+          >
+            <AiIcon size={16} />
+            <span>Create with AI</span>
+          </button>
+          <button
+            className="create-menu-item"
+            onClick={() => handleAction(onSelectExisting)}
+          >
+            <Catalog size={16} />
+            <span>From Existing</span>
+          </button>
         </div>
       )}
     </div>

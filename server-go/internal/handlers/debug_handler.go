@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/tviviano/dashboard/internal/ai"
+	"github.com/tviviano/dashboard/internal/registry"
 )
 
 var upgrader = websocket.Upgrader{
@@ -40,6 +41,12 @@ func (h *DebugHandler) HandleDebugWebSocket(c *gin.Context) {
 		return
 	}
 
+	// Register with client registry
+	clientRegistry := registry.GetClientRegistry()
+	clientID := clientRegistry.Register(registry.ConnectionTypeDebug, map[string]interface{}{
+		"remote_addr": c.Request.RemoteAddr,
+	})
+
 	// Get the debug hub and register this connection
 	hub := ai.GetDebugHub()
 	hub.Register(conn)
@@ -53,7 +60,10 @@ func (h *DebugHandler) HandleDebugWebSocket(c *gin.Context) {
 
 	// Keep the connection open and handle incoming messages (if any)
 	go func() {
-		defer hub.Unregister(conn)
+		defer func() {
+			hub.Unregister(conn)
+			clientRegistry.Unregister(clientID)
+		}()
 		for {
 			_, _, err := conn.ReadMessage()
 			if err != nil {

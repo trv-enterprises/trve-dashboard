@@ -503,16 +503,11 @@ const Component = () => {
 - **Fix AI Chart Builder 429 Rate Limit Error**: Hitting Anthropic's 30k input tokens/minute limit after just a few messages. Options: implement retry-with-backoff on 429 errors, trim conversation history to last N messages, or summarize older context to reduce token usage.
 - **Tabbed Panel Layout**: Allow panels to contain multiple charts with tabs to switch between
 - **Connection Testing in Editor**: Add connection test capability to connection editor UI (backend API already exists at `/api/connections/test`)
-- **Dashboard Design Preset Sizes**: Implement solution for layout dimensions/aspect ratios for fullscreen viewing
 - **Fix `include_connections` Aggregation**: The `ListWithDatasources` MongoDB aggregation in `dashboard_repository.go` has a bug where `panel_count` returns 0. Currently worked around by fetching dashboards, charts, and connections separately client-side. Fix the aggregation to reduce API calls as dashboard count grows.
-- Manage Mode implementation
 - User authentication
 - ModeContext for shared state (replace localStorage-based mode switching)
 - ErrorBoundary component for crash recovery
 - Entity-specific hooks (useDashboard, useCharts, etc.)
-
-### ⚠️ Known Issues
-- **Firefox: MenuButton alignment** - On the Charts List page, the Create MenuButton has extra spacing from the right edge in Firefox. Works correctly in Chrome and Safari. Root cause: Firefox renders Carbon's MenuButton container differently. Low priority due to Firefox's small market share (~3%).
 
 ---
 

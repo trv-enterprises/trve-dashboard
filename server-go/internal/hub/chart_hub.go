@@ -12,14 +12,16 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/tviviano/dashboard/internal/models"
+	"github.com/tviviano/dashboard/internal/registry"
 )
 
 // ChartSubscriber represents a WebSocket connection subscribed to chart updates
 type ChartSubscriber struct {
-	ID         string          // Unique subscriber ID (e.g., session ID or connection ID)
-	Conn       *websocket.Conn // WebSocket connection
-	ChartIDs   map[string]bool // Set of chart IDs this subscriber is interested in
-	mu         sync.Mutex      // Protects Conn writes
+	ID               string          // Unique subscriber ID (e.g., session ID or connection ID)
+	Conn             *websocket.Conn // WebSocket connection
+	ChartIDs         map[string]bool // Set of chart IDs this subscriber is interested in
+	ClientRegistryID uint64          // ID from client registry for status tracking
+	mu               sync.Mutex      // Protects Conn writes
 }
 
 // Send sends a message to the subscriber (thread-safe)
@@ -153,7 +155,13 @@ func (h *ChartHub) handleSubscribe(req *subscribeRequest) {
 		// Subscriber exists, add chart to their list
 		existing.ChartIDs[req.chartID] = true
 	} else {
-		// New subscriber
+		// New subscriber - register with client registry
+		clientRegistry := registry.GetClientRegistry()
+		req.subscriber.ClientRegistryID = clientRegistry.Register(registry.ConnectionTypeChartSubscription, map[string]interface{}{
+			"subscriber_id": req.subscriber.ID,
+			"chart_id":      req.chartID,
+		})
+
 		req.subscriber.ChartIDs = make(map[string]bool)
 		req.subscriber.ChartIDs[req.chartID] = true
 		h.subscribers[req.subscriber.ID] = req.subscriber
@@ -189,6 +197,11 @@ func (h *ChartHub) handleUnsubscribe(req *unsubscribeRequest) {
 				}
 			}
 		}
+		// Unregister from client registry
+		if subscriber.ClientRegistryID > 0 {
+			clientRegistry := registry.GetClientRegistry()
+			clientRegistry.Unregister(subscriber.ClientRegistryID)
+		}
 		delete(h.subscribers, req.subscriberID)
 		fmt.Printf("[ChartHub] Subscriber %s unsubscribed from all charts\n", req.subscriberID)
 	} else {
@@ -202,6 +215,11 @@ func (h *ChartHub) handleUnsubscribe(req *unsubscribeRequest) {
 		}
 		// If subscriber has no more subscriptions, remove them
 		if len(subscriber.ChartIDs) == 0 {
+			// Unregister from client registry
+			if subscriber.ClientRegistryID > 0 {
+				clientRegistry := registry.GetClientRegistry()
+				clientRegistry.Unregister(subscriber.ClientRegistryID)
+			}
 			delete(h.subscribers, req.subscriberID)
 		}
 		fmt.Printf("[ChartHub] Subscriber %s unsubscribed from chart %s\n", req.subscriberID, req.chartID)

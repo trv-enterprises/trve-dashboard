@@ -2,7 +2,7 @@
 // Licensed under Apache 2.0
 // See LICENSE file for details.
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getFilters, setFilters } from '../utils/filterStore';
 import {
@@ -36,6 +36,7 @@ import apiClient from '../api/client';
 import ChartDeleteDialog from '../components/ChartDeleteDialog';
 import CreateMenu from '../components/CreateMenu';
 import ComponentPickerModal from '../components/ComponentPickerModal';
+import AIPreflightModal from '../components/AIPreflightModal';
 import './ChartsListPage.scss';
 
 /**
@@ -66,7 +67,7 @@ function ChartsListPage() {
   const [chartToDelete, setChartToDelete] = useState(null);
   const [viewMode, setViewMode] = useState(savedFilters.view || 'list'); // 'list' or 'tile'
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerCategory, setPickerCategory] = useState('chart');
+  const [aiPreflightOpen, setAiPreflightOpen] = useState(false);
   const [connectionFilter, setConnectionFilter] = useState(savedFilters.ds || 'all'); // 'all' or connection id
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const [collapsedTypes, setCollapsedTypes] = useState(new Set(['display', 'control'])); // Start collapsed
@@ -313,41 +314,29 @@ function ChartsListPage() {
     fetchData();
   };
 
+  // Create menu handlers
   const handleCreate = () => {
     navigate('/design/charts/new');
   };
 
   const handleCreateWithAI = () => {
-    navigate('/design/charts/ai/new');
+    setAiPreflightOpen(true);
   };
 
-  // Chart picker handlers
-  const handleSelectChart = () => {
-    setPickerCategory('chart');
+  const handleSelectExisting = () => {
     setPickerOpen(true);
   };
 
+  // AI pre-flight modal handler
+  const handleAIPreflightContinue = (context) => {
+    setAiPreflightOpen(false);
+    navigate('/design/charts/ai/new', { state: context });
+  };
+
+  // Component picker handler
   const handlePickerSelect = (item) => {
     setPickerOpen(false);
-    if (pickerCategory === 'chart') {
-      navigate(`/design/charts/${item.id}`);
-    } else {
-      navigate(`/design/controls/${item.id}`);
-    }
-  };
-
-  // Control handlers - navigate to chart editor with component_type=control
-  const handleCreateControl = () => {
-    navigate('/design/charts/new?type=control');
-  };
-
-  const handleCreateControlAI = () => {
-    navigate('/design/ai-builder?type=control');
-  };
-
-  const handleSelectControl = () => {
-    setPickerCategory('control');
-    setPickerOpen(true);
+    navigate(`/design/charts/${item.id}`);
   };
 
   const handleRowClick = (chart) => {
@@ -426,7 +415,6 @@ function ChartsListPage() {
       setSortKey(key);
       setSortDirection('asc');
     }
-    updateSearchParams({ sortKey: key, sortDir: newDirection });
   };
 
   // Filter and sort components (displays + controls)
@@ -567,10 +555,7 @@ function ChartsListPage() {
       <div className="page-toolbar">
         <div className="toolbar-left">
           <TableToolbarSearch
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              updateSearchParams({ search: e.target.value });
-            }}
+            onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search"
             persistent
             value={searchTerm}
@@ -626,9 +611,7 @@ function ChartsListPage() {
                           labelText={config.label}
                           checked={isParentFullySelected(parentType)}
                           indeterminate={isParentPartiallySelected(parentType)}
-                          onChange={(_, { checked }) => {
-                            toggleParentType(parentType);
-                          }}
+                          onChange={() => toggleParentType(parentType)}
                         />
                       </div>
                       {!isCollapsed && (
@@ -639,9 +622,7 @@ function ChartsListPage() {
                               id={`filter-${parentType}-${subtype.id}`}
                               labelText={subtype.label}
                               checked={isSubtypeSelected(parentType, subtype.id)}
-                              onChange={(_, { checked }) => {
-                                toggleSubtype(parentType, subtype.id);
-                              }}
+                              onChange={() => toggleSubtype(parentType, subtype.id)}
                             />
                           ))}
                         </div>
@@ -664,17 +645,12 @@ function ChartsListPage() {
             itemToString={(item) => item?.text || ''}
             selectedItem={{ id: connectionFilter, text: connectionFilter === 'all' ? 'All Connections' : (connections[connectionFilter] || 'Unknown') }}
             onChange={({ selectedItem }) => {
-              const newConn = selectedItem?.id || 'all';
-              setConnectionFilter(newConn);
-              updateSearchParams({ ds: newConn });
+              setConnectionFilter(selectedItem?.id || 'all');
             }}
             size="md"
           />
           <ContentSwitcher
-            onChange={(e) => {
-              setViewMode(e.name);
-              updateSearchParams({ view: e.name });
-            }}
+            onChange={(e) => setViewMode(e.name)}
             selectedIndex={viewMode === 'list' ? 0 : 1}
             size="md"
           >
@@ -688,12 +664,9 @@ function ChartsListPage() {
         </div>
         <div className="toolbar-actions">
           <CreateMenu
-            onCreateChart={handleCreate}
-            onCreateChartAI={handleCreateWithAI}
-            onSelectChart={handleSelectChart}
-            onCreateControl={handleCreateControl}
-            onCreateControlAI={handleCreateControlAI}
-            onSelectControl={handleSelectControl}
+            onCreate={handleCreate}
+            onCreateWithAI={handleCreateWithAI}
+            onSelectExisting={handleSelectExisting}
           />
         </div>
       </div>
@@ -935,7 +908,14 @@ function ChartsListPage() {
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={handlePickerSelect}
-        category={pickerCategory}
+        category="chart"
+      />
+
+      {/* AI Pre-flight Modal */}
+      <AIPreflightModal
+        open={aiPreflightOpen}
+        onClose={() => setAiPreflightOpen(false)}
+        onContinue={handleAIPreflightContinue}
       />
 
     </div>

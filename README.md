@@ -227,6 +227,63 @@ dashboard/
 | POST | `/api/ai/session/:id/save` | Save chart |
 | DELETE | `/api/ai/session/:id` | Cancel session |
 
+### Status & Monitoring
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check (MongoDB, Redis status) |
+| WS | `/api/ws/status` | WebSocket for real-time server status |
+
+#### Status WebSocket
+
+Connect to receive periodic server status updates:
+
+```bash
+# Using websocat (default 5s interval)
+websocat ws://localhost:3001/api/ws/status
+
+# Custom interval (2 seconds)
+websocat "ws://localhost:3001/api/ws/status?interval=2s"
+
+# One-shot (single response, then close)
+websocat "ws://localhost:3001/api/ws/status?interval=0"
+```
+
+**Response payload:**
+```json
+{
+  "timestamp": "2026-02-26T11:05:42-06:00",
+  "server": {
+    "version": "1.0.0",
+    "uptime_secs": 3600.5
+  },
+  "services": {
+    "mongodb": { "status": "healthy", "latency_ms": 2 },
+    "redis": { "status": "healthy", "latency_ms": 1 }
+  },
+  "connections": {
+    "total_clients": 3,
+    "by_type": {
+      "ai_session": 1,
+      "chart_subscription": 2
+    },
+    "connections": [...]
+  },
+  "streams": {
+    "active_count": 1,
+    "streams": [...],
+    "aggregators": {...}
+  }
+}
+```
+
+**Connection types tracked:**
+- `ai_session` - AI builder WebSocket sessions
+- `chart_subscription` - Chart update subscriptions
+- `stream` - Data stream connections
+- `inbound` - Inbound data push (e.g., ts-store)
+- `status_monitor` - Status endpoint connections
+- `debug` - AI debug stream connections
+
 ### Swagger Documentation
 Access at: http://localhost:3001/swagger/index.html
 

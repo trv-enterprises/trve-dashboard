@@ -5,43 +5,41 @@
 import { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@carbon/react';
-import { ChevronDown, Edit, Add, ChartLineSmooth, Keyboard, Catalog } from '@carbon/icons-react';
+import { ChevronDown, Edit, Add, Catalog } from '@carbon/icons-react';
 import AiIcon from './icons/AiIcon';
 import './PanelEditMenu.scss';
 
 /**
  * PanelEditMenu Component
  *
- * Custom two-column dropdown menu for editing panel contents.
- * Displays two categories: Displays and Controls.
- * Each category has three actions: Edit/Create manually, Build with AI, From existing.
+ * Single-column dropdown menu for editing panel contents.
+ * Shows unified options for components (displays and controls):
+ * - Edit Component (if hasExisting)
+ * - Edit with AI (if hasExisting)
+ * - New Component
+ * - New with AI
+ * - Select Existing
  *
  * @param {string} buttonLabel - Label for the menu button (default: "Edit")
  * @param {string} buttonKind - Kind for the menu button (default: "secondary")
  * @param {string} buttonSize - Size for the menu button (default: "sm")
  * @param {boolean} hasExisting - Whether the panel already has a component assigned
- * @param {Function} onEditDisplay - Handler for editing the existing display (only when hasExisting=true)
- * @param {Function} onCreateDisplay - Handler for creating a new display manually
- * @param {Function} onCreateDisplayAI - Handler for creating a display with AI
- * @param {Function} onSelectDisplay - Handler for selecting an existing display
- * @param {Function} onEditControl - Handler for editing the existing control (only when hasExisting=true)
- * @param {Function} onCreateControl - Handler for creating a new control manually
- * @param {Function} onCreateControlAI - Handler for creating a control with AI
- * @param {Function} onSelectControl - Handler for selecting an existing control
+ * @param {Function} onEdit - Handler for editing the existing component (only when hasExisting=true)
+ * @param {Function} onEditWithAI - Handler for editing with AI (only when hasExisting=true)
+ * @param {Function} onNew - Handler for creating a new component manually
+ * @param {Function} onNewWithAI - Handler for creating a component with AI (opens pre-flight modal)
+ * @param {Function} onSelectExisting - Handler for selecting an existing component
  */
 function PanelEditMenu({
   buttonLabel = 'Edit',
   buttonKind = 'secondary',
   buttonSize = 'sm',
   hasExisting = false,
-  onEditDisplay,
-  onCreateDisplay,
-  onCreateDisplayAI,
-  onSelectDisplay,
-  onEditControl,
-  onCreateControl,
-  onCreateControlAI,
-  onSelectControl
+  onEdit,
+  onEditWithAI,
+  onNew,
+  onNewWithAI,
+  onSelectExisting
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState({});
@@ -55,8 +53,8 @@ function PanelEditMenu({
     if (isOpen && buttonRef.current) {
       const updatePosition = () => {
         const buttonRect = buttonRef.current.getBoundingClientRect();
-        const dropdownWidth = 320; // min-width from CSS
-        const dropdownHeight = 220; // estimated height
+        const dropdownWidth = 200; // min-width from CSS
+        const dropdownHeight = hasExisting ? 220 : 140; // estimated height based on items
 
         // Position below the button, centered horizontally
         // getBoundingClientRect() returns visual (screen) coordinates, which is what we want for fixed positioning
@@ -103,7 +101,7 @@ function PanelEditMenu({
         window.removeEventListener('resize', handleScroll);
       };
     }
-  }, [isOpen]);
+  }, [isOpen, hasExisting]);
 
   // Close on outside click
   useEffect(() => {
@@ -136,82 +134,52 @@ function PanelEditMenu({
   // Render dropdown content
   const dropdownContent = isOpen ? (
     <div className="panel-edit-menu-dropdown" ref={dropdownRef} style={dropdownStyle}>
-          {/* Displays Column */}
-          <div className="panel-edit-menu-column">
-            <div className="panel-edit-menu-header">
-              <ChartLineSmooth size={16} />
-              <span>Displays</span>
-            </div>
-            {hasExisting && onEditDisplay && (
-              <button
-                className="panel-edit-menu-item"
-                onClick={() => handleAction(onEditDisplay)}
-              >
-                <Edit size={16} />
-                <span>Edit current</span>
-              </button>
-            )}
-            <button
-              className="panel-edit-menu-item"
-              onClick={() => handleAction(onCreateDisplay)}
-            >
-              <Add size={16} />
-              <span>{hasExisting ? 'New display' : 'Create manually'}</span>
-            </button>
-            <button
-              className="panel-edit-menu-item"
-              onClick={() => handleAction(onCreateDisplayAI)}
-            >
-              <AiIcon size={16} />
-              <span>Build with AI</span>
-            </button>
-            <button
-              className="panel-edit-menu-item"
-              onClick={() => handleAction(onSelectDisplay)}
-            >
-              <Catalog size={16} />
-              <span>From existing...</span>
-            </button>
-          </div>
+      {/* Edit existing component options (only shown when hasExisting) */}
+      {hasExisting && onEdit && (
+        <button
+          className="panel-edit-menu-item"
+          onClick={() => handleAction(onEdit)}
+        >
+          <Edit size={16} />
+          <span>Edit Component</span>
+        </button>
+      )}
+      {hasExisting && onEditWithAI && (
+        <button
+          className="panel-edit-menu-item"
+          onClick={() => handleAction(onEditWithAI)}
+        >
+          <AiIcon size={16} />
+          <span>Edit with AI</span>
+        </button>
+      )}
 
-          {/* Controls Column */}
-          <div className="panel-edit-menu-column">
-            <div className="panel-edit-menu-header">
-              <Keyboard size={16} />
-              <span>Controls</span>
-            </div>
-            {hasExisting && onEditControl && (
-              <button
-                className="panel-edit-menu-item"
-                onClick={() => handleAction(onEditControl)}
-              >
-                <Edit size={16} />
-                <span>Edit current</span>
-              </button>
-            )}
-            <button
-              className="panel-edit-menu-item"
-              onClick={() => handleAction(onCreateControl)}
-            >
-              <Add size={16} />
-              <span>{hasExisting ? 'New control' : 'Create manually'}</span>
-            </button>
-            <button
-              className="panel-edit-menu-item"
-              onClick={() => handleAction(onCreateControlAI)}
-            >
-              <AiIcon size={16} />
-              <span>Build with AI</span>
-            </button>
-            <button
-              className="panel-edit-menu-item"
-              onClick={() => handleAction(onSelectControl)}
-            >
-              <Catalog size={16} />
-              <span>From existing...</span>
-            </button>
-          </div>
-        </div>
+      {/* Divider between edit and create options */}
+      {hasExisting && <div className="panel-edit-menu-divider" />}
+
+      {/* Create new component options */}
+      <button
+        className="panel-edit-menu-item"
+        onClick={() => handleAction(onNew)}
+      >
+        <Add size={16} />
+        <span>New Component</span>
+      </button>
+      <button
+        className="panel-edit-menu-item"
+        onClick={() => handleAction(onNewWithAI)}
+      >
+        <AiIcon size={16} />
+        <span>New with AI</span>
+      </button>
+      <button
+        className="panel-edit-menu-item"
+        onClick={() => handleAction(onSelectExisting)}
+      >
+        <Catalog size={16} />
+        <span>Select Existing</span>
+      </button>
+    </div>
   ) : null;
 
   return (

@@ -17,6 +17,7 @@ import (
 	"github.com/tviviano/dashboard/internal/ai"
 	"github.com/tviviano/dashboard/internal/hub"
 	"github.com/tviviano/dashboard/internal/models"
+	"github.com/tviviano/dashboard/internal/registry"
 	"github.com/tviviano/dashboard/internal/service"
 )
 
@@ -212,7 +213,15 @@ func (h *AISessionHandler) HandleWebSocket(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	fmt.Printf("[WS] New connection for session %s\n", id)
+	// Register with client registry for status monitoring
+	clientRegistry := registry.GetClientRegistry()
+	clientID := clientRegistry.Register(registry.ConnectionTypeAISession, map[string]interface{}{
+		"session_id": id,
+		"chart_id":   response.Session.ChartID,
+	})
+	defer clientRegistry.Unregister(clientID)
+
+	fmt.Printf("[WS] New connection for session %s (client: %d)\n", id, clientID)
 
 	// Register client with the AI session service
 	client := h.service.RegisterWSClient(id, conn)
