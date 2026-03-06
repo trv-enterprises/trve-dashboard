@@ -23,6 +23,7 @@ const (
 	QueryTypeTSStore      QueryType = "tsstore"
 	QueryTypePrometheus   QueryType = "prometheus"
 	QueryTypeEdgeLake     QueryType = "edgelake"
+	QueryTypeMQTT         QueryType = "mqtt"
 )
 
 // DatasourceType represents the type of data source
@@ -36,6 +37,7 @@ const (
 	DatasourceTypeTSStore    DatasourceType = "tsstore"
 	DatasourceTypePrometheus DatasourceType = "prometheus"
 	DatasourceTypeEdgeLake  DatasourceType = "edgelake"
+	DatasourceTypeMQTT     DatasourceType = "mqtt"
 )
 
 // HealthStatus represents the health status of a data source
@@ -142,6 +144,8 @@ func (d *Datasource) GetEffectiveTypeID() string {
 		return "api.prometheus"
 	case DatasourceTypeEdgeLake:
 		return "api.edgelake"
+	case DatasourceTypeMQTT:
+		return "stream.mqtt"
 	default:
 		return ""
 	}
@@ -231,6 +235,18 @@ func (d *Datasource) GetEffectiveConfig() map[string]interface{} {
 			config["timeout"] = d.Config.EdgeLake.Timeout
 			config["use_distributed_query"] = d.Config.EdgeLake.UseDistributedQuery
 		}
+	case DatasourceTypeMQTT:
+		if d.Config.MQTT != nil {
+			config["broker_url"] = d.Config.MQTT.BrokerURL
+			config["client_id"] = d.Config.MQTT.ClientID
+			config["username"] = d.Config.MQTT.Username
+			config["password"] = d.Config.MQTT.Password
+			config["tls"] = d.Config.MQTT.TLS
+			config["keep_alive"] = d.Config.MQTT.KeepAlive
+			config["qos"] = d.Config.MQTT.QoS
+			config["clean_start"] = d.Config.MQTT.CleanStart
+			config["buffer_size"] = d.Config.MQTT.BufferSize
+		}
 	}
 
 	return config
@@ -245,6 +261,7 @@ type DatasourceConfig struct {
 	TSStore    *TSStoreConfig    `json:"tsstore,omitempty" bson:"tsstore,omitempty"`
 	Prometheus *PrometheusConfig `json:"prometheus,omitempty" bson:"prometheus,omitempty"`
 	EdgeLake   *EdgeLakeConfig   `json:"edgelake,omitempty" bson:"edgelake,omitempty"`
+	MQTT       *MQTTConfig       `json:"mqtt,omitempty" bson:"mqtt,omitempty"`
 }
 
 // SQLConfig represents configuration for SQL databases
@@ -420,6 +437,19 @@ type PrometheusConfig struct {
 	Username string `json:"username,omitempty" bson:"username,omitempty"` // Basic auth username (optional)
 	Password string `json:"password,omitempty" bson:"password,omitempty"` // Basic auth password (optional)
 	Timeout  int    `json:"timeout,omitempty" bson:"timeout,omitempty"`   // Query timeout in seconds (default: 30)
+}
+
+// MQTTConfig represents configuration for MQTT broker connections
+type MQTTConfig struct {
+	BrokerURL  string `json:"broker_url" bson:"broker_url" binding:"required"`   // mqtt://host:1883 or mqtts://host:8883
+	ClientID   string `json:"client_id" bson:"client_id"`                         // MQTT client identifier (auto-generated if empty)
+	Username   string `json:"username,omitempty" bson:"username,omitempty"`        // Auth username (optional)
+	Password   string `json:"password,omitempty" bson:"password,omitempty"`        // Auth password (optional)
+	TLS        bool   `json:"tls" bson:"tls"`                                     // Use TLS (mqtts://)
+	KeepAlive  int    `json:"keep_alive,omitempty" bson:"keep_alive,omitempty"`    // Seconds (default 60)
+	QoS        int    `json:"qos,omitempty" bson:"qos,omitempty"`                 // Default Quality of Service (0, 1, or 2)
+	CleanStart bool   `json:"clean_start" bson:"clean_start"`                     // Clean session on connect
+	BufferSize int    `json:"buffer_size,omitempty" bson:"buffer_size,omitempty"`  // Message buffer size (default 100)
 }
 
 // EdgeLakeConfig represents configuration for EdgeLake data sources
@@ -724,6 +754,15 @@ func (d *Datasource) SanitizeForAPI() *Datasource {
 		sanitized.Config.Socket = &socketCopy
 	}
 
+	// Sanitize MQTT config
+	if d.Config.MQTT != nil {
+		mqttCopy := *d.Config.MQTT
+		if mqttCopy.Password != "" {
+			mqttCopy.Password = SecretMaskedValue
+		}
+		sanitized.Config.MQTT = &mqttCopy
+	}
+
 	return &sanitized
 }
 
@@ -737,6 +776,8 @@ func (d *Datasource) HasSecret(fieldPath string) bool {
 		return d.Config.API != nil && len(d.Config.API.AuthCredentials) > 0
 	case "tsstore.api_key":
 		return d.Config.TSStore != nil && d.Config.TSStore.APIKey != ""
+	case "mqtt.password":
+		return d.Config.MQTT != nil && d.Config.MQTT.Password != ""
 	default:
 		return false
 	}

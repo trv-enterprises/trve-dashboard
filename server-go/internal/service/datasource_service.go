@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -290,6 +291,8 @@ func (s *DatasourceService) TestDatasource(ctx context.Context, req *models.Test
 		response = s.testPrometheusConnection(ctx, req.Config.Prometheus)
 	case models.DatasourceTypeEdgeLake:
 		response = s.testEdgeLakeConnection(ctx, req.Config.EdgeLake)
+	case models.DatasourceTypeMQTT:
+		response = s.testMQTTConnection(ctx, req.Config.MQTT)
 	default:
 		return &models.TestDatasourceResponse{
 			Success: false,
@@ -338,6 +341,8 @@ func (s *DatasourceService) CheckHealth(ctx context.Context, id string) (*models
 		testResponse = s.testPrometheusConnection(ctx, datasource.Config.Prometheus)
 	case models.DatasourceTypeEdgeLake:
 		testResponse = s.testEdgeLakeConnection(ctx, datasource.Config.EdgeLake)
+	case models.DatasourceTypeMQTT:
+		testResponse = s.testMQTTConnection(ctx, datasource.Config.MQTT)
 	}
 
 	health.Status = testResponse.Status
@@ -402,6 +407,12 @@ func (s *DatasourceService) validateConfig(dsType models.DatasourceType, config 
 			return fmt.Errorf("EdgeLake configuration is required for EdgeLake datasource")
 		}
 		return s.validateEdgeLakeConfig(config.EdgeLake)
+
+	case models.DatasourceTypeMQTT:
+		if config.MQTT == nil {
+			return fmt.Errorf("MQTT configuration is required for MQTT datasource")
+		}
+		return s.validateMQTTConfig(config.MQTT)
 
 	default:
 		return fmt.Errorf("unsupported datasource type: %s", dsType)
@@ -804,6 +815,61 @@ func (s *DatasourceService) testEdgeLakeConnection(ctx context.Context, config *
 	}
 }
 
+// validateMQTTConfig validates MQTT configuration
+func (s *DatasourceService) validateMQTTConfig(config *models.MQTTConfig) error {
+	if config.BrokerURL == "" {
+		return fmt.Errorf("broker URL is required")
+	}
+	if config.QoS < 0 || config.QoS > 2 {
+		return fmt.Errorf("QoS must be 0, 1, or 2")
+	}
+	return nil
+}
+
+// testMQTTConnection tests an MQTT broker connection
+func (s *DatasourceService) testMQTTConnection(ctx context.Context, config *models.MQTTConfig) *models.TestDatasourceResponse {
+	if config == nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: "MQTT configuration is required",
+		}
+	}
+
+	// Use the registry adapter to test the connection
+	adapter, err := registry.CreateAdapter("stream.mqtt", map[string]interface{}{
+		"broker_url":  config.BrokerURL,
+		"client_id":   config.ClientID,
+		"username":    config.Username,
+		"password":    config.Password,
+		"tls":         config.TLS,
+		"keep_alive":  config.KeepAlive,
+		"qos":         config.QoS,
+		"clean_start": config.CleanStart,
+	})
+	if err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Failed to create adapter: %v", err),
+		}
+	}
+
+	if err := adapter.TestConnection(ctx); err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Connection failed: %v", err),
+		}
+	}
+
+	return &models.TestDatasourceResponse{
+		Success: true,
+		Status:  models.HealthStatusHealthy,
+		Message: fmt.Sprintf("Connected to MQTT broker at %s", config.BrokerURL),
+	}
+}
+
 // QueryDatasource executes a query against a datasource
 func (s *DatasourceService) QueryDatasource(ctx context.Context, id string, req *models.QueryRequest) (*models.QueryResponse, error) {
 	// Get datasource configuration
@@ -1077,6 +1143,64 @@ func (s *DatasourceService) GetEdgeLakeSchema(ctx context.Context, id string, da
 	}
 
 	return columns, nil
+}
+
+// GetMQTTTopics discovers available topics from an MQTT broker by subscribing briefly
+func (s *DatasourceService) GetMQTTTopics(ctx context.Context, id string) ([]string, error) {
+	ds, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if ds == nil {
+		return nil, fmt.Errorf("datasource not found")
+	}
+	if ds.Type != models.DatasourceTypeMQTT || ds.Config.MQTT == nil {
+		return nil, fmt.Errorf("datasource is not an MQTT connection")
+	}
+
+	// Create adapter and use Stream to collect topics
+	adapter, err := registry.CreateAdapter("stream.mqtt", ds.GetEffectiveConfig())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create MQTT adapter: %w", err)
+	}
+
+	// Subscribe to # for a few seconds to discover topics
+	collectCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	recordChan, err := adapter.Stream(collectCtx, registry.Query{Raw: "#"})
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe: %w", err)
+	}
+
+	topicSet := make(map[string]bool)
+	for {
+		select {
+		case record, ok := <-recordChan:
+			if !ok {
+				goto done
+			}
+			if topic, exists := record["topic"].(string); exists {
+				topicSet[topic] = true
+			}
+		case <-collectCtx.Done():
+			goto done
+		}
+	}
+
+done:
+	// Close the adapter to clean up the connection
+	adapter.Close()
+
+	topics := make([]string, 0, len(topicSet))
+	for topic := range topicSet {
+		topics = append(topics, topic)
+	}
+
+	// Sort topics alphabetically
+	sort.Strings(topics)
+
+	return topics, nil
 }
 
 // CreateAdapter creates a registry.Adapter for the given data source

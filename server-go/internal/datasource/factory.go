@@ -157,6 +157,17 @@ func (f *DataSourceFactory) CreateFromConfig(ds *models.Datasource) (models.Data
 		}
 		return NewEdgeLakeDataSource(ds.Config.EdgeLake)
 
+	case models.DatasourceTypeMQTT:
+		if ds.Config.MQTT == nil {
+			return nil, fmt.Errorf("MQTT configuration is required")
+		}
+		// MQTT uses the registry adapter
+		adapter, err := registry.CreateAdapter("stream.mqtt", ds.GetEffectiveConfig())
+		if err != nil {
+			return nil, err
+		}
+		return &RegistryAdapterWrapper{adapter: adapter}, nil
+
 	default:
 		return nil, fmt.Errorf("unsupported datasource type: %s", ds.Type)
 	}

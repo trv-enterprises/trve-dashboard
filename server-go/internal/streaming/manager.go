@@ -102,6 +102,13 @@ func (m *Manager) SubscribeAndGetChannel(ctx context.Context, datasourceID strin
 		}
 		stream = NewTSStoreStream(datasourceID, ds.Config.TSStore, streamConfig)
 
+	case models.DatasourceTypeMQTT:
+		if ds.Config.MQTT == nil {
+			log.Printf("[StreamManager] Datasource %s has no MQTT configuration", datasourceID)
+			return nil
+		}
+		stream = NewMQTTStream(datasourceID, ds.Config.MQTT, streamConfig)
+
 	default:
 		log.Printf("[StreamManager] Datasource %s is not a streaming type (got: %s)", datasourceID, ds.Type)
 		return nil
@@ -158,6 +165,12 @@ func (m *Manager) Subscribe(ctx context.Context, datasourceID string) (<-chan mo
 			return nil, fmt.Errorf("datasource %s has no TSStore configuration", datasourceID)
 		}
 		stream = NewTSStoreStream(datasourceID, ds.Config.TSStore, streamConfig)
+
+	case models.DatasourceTypeMQTT:
+		if ds.Config.MQTT == nil {
+			return nil, fmt.Errorf("datasource %s has no MQTT configuration", datasourceID)
+		}
+		stream = NewMQTTStream(datasourceID, ds.Config.MQTT, streamConfig)
 
 	default:
 		return nil, fmt.Errorf("datasource %s is not a streaming type (got: %s)", datasourceID, ds.Type)
@@ -311,5 +324,5 @@ func (m *Manager) IsStreamingDatasource(ctx context.Context, datasourceID string
 	if ds == nil {
 		return false, fmt.Errorf("datasource not found")
 	}
-	return ds.Type == models.DatasourceTypeSocket || ds.Type == models.DatasourceTypeTSStore, nil
+	return ds.Type == models.DatasourceTypeSocket || ds.Type == models.DatasourceTypeTSStore || ds.Type == models.DatasourceTypeMQTT, nil
 }

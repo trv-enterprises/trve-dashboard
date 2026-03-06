@@ -1,0 +1,105 @@
+@use '@carbon/styles/scss/spacing' as spacing;
+
+.mqtt-topic-selector {
+  display: flex;
+  flex-direction: column;
+  gap: spacing.$spacing-03;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h4 {
+      margin: 0;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+  }
+
+  &__selected {
+    display: flex;
+    align-items: flex-start;
+    gap: spacing.$spacing-03;
+    flex-wrap: wrap;
+
+    .label {
+      font-size: 0.75rem;
+      color: var(--cds-text-secondary);
+      margin-top: 0.25rem;
+      white-space: nowrap;
+    }
+
+    .selected-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: spacing.$spacing-02;
+    }
+  }
+
+  &__custom {
+    display: flex;
+    align-items: flex-end;
+    gap: spacing.$spacing-02;
+
+    .cds--text-input-wrapper {
+      flex: 1;
+    }
+  }
+
+  &__hint {
+    font-size: 0.75rem;
+    color: var(--cds-text-secondary);
+    margin: 0;
+
+    code {
+      background: var(--cds-layer-02);
+      padding: 0 0.25rem;
+      border-radius: 2px;
+      font-size: 0.75rem;
+    }
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-02;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--cds-border-subtle-01);
+    border-radius: 4px;
+    padding: spacing.$spacing-03;
+
+    > .label {
+      font-size: 0.75rem;
+      color: var(--cds-text-secondary);
+      font-weight: 600;
+      margin-bottom: spacing.$spacing-02;
+    }
+
+    .topic-group {
+      &__label {
+        font-size: 0.75rem;
+        color: var(--cds-text-secondary);
+        font-weight: 600;
+        display: block;
+        margin-top: spacing.$spacing-02;
+        margin-bottom: spacing.$spacing-01;
+      }
+    }
+
+    .topic-checkbox {
+      .cds--checkbox-label-text {
+        font-size: 0.75rem;
+        font-family: 'IBM Plex Mono', monospace;
+      }
+    }
+  }
+
+  &__empty {
+    font-size: 0.75rem;
+    color: var(--cds-text-secondary);
+    font-style: italic;
+    margin: 0;
+  }
+}

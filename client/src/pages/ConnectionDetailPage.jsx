@@ -201,6 +201,20 @@ function ConnectionDetailPage() {
             use_distributed_query: false
           }
         };
+      case 'mqtt':
+        return {
+          mqtt: {
+            broker_url: 'mqtt://192.168.1.216:1883',
+            client_id: '',
+            username: '',
+            password: '',
+            tls: false,
+            keep_alive: 60,
+            qos: 0,
+            clean_start: true,
+            buffer_size: 100
+          }
+        };
       default:
         return {};
     }
@@ -248,6 +262,13 @@ function ConnectionDetailPage() {
     if (prepared.tsstore) {
       if (prepared.tsstore.api_key === '' && connection?.config?.tsstore?.api_key === SECRET_MASKED_VALUE) {
         prepared.tsstore.api_key = SECRET_MASKED_VALUE;
+      }
+    }
+
+    // For MQTT: if password is empty and was masked, keep the masked value
+    if (prepared.mqtt) {
+      if (prepared.mqtt.password === '' && connection?.config?.mqtt?.password === SECRET_MASKED_VALUE) {
+        prepared.mqtt.password = SECRET_MASKED_VALUE;
       }
     }
 
@@ -1205,6 +1226,95 @@ function ConnectionDetailPage() {
     );
   };
 
+  const renderMQTTConfig = () => {
+    const mqttConfig = config.mqtt || {};
+    return (
+      <div className="config-form">
+        <TextInput
+          id="mqtt-broker-url"
+          labelText="Broker URL"
+          value={mqttConfig.broker_url || ''}
+          onChange={(e) => updateConfig('mqtt.broker_url', e.target.value)}
+          placeholder="mqtt://192.168.1.216:1883"
+          helperText="MQTT broker URL (mqtt:// or mqtts:// for TLS)"
+        />
+
+        <TextInput
+          id="mqtt-client-id"
+          labelText="Client ID"
+          value={mqttConfig.client_id || ''}
+          onChange={(e) => updateConfig('mqtt.client_id', e.target.value)}
+          placeholder="dashboard-client-01"
+          helperText="Unique client identifier (auto-generated if empty)"
+        />
+
+        <div className="form-row">
+          <TextInput
+            id="mqtt-username"
+            labelText="Username"
+            value={mqttConfig.username || ''}
+            onChange={(e) => updateConfig('mqtt.username', e.target.value)}
+            placeholder="(optional)"
+          />
+          <TextInput
+            id="mqtt-password"
+            type="password"
+            labelText="Password"
+            value={mqttConfig.password === SECRET_MASKED_VALUE ? '' : (mqttConfig.password || '')}
+            onChange={(e) => updateConfig('mqtt.password', e.target.value)}
+            placeholder={connection?.config?.mqtt?.password === SECRET_MASKED_VALUE ? '(secret set)' : '(optional)'}
+          />
+        </div>
+
+        <div className="form-row">
+          <NumberInput
+            id="mqtt-keep-alive"
+            label="Keep Alive (seconds)"
+            value={mqttConfig.keep_alive || 60}
+            onChange={(e) => updateConfig('mqtt.keep_alive', e.imaginaryTarget.value)}
+            min={5}
+            max={3600}
+            helperText="Ping interval to keep connection alive"
+          />
+          <Select
+            id="mqtt-qos"
+            labelText="Default QoS"
+            value={String(mqttConfig.qos ?? 0)}
+            onChange={(e) => updateConfig('mqtt.qos', parseInt(e.target.value))}
+          >
+            <SelectItem value="0" text="0 - At most once" />
+            <SelectItem value="1" text="1 - At least once" />
+            <SelectItem value="2" text="2 - Exactly once" />
+          </Select>
+        </div>
+
+        <NumberInput
+          id="mqtt-buffer-size"
+          label="Buffer Size (messages)"
+          value={mqttConfig.buffer_size || 100}
+          onChange={(e) => updateConfig('mqtt.buffer_size', e.imaginaryTarget.value)}
+          min={1}
+          max={10000}
+        />
+
+        <div className="form-row">
+          <Checkbox
+            id="mqtt-tls"
+            labelText="Use TLS encryption"
+            checked={mqttConfig.tls || false}
+            onChange={(e) => updateConfig('mqtt.tls', e.target.checked)}
+          />
+          <Checkbox
+            id="mqtt-clean-start"
+            labelText="Clean session on connect"
+            checked={mqttConfig.clean_start !== false}
+            onChange={(e) => updateConfig('mqtt.clean_start', e.target.checked)}
+          />
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="connection-detail-page">
@@ -1308,6 +1418,7 @@ function ConnectionDetailPage() {
             <SelectItem value="tsstore" text="TSStore (Timeseries)" />
             <SelectItem value="prometheus" text="Prometheus" />
             <SelectItem value="edgelake" text="EdgeLake" />
+            <SelectItem value="mqtt" text="MQTT Broker" />
           </Select>
         </div>
 
@@ -1332,6 +1443,7 @@ function ConnectionDetailPage() {
           {type === 'tsstore' && renderTSStoreConfig()}
           {type === 'prometheus' && renderPrometheusConfig()}
           {type === 'edgelake' && renderEdgeLakeConfig()}
+          {type === 'mqtt' && renderMQTTConfig()}
         </div>
       </div>
 

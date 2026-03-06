@@ -92,7 +92,10 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     };
   }, [datasourceId]);
 
-  // === STREAMING LOGIC (for socket datasources) ===
+  // Streaming datasource types use SSE instead of polling
+  const isStreamingType = datasourceType === 'socket' || datasourceType === 'mqtt';
+
+  // === STREAMING LOGIC (for streaming datasources) ===
   const processStreamRecord = useCallback((record) => {
     if (!mountedRef.current) return;
 
@@ -183,7 +186,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
 
   // Connect to SSE stream for socket datasources (raw or aggregated)
   useEffect(() => {
-    if (typeLoading || datasourceType !== 'socket' || !datasourceId) {
+    if (typeLoading || !isStreamingType || !datasourceId) {
       return;
     }
 
@@ -410,7 +413,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
 
   // Initial fetch for non-socket datasources
   useEffect(() => {
-    if (typeLoading || datasourceType === 'socket' || !datasourceId) {
+    if (typeLoading || isStreamingType || !datasourceId) {
       return;
     }
 
@@ -424,7 +427,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
 
   // Auto-refresh interval for non-socket datasources
   useEffect(() => {
-    if (typeLoading || datasourceType === 'socket') {
+    if (typeLoading || isStreamingType) {
       return; // Streaming handles its own updates
     }
 
@@ -444,7 +447,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
   // Refetch function (bypasses cache for polling, clears buffer for streaming)
   // showLoading: if true, shows loading spinner during refetch (default: false for seamless updates)
   const refetch = useCallback(async (showLoading = false) => {
-    if (datasourceType === 'socket') {
+    if (isStreamingType) {
       // For streaming, clear the buffer
       setData({ columns: columnsRef.current, rows: [] });
       return;
@@ -487,15 +490,15 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     loading: typeLoading || loading,
     error,
     refetch,
-    source: datasourceType === 'socket' ? (useAggregated ? 'aggregated-stream' : 'stream') : source,
+    source: isStreamingType ? (useAggregated ? 'aggregated-stream' : 'stream') : source,
     cached: source === 'cache' || source === 'partial-cache',
     // Streaming-specific properties
-    connected: datasourceType === 'socket' ? connected : null,
-    isStreaming: datasourceType === 'socket',
-    isAggregated: datasourceType === 'socket' && useAggregated,
-    clearBuffer: datasourceType === 'socket' ? clearBuffer : null,
+    connected: isStreamingType ? connected : null,
+    isStreaming: isStreamingType,
+    isAggregated: isStreamingType && useAggregated,
+    clearBuffer: isStreamingType ? clearBuffer : null,
     // Reconnection state (for overlay errors)
-    reconnecting: datasourceType === 'socket' ? reconnecting : false,
-    disconnectedSince: datasourceType === 'socket' ? disconnectedSince : null,
+    reconnecting: isStreamingType ? reconnecting : false,
+    disconnectedSince: isStreamingType ? disconnectedSince : null,
   };
 }

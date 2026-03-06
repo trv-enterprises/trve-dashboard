@@ -39,7 +39,7 @@ const SystemPrompt = `You are an AI assistant helping users create and edit data
 
 Use the list_datasources tool to see what data sources are available. Each source has:
 - ID: Used to reference the source
-- Type: sql, api, csv, socket, prometheus, edgelake
+- Type: sql, api, csv, socket, mqtt, prometheus, edgelake
 - Connection info
 
 ## Schema Discovery (All Data Sources)

@@ -216,7 +216,7 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
 
 1. **Three Operating Modes**: Design, View, and Manage
 2. **Dynamic Chart Builder**: Create React components with ECharts visualizations
-3. **Multi-Source Data**: Connect to SQL, API, CSV, and WebSocket data sources
+3. **Multi-Source Data**: Connect to SQL, API, CSV, WebSocket, and MQTT data sources
 4. **Real-time Updates**: Auto-refresh dashboards with configurable intervals
 
 ## Architecture Summary
@@ -469,7 +469,7 @@ const Component = () => {
 └───────────────────────────────┴────────────────────────────────┘
 ```
 
-## Current Status (2026-02-13)
+## Current Status (2026-03-06)
 
 ### ✅ Completed
 - Go backend with MongoDB (layouts, connections, components, dashboards, charts)
@@ -492,6 +492,7 @@ const Component = () => {
 - **EdgeLake Connection**: Full EdgeLake integration with distributed query support, cascading schema discovery (database → table → columns), visual query builder, and AI tool support
 - **Terminology Rename**: "Data Sources" renamed to "Connections" throughout UI and API (`/api/connections`)
 - **Terminology Rename**: "Chart" renamed to "Display" in UI (DB still uses `component_type: 'chart'` for backward compatibility)
+- **MQTT Connection**: Full MQTT broker integration with Eclipse Paho v2, bidirectional pub/sub, visual topic selector with broker discovery, multi-topic subscription, and streaming support via SSE
 
 ### 🚧 In Progress
 - AI Builder Phase 8: Polish & Testing
@@ -531,8 +532,8 @@ const Component = () => {
 
 ---
 
-**Last Updated**: 2026-01-28
-**Build**: 459
+**Last Updated**: 2026-03-06
+**Build**: 578
 
 ## Simulator Services
 

@@ -435,3 +435,31 @@ func (h *DatasourceHandler) GetEdgeLakeSchema(c *gin.Context) {
 		"columns":  columns,
 	})
 }
+
+// GetMQTTTopics discovers available topics from an MQTT broker
+// @Summary Get topics from an MQTT broker
+// @Description Subscribe briefly to discover available topics on an MQTT broker
+// @Tags datasources
+// @Produce json
+// @Param id path string true "Datasource ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /connections/{id}/mqtt/topics [get]
+func (h *DatasourceHandler) GetMQTTTopics(c *gin.Context) {
+	id := c.Param("id")
+
+	topics, err := h.service.GetMQTTTopics(c.Request.Context(), id)
+	if err != nil {
+		if err.Error() == "datasource not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Datasource not found"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"topics": topics,
+	})
+}

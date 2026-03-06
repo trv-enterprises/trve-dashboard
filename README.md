@@ -7,7 +7,7 @@ A full-stack application for creating, managing, and viewing dynamic data visual
 This system allows you to:
 - Create dashboards with customizable grid layouts
 - Build React components with ECharts visualizations
-- Connect to multiple data sources (SQL, API, CSV, WebSocket)
+- Connect to multiple data sources (SQL, API, CSV, WebSocket, MQTT)
 - Generate charts using AI assistance
 - View dashboards with real-time data updates
 - Auto-refresh dashboards at configurable intervals
@@ -105,7 +105,7 @@ Then open http://localhost:5173 in your browser.
 
 ### Design Mode (`/design/*`)
 Create and configure dashboard components:
-- **Connections** - Configure SQL, API, CSV, WebSocket data connections
+- **Connections** - Configure SQL, API, CSV, WebSocket, MQTT data connections
 - **Components** - Build displays (charts, gauges, tables) and controls (buttons, sliders), or use AI Builder
 - **Dashboards** - Combine components with layouts and configure settings
 
@@ -138,6 +138,7 @@ Create displays using natural language:
 - **API**: REST APIs with authentication (Bearer, Basic, API-Key)
 - **CSV**: File-based with filtering and header detection
 - **WebSocket**: Real-time data streams with parser configuration
+- **MQTT**: Broker connections with topic discovery, multi-topic subscription, and publish support
 
 ### MCP Server (Model Context Protocol)
 A standalone MCP server allows external AI agents (like Claude Desktop) to query your data sources:

@@ -274,6 +274,10 @@ class APIClient {
     return this.request(`/api/connections/${connectionId}/edgelake/schema?database=${encodeURIComponent(database)}&table=${encodeURIComponent(table)}`);
   }
 
+  async getMQTTTopics(connectionId) {
+    return this.request(`/api/connections/${connectionId}/mqtt/topics`);
+  }
+
   // Get connections that support write operations (for controls)
   async getWritableConnections() {
     const response = await this.getConnections();

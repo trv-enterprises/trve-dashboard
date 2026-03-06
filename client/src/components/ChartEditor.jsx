@@ -28,6 +28,7 @@ import { API_BASE } from '../api/client';
 import SQLQueryBuilder from './SQLQueryBuilder';
 import PrometheusQueryBuilder from './PrometheusQueryBuilder';
 import EdgeLakeQueryBuilder from './EdgeLakeQueryBuilder';
+import MQTTTopicSelector from './MQTTTopicSelector';
 import ControlEditor from './ControlEditor';
 import { transformData, formatCellValue } from '../utils/dataTransforms';
 import apiClient from '../api/client';
@@ -514,6 +515,7 @@ const ChartEditor = forwardRef(function ChartEditor({
   // Derived datasource type flags (used in multiple places)
   const isTSStore = selectedDatasource?.type === 'tsstore';
   const isSocket = selectedDatasource?.type === 'socket';
+  const isMQTT = selectedDatasource?.type === 'mqtt';
   const isAPI = selectedDatasource?.type === 'api';
 
   const handleDatasourceChange = (newDatasourceId) => {
@@ -538,6 +540,11 @@ const ChartEditor = forwardRef(function ChartEditor({
           case 'socket':
             setQueryType('stream_filter');
             setQueryMode('raw');
+            break;
+          case 'mqtt':
+            setQueryType('mqtt');
+            setQueryMode('visual');
+            setQueryRaw('#');
             break;
           case 'tsstore':
             setQueryType('tsstore');
@@ -619,7 +626,7 @@ const ChartEditor = forwardRef(function ChartEditor({
     }
 
     // Socket, API, and TSStore datasources don't require manual query entry
-    if (!isSocket && !isAPI && !isTSStore && !queryRaw.trim()) {
+    if (!isSocket && !isMQTT && !isAPI && !isTSStore && !queryRaw.trim()) {
       setPreviewError('Please enter a query');
       return;
     }
@@ -1098,6 +1105,17 @@ const ChartEditor = forwardRef(function ChartEditor({
                           <Switch name="raw" text="PromQL" />
                         </ContentSwitcher>
                       )}
+                      {selectedDatasource.type === 'mqtt' && (
+                        <ContentSwitcher
+                          size="sm"
+                          selectedIndex={queryMode === 'visual' ? 0 : 1}
+                          onChange={(e) => setQueryMode(e.name)}
+                          className="query-mode-switcher"
+                        >
+                          <Switch name="visual" text="Topics" />
+                          <Switch name="raw" text="Raw" />
+                        </ContentSwitcher>
+                      )}
                       {selectedDatasource.type === 'edgelake' && (
                         <ContentSwitcher
                           size="sm"
@@ -1257,6 +1275,12 @@ const ChartEditor = forwardRef(function ChartEditor({
                       }}
                       initialQuery={queryRaw}
                     />
+                  ) : selectedDatasource.type === 'mqtt' && queryMode === 'visual' ? (
+                    <MQTTTopicSelector
+                      datasourceId={selectedDatasourceId}
+                      onQueryChange={(query) => setQueryRaw(query)}
+                      initialQuery={queryRaw}
+                    />
                   ) : selectedDatasource.type === 'edgelake' && queryMode === 'visual' ? (
                     <EdgeLakeQueryBuilder
                       datasourceId={selectedDatasourceId}
@@ -1281,8 +1305,8 @@ const ChartEditor = forwardRef(function ChartEditor({
                       value={queryRaw}
                       onChange={(e) => setQueryRaw(e.target.value)}
                       placeholder={getQueryPlaceholderForType(selectedDatasource.type)}
-                      rows={selectedDatasource.type === 'api' ? 1 : 6}
-                      className={`query-textarea ${selectedDatasource.type === 'api' ? 'query-textarea--compact' : ''}`}
+                      rows={selectedDatasource.type === 'api' || selectedDatasource.type === 'mqtt' ? 1 : 6}
+                      className={`query-textarea ${selectedDatasource.type === 'api' || selectedDatasource.type === 'mqtt' ? 'query-textarea--compact' : ''}`}
                     />
                   )}
                 </div>
@@ -2825,6 +2849,7 @@ function getQueryLabelForType(type) {
     case 'api': return 'Query Parameters (optional)';
     case 'csv': return 'Filter Expression';
     case 'socket': return 'Stream Filter';
+    case 'mqtt': return 'MQTT Topic Filter';
     case 'tsstore': return 'TSStore Query';
     case 'prometheus': return 'PromQL Query';
     case 'edgelake': return 'EdgeLake SQL Query';
@@ -2838,6 +2863,7 @@ function getQueryPlaceholderForType(type) {
     case 'api': return '?limit=100&format=json';
     case 'csv': return 'sensor_type = temperature';
     case 'socket': return '';
+    case 'mqtt': return 'sensors/temperature/# or home/+/status';
     case 'tsstore': return 'newest';
     case 'prometheus': return 'up{job="prometheus"}';
     case 'edgelake': return 'SELECT * FROM sensor_data WHERE timestamp > NOW() - 1 hour LIMIT 100';

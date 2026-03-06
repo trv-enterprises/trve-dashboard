@@ -268,6 +268,7 @@ func main() {
 			connections.GET("/:id/edgelake/databases", datasourceHandler.GetEdgeLakeDatabases)                     // EdgeLake databases
 			connections.GET("/:id/edgelake/tables", datasourceHandler.GetEdgeLakeTables)                           // EdgeLake tables
 			connections.GET("/:id/edgelake/schema", datasourceHandler.GetEdgeLakeSchema)                           // EdgeLake table schema
+			connections.GET("/:id/mqtt/topics", datasourceHandler.GetMQTTTopics)                                // MQTT topic discovery
 			connections.GET("/:id/stream", streamHandler.StreamDatasource)                                      // SSE streaming
 			connections.GET("/:id/stream/status", streamHandler.GetStreamStatus)                 // Stream status
 			connections.POST("/:id/stream/aggregated", streamHandler.StreamAggregatedDatasource) // SSE aggregated streaming
@@ -292,6 +293,7 @@ func main() {
 			datasources.GET("/:id/edgelake/databases", datasourceHandler.GetEdgeLakeDatabases)                     // EdgeLake databases
 			datasources.GET("/:id/edgelake/tables", datasourceHandler.GetEdgeLakeTables)                           // EdgeLake tables
 			datasources.GET("/:id/edgelake/schema", datasourceHandler.GetEdgeLakeSchema)                           // EdgeLake table schema
+			datasources.GET("/:id/mqtt/topics", datasourceHandler.GetMQTTTopics)                                // MQTT topic discovery
 			datasources.GET("/:id/stream", streamHandler.StreamDatasource)                                      // SSE streaming
 			datasources.GET("/:id/stream/status", streamHandler.GetStreamStatus)                 // Stream status
 			datasources.POST("/:id/stream/aggregated", streamHandler.StreamAggregatedDatasource) // SSE aggregated streaming
