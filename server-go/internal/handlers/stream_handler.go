@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tviviano/dashboard/internal/models"
 	"github.com/tviviano/dashboard/internal/streaming"
 )
 
@@ -56,8 +57,21 @@ func (h *StreamHandler) StreamDatasource(c *gin.Context) {
 		return
 	}
 
-	// Subscribe to the stream (returns a bidirectional channel)
-	recordCh := h.manager.SubscribeAndGetChannel(c.Request.Context(), datasourceID)
+	// Parse optional topic filters for MQTT datasources
+	// Accepts comma-separated MQTT topic patterns (e.g., "sensors/temp/#,home/+/status")
+	topicFilters := streaming.ParseTopicFilters(c.Query("topics"))
+	if len(topicFilters) > 0 {
+		log.Printf("[StreamHandler] Topic filters for datasource %s: %v", datasourceID, topicFilters)
+	}
+
+	// Subscribe to the stream — for MQTT, this subscribes only to the requested topics
+	// at the broker level and routes only matching records to this channel
+	var recordCh chan models.Record
+	if len(topicFilters) > 0 {
+		recordCh = h.manager.SubscribeWithTopics(c.Request.Context(), datasourceID, topicFilters)
+	} else {
+		recordCh = h.manager.SubscribeAndGetChannel(c.Request.Context(), datasourceID)
+	}
 	if recordCh == nil {
 		log.Printf("[StreamHandler] Subscribe error for %s", datasourceID)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to subscribe to stream"})
@@ -72,10 +86,9 @@ func (h *StreamHandler) StreamDatasource(c *gin.Context) {
 
 	log.Printf("[StreamHandler] SSE connection opened for datasource %s", datasourceID)
 
-	// Send buffered records first (initial state)
-	bufferedRecords := h.manager.GetBuffer(datasourceID)
+	// Send buffered records first (initial state) — already topic-filtered for MQTT
+	bufferedRecords := h.manager.GetBufferFiltered(datasourceID, topicFilters)
 	if len(bufferedRecords) > 0 {
-		log.Printf("[StreamHandler] Sending %d buffered records", len(bufferedRecords))
 		for _, record := range bufferedRecords {
 			data, err := json.Marshal(record)
 			if err != nil {
@@ -83,6 +96,7 @@ func (h *StreamHandler) StreamDatasource(c *gin.Context) {
 			}
 			fmt.Fprintf(c.Writer, "event: record\ndata: %s\n\n", data)
 		}
+		log.Printf("[StreamHandler] Sent %d buffered records", len(bufferedRecords))
 		c.Writer.Flush()
 	}
 
@@ -90,7 +104,7 @@ func (h *StreamHandler) StreamDatasource(c *gin.Context) {
 	heartbeatTicker := time.NewTicker(30 * time.Second)
 	defer heartbeatTicker.Stop()
 
-	// Stream records to client
+	// Stream records to client — filtering already handled upstream for MQTT
 	clientGone := c.Request.Context().Done()
 	for {
 		select {
@@ -101,7 +115,6 @@ func (h *StreamHandler) StreamDatasource(c *gin.Context) {
 
 		case record, ok := <-recordCh:
 			if !ok {
-				// Channel closed
 				log.Printf("[StreamHandler] Stream channel closed for datasource %s", datasourceID)
 				return
 			}
@@ -116,7 +129,6 @@ func (h *StreamHandler) StreamDatasource(c *gin.Context) {
 			c.Writer.Flush()
 
 		case <-heartbeatTicker.C:
-			// Send heartbeat to keep connection alive
 			fmt.Fprintf(c.Writer, "event: heartbeat\ndata: {\"timestamp\":%d}\n\n", time.Now().Unix())
 			c.Writer.Flush()
 		}

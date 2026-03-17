@@ -233,7 +233,19 @@ func (r *ControlSchemaRepository) UpsertBuiltIn(ctx context.Context, schema *mod
 
 	opts := options.Update().SetUpsert(true)
 	update := bson.M{
-		"$set": schema,
+		"$set": bson.M{
+			"name":            schema.Name,
+			"description":     schema.Description,
+			"version":         schema.Version,
+			"protocol_type":   schema.ProtocolType,
+			"supported_types": schema.SupportedTypes,
+			"commands":        schema.Commands,
+			"state_query":     schema.StateQuery,
+			"response":        schema.Response,
+			"is_built_in":     schema.IsBuiltIn,
+			"metadata":        schema.Metadata,
+			"updated":         now,
+		},
 		"$setOnInsert": bson.M{
 			"created": now,
 		},

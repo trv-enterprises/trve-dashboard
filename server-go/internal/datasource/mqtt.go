@@ -473,9 +473,10 @@ func (a *MQTTAdapter) Write(ctx context.Context, cmd registry.Command) (*registr
 
 // parseMessageToRecord converts an MQTT message to a Record
 func (a *MQTTAdapter) parseMessageToRecord(m *paho.Publish) registry.Record {
+	serverTS := time.Now().Unix()
 	record := registry.Record{
 		"topic":     m.Topic,
-		"timestamp": time.Now().Unix(),
+		"timestamp": serverTS,
 	}
 
 	// Try to parse payload as JSON
@@ -488,10 +489,22 @@ func (a *MQTTAdapter) parseMessageToRecord(m *paho.Publish) registry.Record {
 
 	// Merge JSON fields into record
 	for k, v := range payload {
-		if k == "timestamp" {
-			record["timestamp"] = normalizeTimestamp(v)
+		record[k] = v
+	}
+
+	// Always ensure timestamp is a valid Unix epoch.
+	// If the payload had a "timestamp" field, validate it — if it doesn't look like
+	// a Unix timestamp (too small), keep the server timestamp instead.
+	if payloadTS, exists := payload["timestamp"]; exists {
+		normalized := normalizeTimestamp(payloadTS)
+		if ts, ok := normalized.(int64); ok && ts > 1000000000 {
+			// Valid Unix timestamp (after ~2001)
+			record["timestamp"] = ts
 		} else {
-			record[k] = v
+			// Payload timestamp is not a valid epoch (e.g., just a year like 2026)
+			// Keep as a separate field and use server time
+			record["timestamp"] = serverTS
+			record["payload_timestamp"] = payloadTS
 		}
 	}
 

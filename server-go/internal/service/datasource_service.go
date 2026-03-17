@@ -1203,6 +1203,73 @@ done:
 	return topics, nil
 }
 
+// SampleMQTTTopic subscribes to a single MQTT topic and returns the schema (columns)
+// plus one sample row, with a short timeout. Used by the chart editor to discover
+// the message schema for a topic before configuring data mapping.
+func (s *DatasourceService) SampleMQTTTopic(ctx context.Context, datasourceID string, topic string) (map[string]interface{}, error) {
+	ds, err := s.repo.FindByID(ctx, datasourceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find datasource: %w", err)
+	}
+	if ds == nil {
+		return nil, fmt.Errorf("datasource not found")
+	}
+	if ds.Type != models.DatasourceTypeMQTT || ds.Config.MQTT == nil {
+		return nil, fmt.Errorf("datasource is not an MQTT connection")
+	}
+
+	adapter, err := registry.CreateAdapter("stream.mqtt", ds.GetEffectiveConfig())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create MQTT adapter: %w", err)
+	}
+	defer adapter.Close()
+
+	// Subscribe to the specific topic for up to 3 seconds, stop after first message
+	collectCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	recordChan, err := adapter.Stream(collectCtx, registry.Query{Raw: topic})
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to topic: %w", err)
+	}
+
+	// Wait for first message
+	select {
+	case record, ok := <-recordChan:
+		if !ok {
+			return map[string]interface{}{
+				"topic":   topic,
+				"columns": []string{},
+				"sample":  map[string]interface{}{},
+			}, nil
+		}
+		// Extract columns in a stable order: timestamp and topic first, then sorted alpha
+		columns := []string{"timestamp", "topic"}
+		otherCols := []string{}
+		for k := range record {
+			if k != "timestamp" && k != "topic" {
+				otherCols = append(otherCols, k)
+			}
+		}
+		sort.Strings(otherCols)
+		columns = append(columns, otherCols...)
+
+		return map[string]interface{}{
+			"topic":   topic,
+			"columns": columns,
+			"sample":  record,
+		}, nil
+
+	case <-collectCtx.Done():
+		return map[string]interface{}{
+			"topic":   topic,
+			"columns": []string{},
+			"sample":  map[string]interface{}{},
+			"timeout": true,
+		}, nil
+	}
+}
+
 // CreateAdapter creates a registry.Adapter for the given data source
 // This is used by the command handler for bidirectional communication
 func (s *DatasourceService) CreateAdapter(ctx context.Context, ds *models.Datasource) (registry.Adapter, error) {

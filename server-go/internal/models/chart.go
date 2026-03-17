@@ -26,6 +26,7 @@ const (
 	ControlTypeToggle    = "toggle"     // On/off toggle switch
 	ControlTypeSlider    = "slider"     // Numeric slider
 	ControlTypeTextInput = "text_input" // Text input field
+	ControlTypePlug      = "plug"       // Smart plug toggle
 )
 
 // ControlConfig defines configuration for control components

@@ -2,55 +2,88 @@
 // Licensed under Apache 2.0
 // See LICENSE file for details.
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Slider, Button, InlineLoading } from '@carbon/react';
 import { Send } from '@carbon/icons-react';
 import PropTypes from 'prop-types';
 import apiClient from '../../api/client';
+import StreamConnectionManager from '../../utils/streamConnectionManager';
+import { useNotifications } from '../../context/NotificationContext';
 import './controls.scss';
 
 /**
  * ControlSlider Component
  *
  * A slider control that sends numeric values.
- * Value is sent when the user releases the slider or clicks the send button.
+ * Subscribes to MQTT state topic for live external updates.
  */
 function ControlSlider({ control, onSuccess, onError }) {
   const [loading, setLoading] = useState(false);
-  const [lastResult, setLastResult] = useState(null);
+  const { addNotification } = useNotifications();
+  const suppressUntilRef = useRef(0);
 
   const uiConfig = control.control_config?.ui_config || {};
   const label = uiConfig.label || 'Value';
   const min = uiConfig.min ?? 0;
   const max = uiConfig.max ?? 100;
   const step = uiConfig.step ?? 1;
-  const sendOnRelease = uiConfig.send_on_release !== false; // Default true
+  const sendOnRelease = uiConfig.send_on_release !== false;
+  const target = control.control_config?.target || '';
+  const connectionId = control.connection_id;
+  const stateField = uiConfig.state_field || 'value';
 
   const [value, setValue] = useState(min);
-  const [pendingValue, setPendingValue] = useState(null);
+
+  // Derive state topic from command target (strip /set suffix)
+  const stateTopic = target.endsWith('/set') ? target.slice(0, -4) : '';
+
+  // Subscribe to state topic for live updates
+  useEffect(() => {
+    if (!connectionId || !stateTopic) return;
+
+    const manager = StreamConnectionManager.getInstance();
+    const unsubscribe = manager.subscribe(connectionId, (record) => {
+      if (record.topic && record.topic !== stateTopic) return;
+      if (Date.now() < suppressUntilRef.current) return;
+
+      const newValue = record[stateField];
+      if (newValue === undefined || typeof newValue !== 'number') return;
+
+      setValue(newValue);
+    }, {
+      topics: stateTopic
+    });
+
+    return () => unsubscribe();
+  }, [connectionId, stateTopic, stateField]);
 
   const sendValue = useCallback(async (valueToSend) => {
     setLoading(true);
-    setLastResult(null);
+    suppressUntilRef.current = Date.now() + 3000;
 
     try {
       const result = await apiClient.executeControlCommand(control.id, valueToSend);
-      setLastResult({ success: true, message: result.message });
-      setPendingValue(null);
+      addNotification({
+        kind: 'success',
+        title: `${label} set to ${valueToSend}`,
+        subtitle: target ? `Published to ${target}` : result.message
+      });
       if (onSuccess) onSuccess(result);
     } catch (err) {
-      setLastResult({ success: false, message: err.message });
+      suppressUntilRef.current = 0;
+      addNotification({
+        kind: 'error',
+        title: `${label} command failed`,
+        subtitle: err.message
+      });
       if (onError) onError(err);
     } finally {
       setLoading(false);
     }
-  }, [control.id, onSuccess, onError]);
+  }, [control.id, label, target, onSuccess, onError, addNotification]);
 
   const handleChange = ({ value: newValue }) => {
     setValue(newValue);
-    if (!sendOnRelease) {
-      setPendingValue(newValue);
-    }
   };
 
   const handleRelease = () => {
@@ -97,11 +130,6 @@ function ControlSlider({ control, onSuccess, onError }) {
           <InlineLoading description="" className="slider-loading" />
         )}
       </div>
-      {lastResult && (
-        <div className={`control-result ${lastResult.success ? 'success' : 'error'}`}>
-          {lastResult.message || (lastResult.success ? 'Success' : 'Failed')}
-        </div>
-      )}
     </div>
   );
 }
@@ -109,7 +137,9 @@ function ControlSlider({ control, onSuccess, onError }) {
 ControlSlider.propTypes = {
   control: PropTypes.shape({
     id: PropTypes.string.isRequired,
+    connection_id: PropTypes.string,
     control_config: PropTypes.shape({
+      target: PropTypes.string,
       ui_config: PropTypes.object
     })
   }).isRequired,

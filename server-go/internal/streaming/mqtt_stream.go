@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,15 +19,88 @@ import (
 	"github.com/tviviano/dashboard/internal/models"
 )
 
-// MQTTStream represents a persistent MQTT subscription that broadcasts to multiple subscribers
+// MQTTTopicMatch checks if a topic matches an MQTT topic filter pattern.
+// Supports MQTT wildcards: + (single level) and # (multi level).
+// Examples:
+//
+//	MQTTTopicMatch("sensors/temp/room1", "sensors/temp/room1") => true
+//	MQTTTopicMatch("sensors/temp/room1", "sensors/+/room1") => true
+//	MQTTTopicMatch("sensors/temp/room1", "sensors/#") => true
+//	MQTTTopicMatch("sensors/temp/room1", "#") => true
+func MQTTTopicMatch(topic, filter string) bool {
+	if filter == "#" {
+		return true
+	}
+	if filter == topic {
+		return true
+	}
+
+	topicParts := splitTopic(topic)
+	filterParts := splitTopic(filter)
+
+	for i, fp := range filterParts {
+		if fp == "#" {
+			// # matches everything from here on
+			return true
+		}
+		if i >= len(topicParts) {
+			// Filter has more levels than topic
+			return false
+		}
+		if fp == "+" {
+			// + matches any single level
+			continue
+		}
+		if fp != topicParts[i] {
+			return false
+		}
+	}
+
+	// Filter exhausted — must have matched all topic levels exactly
+	return len(topicParts) == len(filterParts)
+}
+
+func splitTopic(t string) []string {
+	parts := []string{}
+	start := 0
+	for i := 0; i <= len(t); i++ {
+		if i == len(t) || t[i] == '/' {
+			parts = append(parts, t[start:i])
+			start = i + 1
+		}
+	}
+	return parts
+}
+
+// MQTTTopicMatchAny checks if a topic matches any of the given filter patterns.
+func MQTTTopicMatchAny(topic string, filters []string) bool {
+	for _, f := range filters {
+		if MQTTTopicMatch(topic, f) {
+			return true
+		}
+	}
+	return false
+}
+
+// mqttSubscriber tracks a subscriber and its topic filters
+type mqttSubscriber struct {
+	ch      chan models.Record
+	topics  []string // MQTT topic filters this subscriber wants
+}
+
+// MQTTStream represents a persistent MQTT connection that manages topic subscriptions
+// dynamically based on what subscribers need. Only subscribes to topics at the broker
+// level when at least one subscriber wants them.
 type MQTTStream struct {
 	datasourceID string
 	config       *models.MQTTConfig
 	cm           *autopaho.ConnectionManager
-	subscribers  map[chan models.Record]struct{}
+	subscribers  []*mqttSubscriber
+	topicRefs    map[string]int // ref count: topic filter -> number of subscribers using it
 	buffer       *RingBuffer
 	mu           sync.RWMutex
 	cancelFunc   context.CancelFunc
+	streamCtx    context.Context
 	connected    bool
 	lastError    error
 }
@@ -41,16 +115,18 @@ func NewMQTTStream(datasourceID string, config *models.MQTTConfig, streamConfig 
 	return &MQTTStream{
 		datasourceID: datasourceID,
 		config:       config,
-		subscribers:  make(map[chan models.Record]struct{}),
+		subscribers:  make([]*mqttSubscriber, 0),
+		topicRefs:    make(map[string]int),
 		buffer:       NewRingBuffer(bufferSize),
 	}
 }
 
-// Start begins the MQTT streaming connection, subscribing to all topics (#)
-// Individual topic filtering happens client-side
+// Start connects to the MQTT broker but does NOT subscribe to any topics yet.
+// Topics are subscribed dynamically when subscribers are added via SubscribeWithTopics.
 func (s *MQTTStream) Start(ctx context.Context) error {
 	streamCtx, cancel := context.WithCancel(ctx)
 	s.cancelFunc = cancel
+	s.streamCtx = streamCtx
 
 	brokerURL, err := url.Parse(s.config.BrokerURL)
 	if err != nil {
@@ -77,26 +153,20 @@ func (s *MQTTStream) Start(ctx context.Context) error {
 		CleanStartOnInitialConnection: s.config.CleanStart,
 		SessionExpiryInterval:         0,
 		OnConnectionUp: func(cm *autopaho.ConnectionManager, connAck *paho.Connack) {
-			log.Printf("[MQTTStream %s] Connected to broker, subscribing to #", s.datasourceID)
+			log.Printf("[MQTTStream %s] Connected to broker", s.datasourceID)
 
 			s.mu.Lock()
 			s.connected = true
 			s.lastError = nil
+			// Re-subscribe to all active topics after reconnect
+			topics := make([]string, 0, len(s.topicRefs))
+			for t := range s.topicRefs {
+				topics = append(topics, t)
+			}
 			s.mu.Unlock()
 
-			qos := byte(s.config.QoS)
-			if qos > 2 {
-				qos = 0
-			}
-
-			// Subscribe to all topics — filtering is done by the frontend per-component
-			_, err := cm.Subscribe(streamCtx, &paho.Subscribe{
-				Subscriptions: []paho.SubscribeOptions{
-					{Topic: "#", QoS: qos},
-				},
-			})
-			if err != nil {
-				log.Printf("[MQTTStream %s] Subscribe error: %v", s.datasourceID, err)
+			if len(topics) > 0 {
+				s.subscribeBrokerTopics(topics)
 			}
 		},
 		OnConnectError: func(err error) {
@@ -143,11 +213,64 @@ func (s *MQTTStream) Start(ctx context.Context) error {
 	return nil
 }
 
-// handleMessage processes incoming MQTT messages and broadcasts to subscribers
+// subscribeBrokerTopics sends SUBSCRIBE for the given topics to the broker
+func (s *MQTTStream) subscribeBrokerTopics(topics []string) {
+	s.mu.RLock()
+	cm := s.cm
+	s.mu.RUnlock()
+
+	if cm == nil {
+		return
+	}
+
+	qos := byte(s.config.QoS)
+	if qos > 2 {
+		qos = 0
+	}
+
+	subs := make([]paho.SubscribeOptions, len(topics))
+	for i, t := range topics {
+		subs[i] = paho.SubscribeOptions{Topic: t, QoS: qos}
+	}
+
+	ctx, cancel := context.WithTimeout(s.streamCtx, 10*time.Second)
+	defer cancel()
+
+	_, err := cm.Subscribe(ctx, &paho.Subscribe{Subscriptions: subs})
+	if err != nil {
+		log.Printf("[MQTTStream %s] Subscribe error for %v: %v", s.datasourceID, topics, err)
+	} else {
+		log.Printf("[MQTTStream %s] Subscribed to broker topics: %v", s.datasourceID, topics)
+	}
+}
+
+// unsubscribeBrokerTopics sends UNSUBSCRIBE for the given topics to the broker
+func (s *MQTTStream) unsubscribeBrokerTopics(topics []string) {
+	s.mu.RLock()
+	cm := s.cm
+	s.mu.RUnlock()
+
+	if cm == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(s.streamCtx, 10*time.Second)
+	defer cancel()
+
+	_, err := cm.Unsubscribe(ctx, &paho.Unsubscribe{Topics: topics})
+	if err != nil {
+		log.Printf("[MQTTStream %s] Unsubscribe error for %v: %v", s.datasourceID, topics, err)
+	} else {
+		log.Printf("[MQTTStream %s] Unsubscribed from broker topics: %v", s.datasourceID, topics)
+	}
+}
+
+// handleMessage processes incoming MQTT messages and routes to matching subscribers only
 func (s *MQTTStream) handleMessage(m *paho.Publish) {
+	serverTS := time.Now().Unix()
 	record := models.Record{
 		"topic":     m.Topic,
-		"timestamp": time.Now().Unix(),
+		"timestamp": serverTS,
 	}
 
 	// Try to parse payload as JSON
@@ -160,58 +283,139 @@ func (s *MQTTStream) handleMessage(m *paho.Publish) {
 		for k, v := range payload {
 			record[k] = v
 		}
+
+		// Validate payload timestamp if present — reject non-epoch values
+		if payloadTS, exists := payload["timestamp"]; exists {
+			switch v := payloadTS.(type) {
+			case float64:
+				if int64(v) > 1000000000 {
+					record["timestamp"] = int64(v)
+				} else {
+					record["timestamp"] = serverTS
+					record["payload_timestamp"] = payloadTS
+				}
+			default:
+				record["timestamp"] = serverTS
+				record["payload_timestamp"] = payloadTS
+			}
+		}
 	}
 
 	// Add to buffer
 	s.buffer.Push(record)
 
 	// Feed to bucket aggregators
-	registry := GetRegistry()
-	registry.FeedRecord(s.datasourceID, record)
+	aggRegistry := GetRegistry()
+	aggRegistry.FeedRecord(s.datasourceID, record)
 
-	// Broadcast to all subscribers (non-blocking)
+	// Route to matching subscribers only (non-blocking)
 	s.mu.RLock()
-	subscribers := make([]chan models.Record, 0, len(s.subscribers))
-	for ch := range s.subscribers {
-		subscribers = append(subscribers, ch)
-	}
-	s.mu.RUnlock()
-
-	for _, ch := range subscribers {
-		select {
-		case ch <- record:
-		default:
-			// Channel full, skip
+	for _, sub := range s.subscribers {
+		if MQTTTopicMatchAny(m.Topic, sub.topics) {
+			select {
+			case sub.ch <- record:
+			default:
+				// Channel full, skip
+			}
 		}
 	}
+	s.mu.RUnlock()
 }
 
-// Subscribe adds a new subscriber and returns a channel for receiving records
+// Subscribe satisfies the Streamer interface. For MQTT, this subscribes to all topics (#).
+// Prefer SubscribeWithTopics for topic-filtered subscriptions.
 func (s *MQTTStream) Subscribe() chan models.Record {
+	return s.SubscribeWithTopics([]string{"#"})
+}
+
+// SubscribeWithTopics adds a new subscriber with specific topic filters.
+// Dynamically subscribes to new topics at the broker if needed.
+func (s *MQTTStream) SubscribeWithTopics(topics []string) chan models.Record {
 	ch := make(chan models.Record, 100)
 
+	sub := &mqttSubscriber{
+		ch:     ch,
+		topics: topics,
+	}
+
+	// Track which topics are new and need broker subscription
+	var newTopics []string
+
 	s.mu.Lock()
-	s.subscribers[ch] = struct{}{}
+	s.subscribers = append(s.subscribers, sub)
+
+	for _, t := range topics {
+		s.topicRefs[t]++
+		if s.topicRefs[t] == 1 {
+			newTopics = append(newTopics, t)
+		}
+	}
+	totalSubs := len(s.subscribers)
 	s.mu.Unlock()
 
-	log.Printf("[MQTTStream %s] Subscriber added (total: %d)", s.datasourceID, len(s.subscribers))
+	// Subscribe to new topics at broker level (outside lock)
+	if len(newTopics) > 0 && s.connected {
+		s.subscribeBrokerTopics(newTopics)
+	}
+
+	log.Printf("[MQTTStream %s] Subscriber added for topics %v (total subscribers: %d)", s.datasourceID, topics, totalSubs)
 	return ch
 }
 
-// Unsubscribe removes a subscriber
+// Unsubscribe removes a subscriber and cleans up unused broker subscriptions
 func (s *MQTTStream) Unsubscribe(ch chan models.Record) {
+	var removedTopics []string
+
 	s.mu.Lock()
-	delete(s.subscribers, ch)
-	count := len(s.subscribers)
+	for i, sub := range s.subscribers {
+		if sub.ch == ch {
+			// Decrement ref counts for this subscriber's topics
+			for _, t := range sub.topics {
+				s.topicRefs[t]--
+				if s.topicRefs[t] <= 0 {
+					delete(s.topicRefs, t)
+					removedTopics = append(removedTopics, t)
+				}
+			}
+			// Remove subscriber from slice
+			s.subscribers = append(s.subscribers[:i], s.subscribers[i+1:]...)
+			break
+		}
+	}
+	totalSubs := len(s.subscribers)
 	s.mu.Unlock()
 
 	close(ch)
-	log.Printf("[MQTTStream %s] Subscriber removed (total: %d)", s.datasourceID, count)
+
+	// Unsubscribe removed topics from broker (outside lock)
+	if len(removedTopics) > 0 && s.connected {
+		s.unsubscribeBrokerTopics(removedTopics)
+	}
+
+	log.Printf("[MQTTStream %s] Subscriber removed (total: %d)", s.datasourceID, totalSubs)
 }
 
 // GetBuffer returns the current buffer contents
 func (s *MQTTStream) GetBuffer() []models.Record {
 	return s.buffer.GetAll()
+}
+
+// GetBufferFiltered returns buffer contents filtered by topic patterns
+func (s *MQTTStream) GetBufferFiltered(topics []string) []models.Record {
+	all := s.buffer.GetAll()
+	if len(topics) == 0 {
+		return all
+	}
+
+	filtered := make([]models.Record, 0, len(all))
+	for _, record := range all {
+		if topic, ok := record["topic"].(string); ok {
+			if MQTTTopicMatchAny(topic, topics) {
+				filtered = append(filtered, record)
+			}
+		}
+	}
+	return filtered
 }
 
 // BufferCount returns the number of records in the buffer
@@ -224,6 +428,17 @@ func (s *MQTTStream) SubscriberCount() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.subscribers)
+}
+
+// ActiveTopics returns the list of currently subscribed broker topics
+func (s *MQTTStream) ActiveTopics() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	topics := make([]string, 0, len(s.topicRefs))
+	for t := range s.topicRefs {
+		topics = append(topics, t)
+	}
+	return topics
 }
 
 // IsConnected returns whether the stream is connected
@@ -258,4 +473,19 @@ func (s *MQTTStream) Stop() {
 
 	s.connected = false
 	log.Printf("[MQTTStream %s] Stopped", s.datasourceID)
+}
+
+// ParseTopicFilters parses a comma-separated topic filter string into individual filters
+func ParseTopicFilters(topicsParam string) []string {
+	if topicsParam == "" {
+		return nil
+	}
+	var filters []string
+	for _, t := range strings.Split(topicsParam, ",") {
+		t = strings.TrimSpace(t)
+		if t != "" {
+			filters = append(filters, t)
+		}
+	}
+	return filters
 }

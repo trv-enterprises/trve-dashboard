@@ -280,6 +280,10 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     // Reference to unsubscribe function for shared connection
     let unsubscribeFromManager = null;
 
+    // Extract topic filter from query for MQTT datasources
+    const parsedQuery = query ? (typeof query === 'string' ? null : query) : null;
+    const topicFilter = (datasourceType === 'mqtt' && parsedQuery?.raw) ? parsedQuery.raw : null;
+
     const connectRawShared = () => {
       if (!mountedRef.current) return;
 
@@ -287,7 +291,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
       const manager = StreamConnectionManager.getInstance();
 
       // First, load any buffered data from the manager
-      const bufferedRecords = manager.getBuffer(datasourceId);
+      const bufferedRecords = manager.getBuffer(datasourceId, topicFilter);
       if (bufferedRecords.length > 0) {
         bufferedRecords.forEach(record => {
           if (mountedRef.current) {
@@ -296,7 +300,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
         });
       }
 
-      // Subscribe to the shared connection
+      // Subscribe to the shared connection (with optional topic filter for MQTT)
       unsubscribeFromManager = manager.subscribe(
         datasourceId,
         (record) => {
@@ -305,6 +309,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
           }
         },
         {
+          topics: topicFilter,
           onConnect: () => {
             if (mountedRef.current) {
               handleConnectionSuccess();
@@ -325,7 +330,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
       );
 
       // Check if already connected
-      const status = manager.getStatus(datasourceId);
+      const status = manager.getStatus(datasourceId, topicFilter);
       if (status.connected) {
         handleConnectionSuccess();
         setSource('stream');

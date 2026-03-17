@@ -212,7 +212,7 @@ function DashboardViewerPage({ canDesign = false }) {
 
   // Handle double-click on chart panel to show data modal
   const handlePanelDoubleClick = (chart) => {
-    if (chart && chart.datasource_id) {
+    if (chart && chart.connection_id) {
       setSelectedChart(chart);
       setDataModalOpen(true);
     }
@@ -411,7 +411,7 @@ function DashboardViewerPage({ canDesign = false }) {
                               code={chart.component_code}
                               props={{}}
                               dataMapping={chart.data_mapping}
-                              datasourceId={chart.datasource_id}
+                              datasourceId={chart.connection_id}
                               queryConfig={chart.query_config}
                               dataRefreshInterval={dashboard?.settings?.refresh_interval > 0 ? dashboard.settings.refresh_interval * 1000 : null}
                             />

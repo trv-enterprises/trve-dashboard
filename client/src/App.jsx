@@ -2,7 +2,7 @@
 // Licensed under Apache 2.0
 // See LICENSE file for details.
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   Header,
@@ -47,6 +47,9 @@ import ManageModeNav from './components/navigation/ManageModeNav';
 import UsersListPage from './pages/UsersListPage';
 import UserDetailPage from './pages/UserDetailPage';
 import SettingsPage from './pages/SettingsPage';
+import DevicesPage from './pages/DevicesPage';
+import { NotificationProvider, useNotifications } from './context/NotificationContext';
+import NotificationPanel from './components/NotificationPanel';
 import { MODES } from './config/layoutConfig';
 import buildInfo from '../build.json';
 import './App.scss';
@@ -60,6 +63,8 @@ function AppContent({ onDisconnect }) {
   });
   const [firstDashboardId, setFirstDashboardId] = useState(null);
   const [dashboardsLoaded, setDashboardsLoaded] = useState(false);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+  const { notifications } = useNotifications();
   const [users, setUsers] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [userCapabilities, setUserCapabilities] = useState({ can_design: false, can_manage: false });
@@ -232,8 +237,17 @@ function AppContent({ onDisconnect }) {
               <HeaderGlobalAction aria-label="App Switcher">
                 <Switcher size={20} />
               </HeaderGlobalAction>
-              <HeaderGlobalAction aria-label="Notifications">
+              <HeaderGlobalAction
+                aria-label="Notifications"
+                onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}
+                className="notification-badge"
+              >
                 <Notification size={20} />
+                {notifications.length > 0 && (
+                  <span className="notification-badge__count">
+                    {notifications.length > 99 ? '99+' : notifications.length}
+                  </span>
+                )}
               </HeaderGlobalAction>
               {electronMode ? (
                 // Electron mode: Show current user with disconnect option
@@ -292,6 +306,11 @@ function AppContent({ onDisconnect }) {
         )}
       />
 
+      <NotificationPanel
+        open={notificationPanelOpen}
+        onClose={() => setNotificationPanelOpen(false)}
+      />
+
       {/* Hide sidebar in View mode - uses tile view instead */}
       {currentMode !== MODES.VIEW && (
         <SideNav
@@ -337,6 +356,7 @@ function AppContent({ onDisconnect }) {
           <Route path="/manage" element={<Navigate to="/manage/users" replace />} />
           <Route path="/manage/users" element={<UsersListPage />} />
           <Route path="/manage/users/:id" element={<UserDetailPage />} />
+          <Route path="/manage/devices" element={<DevicesPage />} />
           <Route path="/manage/settings" element={<SettingsPage />} />
 
           {/* Legacy routes for backwards compatibility - redirect to design mode */}
@@ -430,9 +450,11 @@ function App() {
 
   // Show main app
   return (
-    <Router>
-      <AppContent onDisconnect={handleDisconnect} />
-    </Router>
+    <NotificationProvider>
+      <Router>
+        <AppContent onDisconnect={handleDisconnect} />
+      </Router>
+    </NotificationProvider>
   );
 }
 

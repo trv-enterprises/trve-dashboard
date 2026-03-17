@@ -3,7 +3,7 @@
 // See LICENSE file for details.
 
 import { SideNavItems, SideNavLink } from '@carbon/react';
-import { Settings, SettingsAdjust, UserMultiple } from '@carbon/icons-react';
+import { Settings, SettingsAdjust, UserMultiple, IotPlatform } from '@carbon/icons-react';
 import './ManageModeNav.scss';
 
 /**
@@ -18,6 +18,12 @@ function ManageModeNav({ location, navigate }) {
       icon: UserMultiple,
       label: 'Users',
       description: 'User management'
+    },
+    {
+      path: '/manage/devices',
+      icon: IotPlatform,
+      label: 'Devices',
+      description: 'Device management'
     },
     {
       path: '/manage/settings',

@@ -7,6 +7,8 @@ import ControlButton from './ControlButton';
 import ControlToggle from './ControlToggle';
 import ControlSlider from './ControlSlider';
 import ControlTextInput from './ControlTextInput';
+import ControlPlug from './ControlPlug';
+import ControlDimmer from './ControlDimmer';
 import { CONTROL_TYPES } from './index';
 import './controls.scss';
 
@@ -39,6 +41,10 @@ function ControlRenderer({ control, onSuccess, onError }) {
         return <ControlSlider control={control} onSuccess={onSuccess} onError={onError} />;
       case CONTROL_TYPES.TEXT_INPUT:
         return <ControlTextInput control={control} onSuccess={onSuccess} onError={onError} />;
+      case CONTROL_TYPES.PLUG:
+        return <ControlPlug control={control} onSuccess={onSuccess} onError={onError} />;
+      case CONTROL_TYPES.DIMMER:
+        return <ControlDimmer control={control} onSuccess={onSuccess} onError={onError} />;
       default:
         return (
           <div className="control-error">

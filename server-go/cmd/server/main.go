@@ -109,6 +109,8 @@ func main() {
 	userRepo := repository.NewUserRepository(mongodb.Database)
 	settingsRepo := repository.NewSettingsItemRepository(mongodb.Database)
 	controlSchemaRepo := repository.NewControlSchemaRepository(mongodb.Database)
+	deviceTypeRepo := repository.NewDeviceTypeRepository(mongodb.Database)
+	deviceRepo := repository.NewDeviceRepository(mongodb.Database)
 
 	// Create chart indexes
 	if err := chartRepo.CreateIndexes(ctx); err != nil {
@@ -135,6 +137,16 @@ func main() {
 		log.Printf("Warning: Failed to create control schema indexes: %v", err)
 	}
 
+	// Create device type indexes
+	if err := deviceTypeRepo.CreateIndexes(ctx); err != nil {
+		log.Printf("Warning: Failed to create device type indexes: %v", err)
+	}
+
+	// Create device indexes
+	if err := deviceRepo.CreateIndexes(ctx); err != nil {
+		log.Printf("Warning: Failed to create device indexes: %v", err)
+	}
+
 	// Initialize services
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	chartService := service.NewChartService(chartRepo)
@@ -143,6 +155,9 @@ func main() {
 	configService := service.NewConfigService(configRepo, cfg)
 	userService := service.NewUserService(userRepo)
 	controlSchemaService := service.NewControlSchemaService(controlSchemaRepo)
+	deviceTypeService := service.NewDeviceTypeService(deviceTypeRepo)
+	deviceService := service.NewDeviceService(deviceRepo, deviceTypeRepo, datasourceRepo)
+	deviceDiscoveryService := service.NewDeviceDiscoveryService(datasourceRepo, deviceTypeRepo, deviceRepo)
 
 	// Load user-configurable settings from separate YAML file
 	userConfig, err := config.LoadUserConfigurableSettings()
@@ -170,7 +185,14 @@ func main() {
 	if err := controlSchemaService.SeedBuiltInSchemas(ctx); err != nil {
 		log.Printf("Warning: Failed to seed built-in control schemas: %v", err)
 	} else {
-		fmt.Println("✓ Built-in control schemas seeded (json-rpc-switch, json-rpc-scalar)")
+		fmt.Println("✓ Built-in control schemas seeded (json-rpc-switch, json-rpc-scalar, zigbee2mqtt-switch, zigbee2mqtt-brightness, caseta-switch, caseta-dimmer)")
+	}
+
+	// Seed built-in device types
+	if err := deviceTypeService.SeedBuiltInDeviceTypes(ctx); err != nil {
+		log.Printf("Warning: Failed to seed built-in device types: %v", err)
+	} else {
+		fmt.Println("✓ Built-in device types seeded (zigbee-switch, zigbee-dimmer, caseta-switch, caseta-dimmer, caseta-shade, caseta-fan)")
 	}
 
 	// Get the global ChartHub for real-time chart update broadcasts
@@ -211,6 +233,8 @@ func main() {
 	commandHandler := handlers.NewCommandHandler(datasourceService, chartService, controlSchemaService)
 	registryHandler := handlers.NewRegistryHandler()
 	controlSchemaHandler := handlers.NewControlSchemaHandler(controlSchemaService)
+	deviceTypeHandler := handlers.NewDeviceTypeHandler(deviceTypeService)
+	deviceHandler := handlers.NewDeviceHandler(deviceService, deviceDiscoveryService)
 	statusHandler := handlers.NewStatusHandler(mongodb, redisClient, streamManager)
 
 	// Initialize auth middleware
@@ -269,11 +293,13 @@ func main() {
 			connections.GET("/:id/edgelake/tables", datasourceHandler.GetEdgeLakeTables)                           // EdgeLake tables
 			connections.GET("/:id/edgelake/schema", datasourceHandler.GetEdgeLakeSchema)                           // EdgeLake table schema
 			connections.GET("/:id/mqtt/topics", datasourceHandler.GetMQTTTopics)                                // MQTT topic discovery
+			connections.GET("/:id/mqtt/sample", datasourceHandler.SampleMQTTTopic)                              // MQTT topic schema sample
 			connections.GET("/:id/stream", streamHandler.StreamDatasource)                                      // SSE streaming
 			connections.GET("/:id/stream/status", streamHandler.GetStreamStatus)                 // Stream status
 			connections.POST("/:id/stream/aggregated", streamHandler.StreamAggregatedDatasource) // SSE aggregated streaming
 			connections.GET("/aggregators", streamHandler.GetAggregatorStats)                    // Aggregator stats
 			connections.POST("/:id/command", commandHandler.ExecuteCommand)                     // Bidirectional command execution
+			connections.POST("/:id/discover-devices", deviceHandler.DiscoverDevices)              // Device discovery
 		}
 
 		// Datasource routes (deprecated alias - kept for backwards compatibility)
@@ -294,6 +320,7 @@ func main() {
 			datasources.GET("/:id/edgelake/tables", datasourceHandler.GetEdgeLakeTables)                           // EdgeLake tables
 			datasources.GET("/:id/edgelake/schema", datasourceHandler.GetEdgeLakeSchema)                           // EdgeLake table schema
 			datasources.GET("/:id/mqtt/topics", datasourceHandler.GetMQTTTopics)                                // MQTT topic discovery
+			datasources.GET("/:id/mqtt/sample", datasourceHandler.SampleMQTTTopic)                              // MQTT topic schema sample
 			datasources.GET("/:id/stream", streamHandler.StreamDatasource)                                      // SSE streaming
 			datasources.GET("/:id/stream/status", streamHandler.GetStreamStatus)                 // Stream status
 			datasources.POST("/:id/stream/aggregated", streamHandler.StreamAggregatedDatasource) // SSE aggregated streaming
@@ -331,6 +358,28 @@ func main() {
 		controls := api.Group("/controls")
 		{
 			controls.POST("/:id/execute", commandHandler.ExecuteControlCommand)
+		}
+
+		// Device Type routes
+		deviceTypes := api.Group("/device-types")
+		{
+			deviceTypes.GET("", deviceTypeHandler.ListDeviceTypes)
+			deviceTypes.POST("", deviceTypeHandler.CreateDeviceType)
+			deviceTypes.GET("/categories", deviceTypeHandler.GetCategories)
+			deviceTypes.GET("/:id", deviceTypeHandler.GetDeviceType)
+			deviceTypes.PUT("/:id", deviceTypeHandler.UpdateDeviceType)
+			deviceTypes.DELETE("/:id", deviceTypeHandler.DeleteDeviceType)
+		}
+
+		// Device routes
+		devices := api.Group("/devices")
+		{
+			devices.GET("", deviceHandler.ListDevices)
+			devices.POST("", deviceHandler.CreateDevice)
+			devices.POST("/import", deviceHandler.ImportDevices)
+			devices.GET("/:id", deviceHandler.GetDevice)
+			devices.PUT("/:id", deviceHandler.UpdateDevice)
+			devices.DELETE("/:id", deviceHandler.DeleteDevice)
 		}
 
 		// Control Schema routes

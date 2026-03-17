@@ -259,6 +259,12 @@ const ChartEditor = forwardRef(function ChartEditor({
   // EdgeLake query configuration (for raw mode database param)
   const [edgelakeDatabase, setEdgelakeDatabase] = useState('');
 
+  // MQTT topic selection
+  const [mqttTopics, setMqttTopics] = useState([]);
+  const [mqttTopicsLoading, setMqttTopicsLoading] = useState(false);
+  const [mqttSelectedTopic, setMqttSelectedTopic] = useState('');
+  const [mqttSampling, setMqttSampling] = useState(false);
+
   // Preview data
   const [previewData, setPreviewData] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -359,7 +365,8 @@ const ChartEditor = forwardRef(function ChartEditor({
       return;
     }
     try {
-      const charts = await apiClient.getCharts();
+      const result = await apiClient.getCharts();
+      const charts = result.charts || [];
       const duplicate = charts.find(c =>
         c.name.toLowerCase() === nameToCheck.trim().toLowerCase() &&
         c.id !== chart?.id
@@ -439,6 +446,34 @@ const ChartEditor = forwardRef(function ChartEditor({
       // EdgeLake query config initialization
       if (chart.query_config?.type === 'edgelake') {
         setEdgelakeDatabase(chart.query_config?.params?.database || '');
+      }
+      // MQTT initialization — restore selected topic and discover topics + schema
+      if (chart.query_config?.type === 'mqtt') {
+        const savedTopic = chart.query_config?.raw || '';
+        setMqttSelectedTopic(savedTopic);
+        // Discover topics from broker
+        const dsId = chart.connection_id || chart.datasource_id || '';
+        if (dsId) {
+          setMqttTopicsLoading(true);
+          apiClient.getMQTTTopics(dsId).then(result => {
+            setMqttTopics(result.topics || []);
+          }).catch(() => {}).finally(() => {
+            setMqttTopicsLoading(false);
+          });
+          // Sample the saved topic to get schema
+          if (savedTopic) {
+            setMqttSampling(true);
+            apiClient.sampleMQTTTopic(dsId, savedTopic).then(result => {
+              if (result.columns?.length > 0) {
+                setAvailableColumns(result.columns);
+                const sampleRow = result.columns.map(col => result.sample?.[col] ?? null);
+                setPreviewData({ columns: result.columns, rows: [sampleRow] });
+              }
+            }).catch(() => {}).finally(() => {
+              setMqttSampling(false);
+            });
+          }
+        }
       }
       setComponentCode(chart.component_code || '');
       setShowCustomCode(chart.use_custom_code ?? (chart.chart_type === 'custom'));
@@ -544,7 +579,20 @@ const ChartEditor = forwardRef(function ChartEditor({
           case 'mqtt':
             setQueryType('mqtt');
             setQueryMode('visual');
-            setQueryRaw('#');
+            setQueryRaw('');
+            setMqttSelectedTopic('');
+            setMqttTopics([]);
+            setAvailableColumns([]);
+            setPreviewData(null);
+            // Discover topics from broker
+            setMqttTopicsLoading(true);
+            apiClient.getMQTTTopics(newDatasourceId).then(result => {
+              setMqttTopics(result.topics || []);
+            }).catch(err => {
+              console.error('[ChartEditor] Failed to discover MQTT topics:', err);
+            }).finally(() => {
+              setMqttTopicsLoading(false);
+            });
             break;
           case 'tsstore':
             setQueryType('tsstore');
@@ -565,6 +613,53 @@ const ChartEditor = forwardRef(function ChartEditor({
             break;
         }
       }
+    }
+  };
+
+  // Handle MQTT topic selection — sample the topic to discover schema
+  const handleMQTTTopicSelect = async (topic) => {
+    setMqttSelectedTopic(topic);
+    setQueryRaw(topic);
+    setAvailableColumns([]);
+    setPreviewData(null);
+    setPreviewError(null);
+
+    if (!topic) return;
+
+    setMqttSampling(true);
+    try {
+      const result = await apiClient.sampleMQTTTopic(selectedDatasourceId, topic);
+      if (result.columns && result.columns.length > 0) {
+        setAvailableColumns(result.columns);
+
+        // Build a preview row from the sample
+        const sampleRow = result.columns.map(col => result.sample?.[col] ?? null);
+        setPreviewData({
+          columns: result.columns,
+          rows: [sampleRow]
+        });
+
+        // Auto-select first column as x-axis if not set
+        if (!xAxisColumn && result.columns.length > 0) {
+          // Prefer 'timestamp' as x-axis for MQTT
+          const tsCol = result.columns.find(c => c === 'timestamp');
+          setXAxisColumn(tsCol || result.columns[0]);
+        }
+        // Auto-select numeric-looking columns as y-axis if not set
+        if (yAxisColumns.length === 0 && result.columns.length > 1) {
+          // Skip timestamp and topic, pick first other column
+          const candidates = result.columns.filter(c => c !== 'timestamp' && c !== 'topic');
+          if (candidates.length > 0) {
+            setYAxisColumns([candidates[0]]);
+          }
+        }
+      } else if (result.timeout) {
+        setPreviewError('No messages received from this topic within 3 seconds. The device may be inactive.');
+      }
+    } catch (err) {
+      setPreviewError(`Failed to sample topic: ${err.message}`);
+    } finally {
+      setMqttSampling(false);
     }
   };
 
@@ -834,7 +929,7 @@ const ChartEditor = forwardRef(function ChartEditor({
       component_type: componentType,
       chart_type: componentType === 'chart' ? chartType : '',
       control_config: componentType === 'control' ? controlConfig : null,
-      datasource_id: componentType === 'control' ? (controlConfig?.connection_id || '') : (selectedDatasourceId || ''),
+      connection_id: componentType === 'control' ? (controlConfig?.connection_id || '') : (selectedDatasourceId || ''),
       query_config: selectedDatasourceId ? {
         raw: selectedDatasource?.type === 'tsstore'
           ? (tsstoreQueryType === 'since' ? `since:${tsstoreSinceDuration}` : tsstoreQueryType)
@@ -1024,7 +1119,7 @@ const ChartEditor = forwardRef(function ChartEditor({
       {componentType === 'control' && (
         <ControlEditor
           controlConfig={controlConfig}
-          connectionId={controlConfig?.connection_id || ''}
+          connectionId={controlConfig?.connection_id || selectedDatasourceId || ''}
           onControlConfigChange={(newConfig) => setControlConfig(newConfig)}
           onConnectionIdChange={(connId) => setControlConfig(prev => ({ ...prev, connection_id: connId }))}
         />
@@ -1081,7 +1176,7 @@ const ChartEditor = forwardRef(function ChartEditor({
               <>
                 <div className="query-section">
                   <div className="query-header">
-                    <h4>{selectedDatasource.type === 'socket' ? 'Stream Capture' : 'Query'}</h4>
+                    <h4>{selectedDatasource.type === 'socket' ? 'Stream Capture' : selectedDatasource.type === 'mqtt' ? 'Topic Selection' : 'Query'}</h4>
                     <div className="query-header-actions">
                       {selectedDatasource.type === 'sql' && (
                         <ContentSwitcher
@@ -1276,11 +1371,50 @@ const ChartEditor = forwardRef(function ChartEditor({
                       initialQuery={queryRaw}
                     />
                   ) : selectedDatasource.type === 'mqtt' && queryMode === 'visual' ? (
-                    <MQTTTopicSelector
-                      datasourceId={selectedDatasourceId}
-                      onQueryChange={(query) => setQueryRaw(query)}
-                      initialQuery={queryRaw}
-                    />
+                    <div className="mqtt-topic-section">
+                      <Select
+                        id="mqtt-topic-select"
+                        labelText="MQTT Topic"
+                        value={mqttSelectedTopic}
+                        onChange={(e) => handleMQTTTopicSelect(e.target.value)}
+                        disabled={mqttTopicsLoading}
+                      >
+                        <SelectItem value="" text={mqttTopicsLoading ? 'Discovering topics...' : 'Select a topic'} />
+                        {mqttTopics.map(topic => (
+                          <SelectItem key={topic} value={topic} text={topic} />
+                        ))}
+                      </Select>
+                      {mqttSampling && (
+                        <InlineNotification
+                          kind="info"
+                          title="Sampling"
+                          subtitle="Listening for a message on this topic to discover the data schema..."
+                          hideCloseButton
+                          lowContrast
+                          style={{ marginTop: '0.5rem' }}
+                        />
+                      )}
+                      {mqttSelectedTopic && !mqttSampling && availableColumns.length > 0 && (
+                        <InlineNotification
+                          kind="success"
+                          title="Schema Discovered"
+                          subtitle={`Found ${availableColumns.length} fields: ${availableColumns.join(', ')}`}
+                          hideCloseButton
+                          lowContrast
+                          style={{ marginTop: '0.5rem' }}
+                        />
+                      )}
+                      {previewError && (
+                        <InlineNotification
+                          kind="warning"
+                          title="Sample Failed"
+                          subtitle={previewError}
+                          hideCloseButton
+                          lowContrast
+                          style={{ marginTop: '0.5rem' }}
+                        />
+                      )}
+                    </div>
                   ) : selectedDatasource.type === 'edgelake' && queryMode === 'visual' ? (
                     <EdgeLakeQueryBuilder
                       datasourceId={selectedDatasourceId}

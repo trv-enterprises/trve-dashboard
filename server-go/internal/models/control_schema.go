@@ -103,6 +103,8 @@ const (
 	ControlUITypeScalar = "scalar" // Slider/numeric input, sends number
 	ControlUITypeButton = "button" // Action trigger, sends null
 	ControlUITypeText   = "text"   // Text/command input, sends string
+	ControlUITypePlug   = "plug"   // Smart plug toggle, sends boolean
+	ControlUITypeDimmer = "dimmer" // Vertical slider with on/off, sends number (0=off)
 )
 
 // ValidControlUITypes returns the list of valid control UI types
@@ -112,6 +114,8 @@ func ValidControlUITypes() []string {
 		ControlUITypeScalar,
 		ControlUITypeButton,
 		ControlUITypeText,
+		ControlUITypePlug,
+		ControlUITypeDimmer,
 	}
 }
 

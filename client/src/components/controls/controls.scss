@@ -156,6 +156,259 @@
       background-color: var(--cds-field-01);
     }
   }
+
+  .text-input-last-received {
+    margin-top: spacing.$spacing-02;
+    color: var(--cds-text-helper);
+    font-size: 0.75rem;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+}
+
+// Plug control - HomeKit-style sliding pill toggle
+.control-plug-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: spacing.$spacing-02;
+  .plug-pill {
+    width: 100px;
+    height: 180px;
+    border-radius: 24px;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+    background-color: #393939;
+    transition: box-shadow 0.4s ease;
+
+    &.plug-on {
+      box-shadow: 0 0 24px rgba(0, 126, 3, 0.3);
+
+      .plug-fill {
+        height: 100%;
+      }
+
+      .plug-thumb {
+        top: 8px; // Slide to top
+
+        .plug-icon {
+          color: #ffffff;
+        }
+      }
+    }
+
+    &.plug-off {
+      .plug-fill {
+        height: 0%;
+      }
+
+      .plug-thumb {
+        top: calc(100% - 8px - 84px); // Slide to bottom (pill height - padding - thumb height)
+
+        .plug-icon {
+          color: var(--cds-text-secondary);
+        }
+      }
+    }
+
+    &.plug-loading {
+      opacity: 0.7;
+      cursor: wait;
+    }
+
+    &:hover:not(.plug-loading) {
+      filter: brightness(1.1);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--cds-focus);
+      outline-offset: 2px;
+    }
+  }
+
+  // Colored fill that rises from bottom
+  .plug-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, #007e03, #005702);
+    border-radius: 24px;
+    transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  // Sliding thumb with icon
+  .plug-thumb {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 84px;
+    height: 84px;
+    border-radius: 20px;
+    background-color: #525252;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: top 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease;
+    z-index: 1;
+
+    .plug-on & {
+      background-color: #007e03;
+    }
+  }
+
+  .plug-inline-loading {
+    position: absolute;
+    bottom: spacing.$spacing-03;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    min-height: auto;
+    z-index: 2;
+  }
+
+  .plug-label {
+    color: var(--cds-text-primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-top: spacing.$spacing-02;
+  }
+
+  .plug-state {
+    font-size: 0.75rem;
+    font-weight: 400;
+    letter-spacing: 1px;
+    color: var(--cds-text-secondary);
+    transition: color 0.3s ease;
+
+    &.plug-state-on {
+      color: #42be65;
+    }
+  }
+}
+
+// Dimmer control - HomeKit-style vertical slider pill
+.control-dimmer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: spacing.$spacing-02;
+
+  .dimmer-pill {
+    width: 100px;
+    height: 220px;
+    border-radius: 24px;
+    cursor: grab;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+    background-color: #393939;
+    transition: box-shadow 0.3s ease;
+    touch-action: none; // Prevent scroll while dragging
+
+    &.dimmer-on {
+      box-shadow: 0 0 24px rgba(244, 196, 48, 0.25);
+    }
+
+    &.dimmer-dragging {
+      cursor: grabbing;
+
+      .dimmer-fill {
+        transition: none; // No animation during drag
+      }
+    }
+
+    &.dimmer-loading {
+      opacity: 0.7;
+      cursor: wait;
+    }
+
+    &:hover:not(.dimmer-loading):not(.dimmer-dragging) {
+      filter: brightness(1.1);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--cds-focus);
+      outline-offset: 2px;
+    }
+  }
+
+  // Colored fill that rises from bottom
+  .dimmer-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, #e8a317, #f4c430);
+    border-radius: 24px;
+    transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  // Lamp icon centered in pill
+  .dimmer-icon-container {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .dimmer-icon {
+    color: var(--cds-text-secondary);
+    transition: color 0.3s ease;
+
+    .dimmer-on & {
+      color: #ffffff;
+    }
+  }
+
+  // Percentage overlay shown while interacting
+  .dimmer-value-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: 'IBM Plex Mono', monospace;
+    color: rgba(255, 255, 255, 0.9);
+    z-index: 1;
+    pointer-events: none;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  .dimmer-inline-loading {
+    position: absolute;
+    bottom: spacing.$spacing-03;
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    min-height: auto;
+    z-index: 2;
+  }
+
+  .dimmer-label {
+    color: var(--cds-text-primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-top: spacing.$spacing-02;
+  }
+
+  .dimmer-state {
+    font-size: 0.75rem;
+    font-weight: 400;
+    letter-spacing: 1px;
+    color: var(--cds-text-secondary);
+    transition: color 0.3s ease;
+
+    &.dimmer-state-on {
+      color: #f4c430;
+    }
+  }
 }
 
 // Dark theme adjustments

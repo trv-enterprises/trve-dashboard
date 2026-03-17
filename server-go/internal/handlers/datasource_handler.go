@@ -10,8 +10,25 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/tviviano/dashboard/internal/models"
+	"github.com/tviviano/dashboard/internal/registry"
 	"github.com/tviviano/dashboard/internal/service"
 )
+
+// datasourceResponse wraps a datasource with its registry capabilities
+type datasourceResponse struct {
+	*models.Datasource
+	Capabilities *registry.Capabilities `json:"capabilities,omitempty"`
+}
+
+// enrichWithCapabilities wraps a sanitized datasource with capabilities from the registry
+func enrichWithCapabilities(ds *models.Datasource) datasourceResponse {
+	resp := datasourceResponse{Datasource: ds}
+	typeID := ds.GetEffectiveTypeID()
+	if info, ok := registry.GetTypeInfo(typeID); ok {
+		resp.Capabilities = &info.Capabilities
+	}
+	return resp
+}
 
 // DatasourceHandler handles datasource HTTP requests
 type DatasourceHandler struct {
@@ -49,8 +66,8 @@ func (h *DatasourceHandler) CreateDatasource(c *gin.Context) {
 		return
 	}
 
-	// Sanitize sensitive fields before returning
-	c.JSON(http.StatusCreated, datasource.SanitizeForAPI())
+	// Sanitize sensitive fields and enrich with capabilities before returning
+	c.JSON(http.StatusCreated, enrichWithCapabilities(datasource.SanitizeForAPI()))
 }
 
 // ListDatasources handles datasource listing
@@ -84,14 +101,14 @@ func (h *DatasourceHandler) ListDatasources(c *gin.Context) {
 		return
 	}
 
-	// Sanitize sensitive fields before returning
-	sanitizedDatasources := make([]*models.Datasource, len(datasources))
+	// Sanitize sensitive fields and enrich with capabilities before returning
+	enrichedDatasources := make([]datasourceResponse, len(datasources))
 	for i, ds := range datasources {
-		sanitizedDatasources[i] = ds.SanitizeForAPI()
+		enrichedDatasources[i] = enrichWithCapabilities(ds.SanitizeForAPI())
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"datasources": sanitizedDatasources,
+		"datasources": enrichedDatasources,
 		"total":       total,
 		"limit":       limit,
 		"offset":      offset,
@@ -121,8 +138,8 @@ func (h *DatasourceHandler) GetDatasource(c *gin.Context) {
 		return
 	}
 
-	// Sanitize sensitive fields before returning
-	c.JSON(http.StatusOK, datasource.SanitizeForAPI())
+	// Sanitize sensitive fields and enrich with capabilities before returning
+	c.JSON(http.StatusOK, enrichWithCapabilities(datasource.SanitizeForAPI()))
 }
 
 // UpdateDatasource handles datasource updates
@@ -157,8 +174,8 @@ func (h *DatasourceHandler) UpdateDatasource(c *gin.Context) {
 		return
 	}
 
-	// Sanitize sensitive fields before returning
-	c.JSON(http.StatusOK, datasource.SanitizeForAPI())
+	// Sanitize sensitive fields and enrich with capabilities before returning
+	c.JSON(http.StatusOK, enrichWithCapabilities(datasource.SanitizeForAPI()))
 }
 
 // DeleteDatasource handles datasource deletion
@@ -462,4 +479,36 @@ func (h *DatasourceHandler) GetMQTTTopics(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"topics": topics,
 	})
+}
+
+// SampleMQTTTopic subscribes to a single MQTT topic and returns the message schema
+// @Summary Sample a single MQTT topic
+// @Description Subscribe to a topic and return the first message's schema (columns and sample values)
+// @Tags datasources
+// @Produce json
+// @Param id path string true "Datasource ID"
+// @Param topic query string true "MQTT topic to sample"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Router /connections/{id}/mqtt/sample [get]
+func (h *DatasourceHandler) SampleMQTTTopic(c *gin.Context) {
+	id := c.Param("id")
+	topic := c.Query("topic")
+	if topic == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "topic query parameter is required"})
+		return
+	}
+
+	result, err := h.service.SampleMQTTTopic(c.Request.Context(), id, topic)
+	if err != nil {
+		if err.Error() == "datasource not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Datasource not found"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
 }

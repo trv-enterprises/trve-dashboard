@@ -319,5 +319,111 @@ func getBuiltInSchemas() []models.ControlSchema {
 			},
 			IsBuiltIn: true,
 		},
+		{
+			ID:           "zigbee2mqtt-switch",
+			Name:         "Zigbee2MQTT Switch",
+			Description:  "On/off control for Zigbee2MQTT devices. Publishes {\"state\": \"ON/OFF\"} to <device>/set topic.",
+			Version:      "1.0",
+			ProtocolType: "mqtt",
+			SupportedTypes: []string{
+				models.ControlUITypeToggle,
+				models.ControlUITypePlug,
+				models.ControlUITypeButton,
+			},
+			Commands: map[string]models.CommandDef{
+				models.ControlUITypeToggle: {
+					Template: map[string]interface{}{"state": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "ON", "false": "OFF"},
+				},
+				models.ControlUITypePlug: {
+					Template: map[string]interface{}{"state": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "ON", "false": "OFF"},
+				},
+				models.ControlUITypeButton: {
+					Template: map[string]interface{}{"state": "TOGGLE"},
+				},
+			},
+			Response: &models.ResponseDef{
+				StatePath: "$.state",
+				ValueMap:  map[string]interface{}{"ON": true, "OFF": false},
+			},
+			IsBuiltIn: true,
+		},
+		{
+			ID:           "zigbee2mqtt-brightness",
+			Name:         "Zigbee2MQTT Brightness",
+			Description:  "Brightness control for Zigbee2MQTT dimmable devices. Publishes {\"brightness\": N} to <device>/set topic.",
+			Version:      "1.0",
+			ProtocolType: "mqtt",
+			SupportedTypes: []string{
+				models.ControlUITypeScalar,
+				models.ControlUITypeDimmer,
+			},
+			Commands: map[string]models.CommandDef{
+				models.ControlUITypeScalar: {
+					Template: map[string]interface{}{"brightness": "{{value}}"},
+				},
+				models.ControlUITypeDimmer: {
+					Template: map[string]interface{}{"brightness": "{{value}}"},
+				},
+			},
+			Response: &models.ResponseDef{
+				StatePath: "$.brightness",
+			},
+			IsBuiltIn: true,
+		},
+		{
+			ID:           "caseta-switch",
+			Name:         "Caseta Switch",
+			Description:  "On/off control for Lutron Caseta devices. Publishes {\"action\": \"turn_on/turn_off\"} to caseta/<device>/set topic.",
+			Version:      "1.0",
+			ProtocolType: "mqtt",
+			SupportedTypes: []string{
+				models.ControlUITypeToggle,
+				models.ControlUITypePlug,
+				models.ControlUITypeButton,
+			},
+			Commands: map[string]models.CommandDef{
+				models.ControlUITypeToggle: {
+					Template: map[string]interface{}{"action": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "turn_on", "false": "turn_off"},
+				},
+				models.ControlUITypePlug: {
+					Template: map[string]interface{}{"action": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "turn_on", "false": "turn_off"},
+				},
+				models.ControlUITypeButton: {
+					Template: map[string]interface{}{"action": "turn_on"},
+				},
+			},
+			Response: &models.ResponseDef{
+				StatePath: "$.state",
+				ValueMap:  map[string]interface{}{"on": true, "off": false},
+			},
+			IsBuiltIn: true,
+		},
+		{
+			ID:           "caseta-dimmer",
+			Name:         "Caseta Dimmer",
+			Description:  "Level control for Lutron Caseta dimmable devices. Publishes {\"action\": \"set_level\", \"level\": N} to caseta/<device>/set topic.",
+			Version:      "1.0",
+			ProtocolType: "mqtt",
+			SupportedTypes: []string{
+				models.ControlUITypeScalar,
+				models.ControlUITypeDimmer,
+			},
+			Commands: map[string]models.CommandDef{
+				models.ControlUITypeScalar: {
+					Template: map[string]interface{}{"action": "set_level", "level": "{{value}}"},
+				},
+				models.ControlUITypeDimmer: {
+					Template: map[string]interface{}{"action": "set_level", "level": "{{value}}"},
+				},
+			},
+			Response: &models.ResponseDef{
+				StatePath: "$.level",
+			},
+			IsBuiltIn: true,
+		},
 	}
 }

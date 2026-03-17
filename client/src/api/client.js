@@ -278,6 +278,10 @@ class APIClient {
     return this.request(`/api/connections/${connectionId}/mqtt/topics`);
   }
 
+  async sampleMQTTTopic(connectionId, topic) {
+    return this.request(`/api/connections/${connectionId}/mqtt/sample?topic=${encodeURIComponent(topic)}`);
+  }
+
   // Get connections that support write operations (for controls)
   async getWritableConnections() {
     const response = await this.getConnections();
@@ -340,6 +344,95 @@ class APIClient {
 
   async getControlSchemasForControlType(controlType) {
     return this.request(`/api/control-schemas/by-control-type/${encodeURIComponent(controlType)}`);
+  }
+
+  // Device Type endpoints
+  async getDeviceTypes(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.category) params.append('category', filters.category);
+    if (filters.protocol) params.append('protocol', filters.protocol);
+    if (filters.built_in_only) params.append('built_in_only', 'true');
+    if (filters.page) params.append('page', filters.page);
+    if (filters.page_size) params.append('page_size', filters.page_size);
+    const queryString = params.toString();
+    return this.request(`/api/device-types${queryString ? '?' + queryString : ''}`);
+  }
+
+  async getDeviceType(id) {
+    return this.request(`/api/device-types/${encodeURIComponent(id)}`);
+  }
+
+  async createDeviceType(deviceType) {
+    return this.request('/api/device-types', {
+      method: 'POST',
+      body: JSON.stringify(deviceType),
+    });
+  }
+
+  async updateDeviceType(id, updates) {
+    return this.request(`/api/device-types/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteDeviceType(id) {
+    return this.request(`/api/device-types/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getDeviceCategories() {
+    return this.request('/api/device-types/categories');
+  }
+
+  // Device endpoints
+  async getDevices(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.device_type_id) params.append('device_type_id', filters.device_type_id);
+    if (filters.connection_id) params.append('connection_id', filters.connection_id);
+    if (filters.room) params.append('room', filters.room);
+    if (filters.page) params.append('page', filters.page);
+    if (filters.page_size) params.append('page_size', filters.page_size);
+    const queryString = params.toString();
+    return this.request(`/api/devices${queryString ? '?' + queryString : ''}`);
+  }
+
+  async getDevice(id) {
+    return this.request(`/api/devices/${encodeURIComponent(id)}`);
+  }
+
+  async createDevice(device) {
+    return this.request('/api/devices', {
+      method: 'POST',
+      body: JSON.stringify(device),
+    });
+  }
+
+  async updateDevice(id, updates) {
+    return this.request(`/api/devices/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteDevice(id) {
+    return this.request(`/api/devices/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async importDevices(connectionId, devices) {
+    return this.request('/api/devices/import', {
+      method: 'POST',
+      body: JSON.stringify({ connection_id: connectionId, devices }),
+    });
+  }
+
+  async discoverDevices(connectionId) {
+    return this.request(`/api/connections/${connectionId}/discover-devices`, {
+      method: 'POST',
+    });
   }
 
   // Deprecated aliases - keep for backwards compatibility

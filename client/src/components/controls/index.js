@@ -13,6 +13,8 @@ export { default as ControlButton } from './ControlButton';
 export { default as ControlToggle } from './ControlToggle';
 export { default as ControlSlider } from './ControlSlider';
 export { default as ControlTextInput } from './ControlTextInput';
+export { default as ControlPlug } from './ControlPlug';
+export { default as ControlDimmer } from './ControlDimmer';
 export { default as ControlRenderer } from './ControlRenderer';
 
 // Control type constants - must match backend models.ControlType* constants
@@ -20,7 +22,9 @@ export const CONTROL_TYPES = {
   BUTTON: 'button',
   TOGGLE: 'toggle',
   SLIDER: 'slider',
-  TEXT_INPUT: 'text_input'
+  TEXT_INPUT: 'text_input',
+  PLUG: 'plug',
+  DIMMER: 'dimmer'
 };
 
 // Control type metadata for UI
@@ -62,6 +66,27 @@ export const CONTROL_TYPE_INFO = {
       label: 'Command',
       placeholder: 'Enter value...',
       submitLabel: 'Send'
+    }
+  },
+  [CONTROL_TYPES.PLUG]: {
+    label: 'Plug',
+    description: 'Smart plug toggle with HomeKit-style pill design',
+    icon: 'Power',
+    defaultUIConfig: {
+      label: 'Plug',
+      onLabel: 'On',
+      offLabel: 'Off'
+    }
+  },
+  [CONTROL_TYPES.DIMMER]: {
+    label: 'Dimmer',
+    description: 'Vertical slider for dimming lights, drag to set level',
+    icon: 'Light',
+    defaultUIConfig: {
+      label: 'Light',
+      min: 0,
+      max: 100,
+      step: 1
     }
   }
 };
