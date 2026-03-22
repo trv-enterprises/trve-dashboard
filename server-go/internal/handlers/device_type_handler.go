@@ -192,3 +192,24 @@ func (h *DeviceTypeHandler) ListDeviceTypes(c *gin.Context) {
 func (h *DeviceTypeHandler) GetCategories(c *gin.Context) {
 	c.JSON(http.StatusOK, models.ValidDeviceCategories())
 }
+
+// GetControlTypes returns valid control UI types
+// @Summary Get valid control types
+// @Description Get the list of valid control UI types (toggle, scalar, button, text, plug, dimmer)
+// @Tags device-types
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /api/device-types/control-types [get]
+func (h *DeviceTypeHandler) GetControlTypes(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"types": models.ValidControlUITypes(),
+		"descriptions": map[string]string{
+			models.ControlUITypeToggle: "On/off switch, sends boolean value",
+			models.ControlUITypeScalar: "Slider/numeric input, sends number value",
+			models.ControlUITypeButton: "Action trigger, sends null (fires event only)",
+			models.ControlUITypeText:   "Text/command input, sends string value",
+			models.ControlUITypePlug:   "Smart plug toggle, sends boolean value",
+			models.ControlUITypeDimmer: "Vertical slider with on/off, sends number (0=off)",
+		},
+	})
+}

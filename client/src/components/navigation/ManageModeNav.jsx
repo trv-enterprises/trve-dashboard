@@ -22,8 +22,8 @@ function ManageModeNav({ location, navigate }) {
     {
       path: '/manage/devices',
       icon: IotPlatform,
-      label: 'Devices',
-      description: 'Device management'
+      label: 'Device Types',
+      description: 'Device type management'
     },
     {
       path: '/manage/settings',

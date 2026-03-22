@@ -298,54 +298,6 @@ class APIClient {
     });
   }
 
-  // Control Schema endpoints
-  async getControlSchemas(filters = {}) {
-    const params = new URLSearchParams();
-    if (filters.protocol_type) params.append('protocol_type', filters.protocol_type);
-    if (filters.control_type) params.append('control_type', filters.control_type);
-    if (filters.built_in_only) params.append('built_in_only', 'true');
-    if (filters.page) params.append('page', filters.page);
-    if (filters.page_size) params.append('page_size', filters.page_size);
-    const queryString = params.toString();
-    return this.request(`/api/control-schemas${queryString ? '?' + queryString : ''}`);
-  }
-
-  async getControlSchema(id) {
-    return this.request(`/api/control-schemas/${id}`);
-  }
-
-  async createControlSchema(schema) {
-    return this.request('/api/control-schemas', {
-      method: 'POST',
-      body: JSON.stringify(schema),
-    });
-  }
-
-  async updateControlSchema(id, updates) {
-    return this.request(`/api/control-schemas/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
-  }
-
-  async deleteControlSchema(id) {
-    return this.request(`/api/control-schemas/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async getControlSchemaTypes() {
-    return this.request('/api/control-schemas/types');
-  }
-
-  async getControlSchemasForProtocol(protocolType) {
-    return this.request(`/api/control-schemas/by-protocol/${encodeURIComponent(protocolType)}`);
-  }
-
-  async getControlSchemasForControlType(controlType) {
-    return this.request(`/api/control-schemas/by-control-type/${encodeURIComponent(controlType)}`);
-  }
-
   // Device Type endpoints
   async getDeviceTypes(filters = {}) {
     const params = new URLSearchParams();
@@ -384,6 +336,10 @@ class APIClient {
 
   async getDeviceCategories() {
     return this.request('/api/device-types/categories');
+  }
+
+  async getDeviceTypeControlTypes() {
+    return this.request('/api/device-types/control-types');
   }
 
   // Device endpoints

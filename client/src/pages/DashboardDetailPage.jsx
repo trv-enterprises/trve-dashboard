@@ -37,6 +37,7 @@ import PanelEditMenu from '../components/PanelEditMenu';
 import ComponentPickerModal from '../components/ComponentPickerModal';
 import AIPreflightModal from '../components/AIPreflightModal';
 import apiClient from '../api/client';
+import { getComponentMinSize } from '../config/layoutConfig';
 import './DashboardDetailPage.scss';
 
 // Editor modes for the dashboard designer
@@ -143,6 +144,16 @@ function DashboardDetailPage() {
   const GRID_ROWS = Math.floor(gridHeight / CELL_HEIGHT);
   const OVERFLOW_ROWS = 10; // Extra rows below visible area for drawing new panels
 
+  // Get minimum panel size based on assigned component's subtype
+  const getMinSizeForPanel = (panelId) => {
+    const panel = panels.find(p => p.id === panelId);
+    if (!panel?.chart_id) return getComponentMinSize('default');
+    const chart = chartsMap[panel.chart_id];
+    if (!chart) return getComponentMinSize('default');
+    const subtype = chart.control_config?.control_type || chart.chart_type;
+    return getComponentMinSize(subtype);
+  };
+
   useEffect(() => {
     if (!isCreateMode) {
       fetchDashboard();
@@ -217,13 +228,16 @@ function DashboardDetailPage() {
         });
 
         // Scale all panels proportionally
-        const scaledPanels = panels.map(panel => ({
-          ...panel,
-          x: Math.floor(panel.x * scaleX),
-          y: Math.floor(panel.y * scaleY),
-          w: Math.max(1, Math.floor(panel.w * scaleX)), // Min width of 1
-          h: Math.max(1, Math.floor(panel.h * scaleY))  // Min height of 1
-        }));
+        const scaledPanels = panels.map(panel => {
+          const minSize = getMinSizeForPanel(panel.id);
+          return {
+            ...panel,
+            x: Math.floor(panel.x * scaleX),
+            y: Math.floor(panel.y * scaleY),
+            w: Math.max(minSize.w, Math.floor(panel.w * scaleX)),
+            h: Math.max(minSize.h, Math.floor(panel.h * scaleY))
+          };
+        });
 
         setPanels(scaledPanels);
         setHasChanges(true);
@@ -335,6 +349,18 @@ function DashboardDetailPage() {
     markPanelsModified();
   };
 
+  // Expand a panel to fit the minimum size for a component, clamping to grid bounds
+  const expandPanelToMinSize = (panelId, component) => {
+    const subtype = component.control_config?.control_type || component.chart_type;
+    const minSize = getComponentMinSize(subtype);
+    setPanels(prev => prev.map(p => {
+      if (p.id !== panelId) return p;
+      const newW = Math.max(p.w, Math.min(minSize.w, GRID_COLS - p.x));
+      const newH = Math.max(p.h, minSize.h);
+      return (newW !== p.w || newH !== p.h) ? { ...p, w: newW, h: newH } : p;
+    }));
+  };
+
   // Chart operations
   const handleChartSave = async (chartData) => {
     const { panel_id, ...chartInfo } = chartData;
@@ -345,10 +371,15 @@ function DashboardDetailPage() {
       [chartInfo.id]: chartInfo
     }));
 
-    // Update panel to reference this chart_id
-    setPanels(prev => prev.map(p =>
-      p.id === panel_id ? { ...p, chart_id: chartInfo.id } : p
-    ));
+    // Update panel to reference this chart_id and expand to minimum size
+    const subtype = chartInfo.control_config?.control_type || chartInfo.chart_type;
+    const minSize = getComponentMinSize(subtype);
+    setPanels(prev => prev.map(p => {
+      if (p.id !== panel_id) return p;
+      const newW = Math.max(p.w, Math.min(minSize.w, GRID_COLS - p.x));
+      const newH = Math.max(p.h, minSize.h);
+      return { ...p, chart_id: chartInfo.id, w: newW, h: newH };
+    }));
 
     setHasChanges(true);
   };
@@ -411,9 +442,10 @@ function DashboardDetailPage() {
     if (!selectingPanelId) return;
 
     // Fetch full chart data if not already in chartsMap
-    if (!chartsMap[chartId]) {
+    let chart = chartsMap[chartId];
+    if (!chart) {
       try {
-        const chart = await apiClient.getChart(chartId);
+        chart = await apiClient.getChart(chartId);
         setChartsMap(prev => ({ ...prev, [chartId]: chart }));
       } catch (err) {
         console.error('Failed to fetch chart:', err);
@@ -425,6 +457,9 @@ function DashboardDetailPage() {
     setPanels(prev => prev.map(p =>
       p.id === selectingPanelId ? { ...p, chart_id: chartId } : p
     ));
+
+    // Expand panel to component's minimum size
+    expandPanelToMinSize(selectingPanelId, chart);
 
     setHasChanges(true);
     closeChartSelector();
@@ -450,10 +485,11 @@ function DashboardDetailPage() {
       setChartsMap(prev => ({ ...prev, [component.id]: component }));
     }
 
-    // Update panel to reference this component
+    // Update panel to reference this component and expand to minimum size
     setPanels(prev => prev.map(p =>
       p.id === componentPickerPanelId ? { ...p, chart_id: component.id } : p
     ));
+    expandPanelToMinSize(componentPickerPanelId, component);
 
     setHasChanges(true);
     closeComponentPicker();
@@ -547,8 +583,9 @@ function DashboardDetailPage() {
       if (pos) {
         const panel = panels.find(p => p.id === resizingPanel.id);
         if (panel) {
-          const newW = Math.max(1, Math.min(pos.x - panel.x + 1, GRID_COLS - panel.x));
-          const newH = Math.max(1, pos.y - panel.y + 1);
+          const minSize = getMinSizeForPanel(resizingPanel.id);
+          const newW = Math.max(minSize.w, Math.min(pos.x - panel.x + 1, GRID_COLS - panel.x));
+          const newH = Math.max(minSize.h, pos.y - panel.y + 1);
           updatePanel(resizingPanel.id, { w: newW, h: newH });
         }
       }

@@ -40,25 +40,51 @@ func (s *DeviceTypeService) CreateDeviceType(ctx context.Context, req *models.Cr
 		return nil, fmt.Errorf("invalid category '%s', must be one of: %v", req.Category, models.ValidDeviceCategories())
 	}
 
-	dt := &models.DeviceType{
-		ID:           req.ID,
-		Name:         req.Name,
-		Description:  req.Description,
-		Category:     req.Category,
-		Subtype:      req.Subtype,
-		Protocol:     req.Protocol,
-		SchemaIDs:    req.SchemaIDs,
-		Capabilities: req.Capabilities,
-		TopicPattern: req.TopicPattern,
-		IsBuiltIn:    false,
-		Metadata:     req.Metadata,
+	// Validate supported types
+	for _, t := range req.SupportedTypes {
+		if !models.IsValidControlUIType(t) {
+			return nil, fmt.Errorf("invalid control type '%s', must be one of: %v", t, models.ValidControlUITypes())
+		}
 	}
 
-	if dt.SchemaIDs == nil {
-		dt.SchemaIDs = []string{}
+	// Validate commands match supported types
+	for controlType := range req.Commands {
+		found := false
+		for _, t := range req.SupportedTypes {
+			if t == controlType {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("command defined for type '%s' but not in supported_types", controlType)
+		}
 	}
+
+	dt := &models.DeviceType{
+		ID:             req.ID,
+		Name:           req.Name,
+		Description:    req.Description,
+		Category:       req.Category,
+		Subtype:        req.Subtype,
+		Protocol:       req.Protocol,
+		Capabilities:   req.Capabilities,
+		SupportedTypes: req.SupportedTypes,
+		Commands:       req.Commands,
+		StateQuery:     req.StateQuery,
+		Response:       req.Response,
+		IsBuiltIn:      false,
+		Metadata:       req.Metadata,
+	}
+
 	if dt.Capabilities == nil {
 		dt.Capabilities = []models.DeviceCapability{}
+	}
+	if dt.SupportedTypes == nil {
+		dt.SupportedTypes = []string{}
+	}
+	if dt.Commands == nil {
+		dt.Commands = map[string]models.CommandDef{}
 	}
 
 	if err := s.repo.Create(ctx, dt); err != nil {
@@ -96,6 +122,35 @@ func (s *DeviceTypeService) UpdateDeviceType(ctx context.Context, id string, req
 
 	if req.Category != nil && !models.IsValidDeviceCategory(*req.Category) {
 		return nil, fmt.Errorf("invalid category '%s', must be one of: %v", *req.Category, models.ValidDeviceCategories())
+	}
+
+	// Validate supported types if being updated
+	if req.SupportedTypes != nil {
+		for _, t := range *req.SupportedTypes {
+			if !models.IsValidControlUIType(t) {
+				return nil, fmt.Errorf("invalid control type '%s', must be one of: %v", t, models.ValidControlUITypes())
+			}
+		}
+	}
+
+	// Validate commands match supported types if commands being updated
+	if req.Commands != nil {
+		supportedTypes := existing.SupportedTypes
+		if req.SupportedTypes != nil {
+			supportedTypes = *req.SupportedTypes
+		}
+		for controlType := range *req.Commands {
+			found := false
+			for _, t := range supportedTypes {
+				if t == controlType {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("command defined for type '%s' but not in supported_types", controlType)
+			}
+		}
 	}
 
 	if err := s.repo.Update(ctx, id, req); err != nil {
@@ -170,7 +225,7 @@ func ptr(v float64) *float64 {
 	return &v
 }
 
-// getBuiltInDeviceTypes returns the list of built-in device types
+// getBuiltInDeviceTypes returns the list of built-in device types with merged command schemas
 func getBuiltInDeviceTypes() []models.DeviceType {
 	return []models.DeviceType{
 		{
@@ -180,17 +235,37 @@ func getBuiltInDeviceTypes() []models.DeviceType {
 			Category:    models.DeviceCategorySwitch,
 			Subtype:     "plug",
 			Protocol:    "mqtt",
-			SchemaIDs:   []string{"zigbee2mqtt-switch"},
 			Capabilities: []models.DeviceCapability{
 				{
 					Name:      "state",
 					Type:      "binary",
-					Access:    7, // read + write + report
 					StatePath: "$.state",
 				},
 			},
-			TopicPattern: "zigbee2mqtt/{device_name}",
-			IsBuiltIn:    true,
+
+			SupportedTypes: []string{
+				models.ControlUITypeToggle,
+				models.ControlUITypePlug,
+				models.ControlUITypeButton,
+			},
+			Commands: map[string]models.CommandDef{
+				models.ControlUITypeToggle: {
+					Template: map[string]interface{}{"state": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "ON", "false": "OFF"},
+				},
+				models.ControlUITypePlug: {
+					Template: map[string]interface{}{"state": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "ON", "false": "OFF"},
+				},
+				models.ControlUITypeButton: {
+					Template: map[string]interface{}{"state": "TOGGLE"},
+				},
+			},
+			Response: &models.ResponseDef{
+				StatePath: "$.state",
+				ValueMap:  map[string]interface{}{"ON": true, "OFF": false},
+			},
+			IsBuiltIn: true,
 		},
 		{
 			ID:          "zigbee-dimmer",
@@ -199,25 +274,51 @@ func getBuiltInDeviceTypes() []models.DeviceType {
 			Category:    models.DeviceCategoryLight,
 			Subtype:     "dimmer",
 			Protocol:    "mqtt",
-			SchemaIDs:   []string{"zigbee2mqtt-switch", "zigbee2mqtt-brightness"},
 			Capabilities: []models.DeviceCapability{
 				{
 					Name:      "state",
 					Type:      "binary",
-					Access:    7,
 					StatePath: "$.state",
 				},
 				{
 					Name:      "brightness",
 					Type:      "numeric",
-					Access:    7,
 					ValueMin:  ptr(0),
 					ValueMax:  ptr(254),
 					StatePath: "$.brightness",
 				},
 			},
-			TopicPattern: "zigbee2mqtt/{device_name}",
-			IsBuiltIn:    true,
+
+			SupportedTypes: []string{
+				models.ControlUITypeToggle,
+				models.ControlUITypePlug,
+				models.ControlUITypeButton,
+				models.ControlUITypeScalar,
+				models.ControlUITypeDimmer,
+			},
+			Commands: map[string]models.CommandDef{
+				models.ControlUITypeToggle: {
+					Template: map[string]interface{}{"state": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "ON", "false": "OFF"},
+				},
+				models.ControlUITypePlug: {
+					Template: map[string]interface{}{"state": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "ON", "false": "OFF"},
+				},
+				models.ControlUITypeButton: {
+					Template: map[string]interface{}{"state": "TOGGLE"},
+				},
+				models.ControlUITypeScalar: {
+					Template: map[string]interface{}{"brightness": "{{value}}"},
+				},
+				models.ControlUITypeDimmer: {
+					Template: map[string]interface{}{"brightness": "{{value}}"},
+				},
+			},
+			Response: &models.ResponseDef{
+				StatePath: "$.brightness",
+			},
+			IsBuiltIn: true,
 		},
 		{
 			ID:          "caseta-switch",
@@ -226,17 +327,37 @@ func getBuiltInDeviceTypes() []models.DeviceType {
 			Category:    models.DeviceCategorySwitch,
 			Subtype:     "switch",
 			Protocol:    "mqtt",
-			SchemaIDs:   []string{"caseta-switch"},
 			Capabilities: []models.DeviceCapability{
 				{
 					Name:      "state",
 					Type:      "binary",
-					Access:    7, // read + write + report
 					StatePath: "$.state",
 				},
 			},
-			TopicPattern: "caseta/{device_name}",
-			IsBuiltIn:    true,
+
+			SupportedTypes: []string{
+				models.ControlUITypeToggle,
+				models.ControlUITypePlug,
+				models.ControlUITypeButton,
+			},
+			Commands: map[string]models.CommandDef{
+				models.ControlUITypeToggle: {
+					Template: map[string]interface{}{"action": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "turn_on", "false": "turn_off"},
+				},
+				models.ControlUITypePlug: {
+					Template: map[string]interface{}{"action": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "turn_on", "false": "turn_off"},
+				},
+				models.ControlUITypeButton: {
+					Template: map[string]interface{}{"action": "turn_on"},
+				},
+			},
+			Response: &models.ResponseDef{
+				StatePath: "$.state",
+				ValueMap:  map[string]interface{}{"on": true, "off": false},
+			},
+			IsBuiltIn: true,
 		},
 		{
 			ID:          "caseta-dimmer",
@@ -245,26 +366,52 @@ func getBuiltInDeviceTypes() []models.DeviceType {
 			Category:    models.DeviceCategoryLight,
 			Subtype:     "dimmer",
 			Protocol:    "mqtt",
-			SchemaIDs:   []string{"caseta-switch", "caseta-dimmer"},
 			Capabilities: []models.DeviceCapability{
 				{
 					Name:      "state",
 					Type:      "binary",
-					Access:    7, // read + write + report
 					StatePath: "$.state",
 				},
 				{
 					Name:      "level",
 					Type:      "numeric",
-					Access:    7,
 					ValueMin:  ptr(0),
 					ValueMax:  ptr(100),
 					Unit:      "%",
 					StatePath: "$.level",
 				},
 			},
-			TopicPattern: "caseta/{device_name}",
-			IsBuiltIn:    true,
+
+			SupportedTypes: []string{
+				models.ControlUITypeToggle,
+				models.ControlUITypePlug,
+				models.ControlUITypeButton,
+				models.ControlUITypeScalar,
+				models.ControlUITypeDimmer,
+			},
+			Commands: map[string]models.CommandDef{
+				models.ControlUITypeToggle: {
+					Template: map[string]interface{}{"action": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "turn_on", "false": "turn_off"},
+				},
+				models.ControlUITypePlug: {
+					Template: map[string]interface{}{"action": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "turn_on", "false": "turn_off"},
+				},
+				models.ControlUITypeButton: {
+					Template: map[string]interface{}{"action": "turn_on"},
+				},
+				models.ControlUITypeScalar: {
+					Template: map[string]interface{}{"action": "set_level", "level": "{{value}}"},
+				},
+				models.ControlUITypeDimmer: {
+					Template: map[string]interface{}{"action": "set_level", "level": "{{value}}"},
+				},
+			},
+			Response: &models.ResponseDef{
+				StatePath: "$.level",
+			},
+			IsBuiltIn: true,
 		},
 		{
 			ID:          "caseta-shade",
@@ -273,26 +420,52 @@ func getBuiltInDeviceTypes() []models.DeviceType {
 			Category:    models.DeviceCategoryCover,
 			Subtype:     "shade",
 			Protocol:    "mqtt",
-			SchemaIDs:   []string{"caseta-switch", "caseta-dimmer"},
 			Capabilities: []models.DeviceCapability{
 				{
 					Name:      "state",
 					Type:      "binary",
-					Access:    7,
 					StatePath: "$.state",
 				},
 				{
 					Name:      "level",
 					Type:      "numeric",
-					Access:    7,
 					ValueMin:  ptr(0),
 					ValueMax:  ptr(100),
 					Unit:      "%",
 					StatePath: "$.level",
 				},
 			},
-			TopicPattern: "caseta/{device_name}",
-			IsBuiltIn:    true,
+
+			SupportedTypes: []string{
+				models.ControlUITypeToggle,
+				models.ControlUITypePlug,
+				models.ControlUITypeButton,
+				models.ControlUITypeScalar,
+				models.ControlUITypeDimmer,
+			},
+			Commands: map[string]models.CommandDef{
+				models.ControlUITypeToggle: {
+					Template: map[string]interface{}{"action": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "turn_on", "false": "turn_off"},
+				},
+				models.ControlUITypePlug: {
+					Template: map[string]interface{}{"action": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "turn_on", "false": "turn_off"},
+				},
+				models.ControlUITypeButton: {
+					Template: map[string]interface{}{"action": "turn_on"},
+				},
+				models.ControlUITypeScalar: {
+					Template: map[string]interface{}{"action": "set_level", "level": "{{value}}"},
+				},
+				models.ControlUITypeDimmer: {
+					Template: map[string]interface{}{"action": "set_level", "level": "{{value}}"},
+				},
+			},
+			Response: &models.ResponseDef{
+				StatePath: "$.level",
+			},
+			IsBuiltIn: true,
 		},
 		{
 			ID:          "caseta-fan",
@@ -301,26 +474,52 @@ func getBuiltInDeviceTypes() []models.DeviceType {
 			Category:    models.DeviceCategoryOther,
 			Subtype:     "fan",
 			Protocol:    "mqtt",
-			SchemaIDs:   []string{"caseta-switch", "caseta-dimmer"},
 			Capabilities: []models.DeviceCapability{
 				{
 					Name:      "state",
 					Type:      "binary",
-					Access:    7,
 					StatePath: "$.state",
 				},
 				{
 					Name:      "level",
 					Type:      "numeric",
-					Access:    7,
 					ValueMin:  ptr(0),
 					ValueMax:  ptr(100),
 					Unit:      "%",
 					StatePath: "$.level",
 				},
 			},
-			TopicPattern: "caseta/{device_name}",
-			IsBuiltIn:    true,
+
+			SupportedTypes: []string{
+				models.ControlUITypeToggle,
+				models.ControlUITypePlug,
+				models.ControlUITypeButton,
+				models.ControlUITypeScalar,
+				models.ControlUITypeDimmer,
+			},
+			Commands: map[string]models.CommandDef{
+				models.ControlUITypeToggle: {
+					Template: map[string]interface{}{"action": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "turn_on", "false": "turn_off"},
+				},
+				models.ControlUITypePlug: {
+					Template: map[string]interface{}{"action": "{{value}}"},
+					ValueMap: map[string]interface{}{"true": "turn_on", "false": "turn_off"},
+				},
+				models.ControlUITypeButton: {
+					Template: map[string]interface{}{"action": "turn_on"},
+				},
+				models.ControlUITypeScalar: {
+					Template: map[string]interface{}{"action": "set_level", "level": "{{value}}"},
+				},
+				models.ControlUITypeDimmer: {
+					Template: map[string]interface{}{"action": "set_level", "level": "{{value}}"},
+				},
+			},
+			Response: &models.ResponseDef{
+				StatePath: "$.level",
+			},
+			IsBuiltIn: true,
 		},
 	}
 }

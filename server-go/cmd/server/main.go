@@ -83,14 +83,29 @@ func main() {
 	router := gin.Default()
 
 	// Setup CORS
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     cfg.CORS.AllowedOrigins,
+	// When AllowCredentials is true, the browser rejects Access-Control-Allow-Origin: "*".
+	// If the config includes "*" in allowed origins, use AllowOriginFunc to echo the
+	// requesting origin back (spec-compliant with credentials).
+	corsConfig := cors.Config{
 		AllowMethods:     cfg.CORS.AllowedMethods,
 		AllowHeaders:     cfg.CORS.AllowedHeaders,
 		ExposeHeaders:    cfg.CORS.ExposeHeaders,
 		AllowCredentials: cfg.CORS.AllowCredentials,
 		MaxAge:           time.Duration(cfg.CORS.MaxAge) * time.Second,
-	}))
+	}
+	hasWildcard := false
+	for _, o := range cfg.CORS.AllowedOrigins {
+		if o == "*" {
+			hasWildcard = true
+			break
+		}
+	}
+	if hasWildcard && cfg.CORS.AllowCredentials {
+		corsConfig.AllowOriginFunc = func(origin string) bool { return true }
+	} else {
+		corsConfig.AllowOrigins = cfg.CORS.AllowedOrigins
+	}
+	router.Use(cors.New(corsConfig))
 
 	// Health check endpoint
 	router.GET("/health", healthCheck(mongodb, redisClient))
@@ -108,7 +123,6 @@ func main() {
 	configRepo := repository.NewConfigRepository(mongodb.Database)
 	userRepo := repository.NewUserRepository(mongodb.Database)
 	settingsRepo := repository.NewSettingsItemRepository(mongodb.Database)
-	controlSchemaRepo := repository.NewControlSchemaRepository(mongodb.Database)
 	deviceTypeRepo := repository.NewDeviceTypeRepository(mongodb.Database)
 	deviceRepo := repository.NewDeviceRepository(mongodb.Database)
 
@@ -132,11 +146,6 @@ func main() {
 		log.Printf("Warning: Failed to create settings indexes: %v", err)
 	}
 
-	// Create control schema indexes
-	if err := controlSchemaRepo.CreateIndexes(ctx); err != nil {
-		log.Printf("Warning: Failed to create control schema indexes: %v", err)
-	}
-
 	// Create device type indexes
 	if err := deviceTypeRepo.CreateIndexes(ctx); err != nil {
 		log.Printf("Warning: Failed to create device type indexes: %v", err)
@@ -154,7 +163,6 @@ func main() {
 	aiSessionService := service.NewAISessionService(aiSessionRepo, chartRepo)
 	configService := service.NewConfigService(configRepo, cfg)
 	userService := service.NewUserService(userRepo)
-	controlSchemaService := service.NewControlSchemaService(controlSchemaRepo)
 	deviceTypeService := service.NewDeviceTypeService(deviceTypeRepo)
 	deviceService := service.NewDeviceService(deviceRepo, deviceTypeRepo, datasourceRepo)
 	deviceDiscoveryService := service.NewDeviceDiscoveryService(datasourceRepo, deviceTypeRepo, deviceRepo)
@@ -179,13 +187,6 @@ func main() {
 		log.Printf("Warning: Failed to seed pseudo users: %v", err)
 	} else {
 		fmt.Println("✓ Pseudo users seeded (Admin, Designer, Support)")
-	}
-
-	// Seed built-in control schemas
-	if err := controlSchemaService.SeedBuiltInSchemas(ctx); err != nil {
-		log.Printf("Warning: Failed to seed built-in control schemas: %v", err)
-	} else {
-		fmt.Println("✓ Built-in control schemas seeded (json-rpc-switch, json-rpc-scalar, zigbee2mqtt-switch, zigbee2mqtt-brightness, caseta-switch, caseta-dimmer)")
 	}
 
 	// Seed built-in device types
@@ -230,9 +231,8 @@ func main() {
 	configHandler := handlers.NewConfigHandler(configService)
 	authHandler := handlers.NewAuthHandler(userService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
-	commandHandler := handlers.NewCommandHandler(datasourceService, chartService, controlSchemaService)
+	commandHandler := handlers.NewCommandHandler(datasourceService, chartService, deviceTypeService)
 	registryHandler := handlers.NewRegistryHandler()
-	controlSchemaHandler := handlers.NewControlSchemaHandler(controlSchemaService)
 	deviceTypeHandler := handlers.NewDeviceTypeHandler(deviceTypeService)
 	deviceHandler := handlers.NewDeviceHandler(deviceService, deviceDiscoveryService)
 	statusHandler := handlers.NewStatusHandler(mongodb, redisClient, streamManager)
@@ -366,6 +366,7 @@ func main() {
 			deviceTypes.GET("", deviceTypeHandler.ListDeviceTypes)
 			deviceTypes.POST("", deviceTypeHandler.CreateDeviceType)
 			deviceTypes.GET("/categories", deviceTypeHandler.GetCategories)
+			deviceTypes.GET("/control-types", deviceTypeHandler.GetControlTypes)
 			deviceTypes.GET("/:id", deviceTypeHandler.GetDeviceType)
 			deviceTypes.PUT("/:id", deviceTypeHandler.UpdateDeviceType)
 			deviceTypes.DELETE("/:id", deviceTypeHandler.DeleteDeviceType)
@@ -380,19 +381,6 @@ func main() {
 			devices.GET("/:id", deviceHandler.GetDevice)
 			devices.PUT("/:id", deviceHandler.UpdateDevice)
 			devices.DELETE("/:id", deviceHandler.DeleteDevice)
-		}
-
-		// Control Schema routes
-		controlSchemas := api.Group("/control-schemas")
-		{
-			controlSchemas.GET("", controlSchemaHandler.ListSchemas)
-			controlSchemas.POST("", controlSchemaHandler.CreateSchema)
-			controlSchemas.GET("/types", controlSchemaHandler.GetValidControlTypes)
-			controlSchemas.GET("/by-protocol/:protocol_type", controlSchemaHandler.GetSchemasForProtocol)
-			controlSchemas.GET("/by-control-type/:control_type", controlSchemaHandler.GetSchemasForControlType)
-			controlSchemas.GET("/:id", controlSchemaHandler.GetSchema)
-			controlSchemas.PUT("/:id", controlSchemaHandler.UpdateSchema)
-			controlSchemas.DELETE("/:id", controlSchemaHandler.DeleteSchema)
 		}
 
 		// Dashboard routes

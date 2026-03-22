@@ -213,14 +213,9 @@ func (s *DeviceService) ImportDevices(ctx context.Context, req *models.ImportDev
 			return nil, fmt.Errorf("device type '%s' not found", entry.DeviceTypeID)
 		}
 
-		// Build target and state topic from topic pattern
+		// Target and state topic are set by the user or discovery flow
 		stateTopic := ""
 		target := ""
-		if dt.TopicPattern != "" {
-			// Replace {device_name} with friendly_name
-			stateTopic = replaceDeviceName(dt.TopicPattern, entry.FriendlyName)
-			target = stateTopic + "/set"
-		}
 
 		device := &models.Device{
 			Name:         entry.Name,
@@ -247,18 +242,3 @@ func (s *DeviceService) ImportDevices(ctx context.Context, req *models.ImportDev
 	return imported, nil
 }
 
-// replaceDeviceName replaces {device_name} in a topic pattern with the actual name
-func replaceDeviceName(pattern string, name string) string {
-	result := ""
-	i := 0
-	for i < len(pattern) {
-		if i+len("{device_name}") <= len(pattern) && pattern[i:i+len("{device_name}")] == "{device_name}" {
-			result += name
-			i += len("{device_name}")
-		} else {
-			result += string(pattern[i])
-			i++
-		}
-	}
-	return result
-}

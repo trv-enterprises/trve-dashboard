@@ -79,6 +79,40 @@ export const ANIMATION = {
   tooltipDelay: 300,
 };
 
+// Minimum panel sizes per component subtype (in grid units: w=columns, h=rows)
+// Used to prevent panels from being resized smaller than the component can render
+export const COMPONENT_MIN_SIZES = {
+  // Default fallback
+  default: { w: 2, h: 2 },
+
+  // Charts (component_type='chart')
+  bar:       { w: 3, h: 4 },
+  line:      { w: 3, h: 4 },
+  area:      { w: 3, h: 4 },
+  pie:       { w: 3, h: 4 },
+  scatter:   { w: 3, h: 4 },
+  gauge:     { w: 2, h: 3 },
+  dataview:  { w: 4, h: 3 },
+  number:    { w: 2, h: 2 },
+  custom:    { w: 2, h: 2 },
+
+  // Controls (component_type='control')
+  button:     { w: 2, h: 2 },
+  toggle:     { w: 3, h: 3 },
+  slider:     { w: 3, h: 3 },
+  text_input: { w: 3, h: 2 },
+  plug:       { w: 2, h: 7 },
+  dimmer:     { w: 2, h: 7 },
+
+  // Displays (component_type='display') — future
+  camera:    { w: 3, h: 4 },
+};
+
+// Get minimum size for a component subtype
+export function getComponentMinSize(subtype) {
+  return COMPONENT_MIN_SIZES[subtype] || COMPONENT_MIN_SIZES.default;
+}
+
 export default {
   SPACING_UNIT,
   CANVAS,
@@ -89,4 +123,6 @@ export default {
   DESIGN_SECTIONS,
   Z_INDEX,
   ANIMATION,
+  COMPONENT_MIN_SIZES,
+  getComponentMinSize,
 };

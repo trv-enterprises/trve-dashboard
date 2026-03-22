@@ -34,11 +34,11 @@ const (
 type ControlConfig struct {
 	ControlType string `json:"control_type" bson:"control_type"` // button, toggle, slider, text_input
 
-	// Schema-based control configuration (preferred - Phase 3)
-	SchemaID string `json:"schema_id,omitempty" bson:"schema_id,omitempty"` // Reference to control_schema
-	Target   string `json:"target,omitempty" bson:"target,omitempty"`       // Device/endpoint identifier for schema interpolation
+	// Device type-based control configuration (preferred)
+	DeviceTypeID string `json:"device_type_id,omitempty" bson:"device_type_id,omitempty"` // Reference to device_type
+	Target       string `json:"target,omitempty" bson:"target,omitempty"`                 // Device/endpoint identifier for template interpolation
 
-	// Legacy command configuration (deprecated, use schema instead)
+	// Legacy command configuration (deprecated, use device type instead)
 	CommandConfig *CommandConfig `json:"command_config,omitempty" bson:"command_config,omitempty"` // How to send commands
 
 	// UI configuration

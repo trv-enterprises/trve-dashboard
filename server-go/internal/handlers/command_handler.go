@@ -18,17 +18,17 @@ import (
 
 // CommandHandler handles command execution for bidirectional datasources and controls
 type CommandHandler struct {
-	datasourceService    *service.DatasourceService
-	chartService         *service.ChartService
-	controlSchemaService *service.ControlSchemaService
+	datasourceService  *service.DatasourceService
+	chartService       *service.ChartService
+	deviceTypeService  *service.DeviceTypeService
 }
 
 // NewCommandHandler creates a new command handler
-func NewCommandHandler(datasourceService *service.DatasourceService, chartService *service.ChartService, controlSchemaService *service.ControlSchemaService) *CommandHandler {
+func NewCommandHandler(datasourceService *service.DatasourceService, chartService *service.ChartService, deviceTypeService *service.DeviceTypeService) *CommandHandler {
 	return &CommandHandler{
-		datasourceService:    datasourceService,
-		chartService:         chartService,
-		controlSchemaService: controlSchemaService,
+		datasourceService:  datasourceService,
+		chartService:       chartService,
+		deviceTypeService:  deviceTypeService,
 	}
 }
 
@@ -211,9 +211,9 @@ func (h *CommandHandler) ExecuteControlCommand(c *gin.Context) {
 	var cmd registry.Command
 	controlConfig := chart.ControlConfig
 
-	if controlConfig.SchemaID != "" {
-		// Schema-based control (Phase 3)
-		cmd, err = h.buildCommandFromSchema(c, controlConfig, req.Value)
+	if controlConfig.DeviceTypeID != "" {
+		// Device type-based control
+		cmd, err = h.buildCommandFromDeviceType(c, controlConfig, req.Value)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -228,7 +228,7 @@ func (h *CommandHandler) ExecuteControlCommand(c *gin.Context) {
 			Payload: payload,
 		}
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "control has no schema or command configuration"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "control has no device type or command configuration"})
 		return
 	}
 
@@ -246,18 +246,18 @@ func (h *CommandHandler) ExecuteControlCommand(c *gin.Context) {
 	})
 }
 
-// buildCommandFromSchema builds a command using a control schema template
-func (h *CommandHandler) buildCommandFromSchema(c *gin.Context, controlConfig *models.ControlConfig, value interface{}) (registry.Command, error) {
-	// Get the schema
-	schema, err := h.controlSchemaService.GetSchema(c.Request.Context(), controlConfig.SchemaID)
+// buildCommandFromDeviceType builds a command using a device type's command template
+func (h *CommandHandler) buildCommandFromDeviceType(c *gin.Context, controlConfig *models.ControlConfig, value interface{}) (registry.Command, error) {
+	// Get the device type
+	deviceType, err := h.deviceTypeService.GetDeviceType(c.Request.Context(), controlConfig.DeviceTypeID)
 	if err != nil {
-		return registry.Command{}, fmt.Errorf("failed to load schema '%s': %w", controlConfig.SchemaID, err)
+		return registry.Command{}, fmt.Errorf("failed to load device type '%s': %w", controlConfig.DeviceTypeID, err)
 	}
 
 	// Get the command definition for this control type
-	commandDef, ok := schema.Commands[controlConfig.ControlType]
+	commandDef, ok := deviceType.Commands[controlConfig.ControlType]
 	if !ok {
-		return registry.Command{}, fmt.Errorf("schema '%s' does not support control type '%s'", schema.ID, controlConfig.ControlType)
+		return registry.Command{}, fmt.Errorf("device type '%s' does not support control type '%s'", deviceType.ID, controlConfig.ControlType)
 	}
 
 	// Apply value mapping if present
@@ -341,7 +341,7 @@ func interpolateSchemaValue(templateVal interface{}, value interface{}, target s
 }
 
 // interpolatePayload replaces {{value}} placeholders in the payload template with the actual value
-// (Legacy support for controls without schema_id)
+// (Legacy support for controls without device_type_id)
 func interpolatePayload(template map[string]interface{}, value interface{}) map[string]interface{} {
 	if template == nil {
 		// If no template, just return the value as-is
@@ -356,7 +356,7 @@ func interpolatePayload(template map[string]interface{}, value interface{}) map[
 }
 
 // interpolateValue recursively replaces {{value}} in nested structures
-// (Legacy support for controls without schema_id)
+// (Legacy support for controls without device_type_id)
 func interpolateValue(templateVal interface{}, value interface{}) interface{} {
 	switch v := templateVal.(type) {
 	case string:

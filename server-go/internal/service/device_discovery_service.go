@@ -230,7 +230,6 @@ func z2mExposeToCap(expose z2mExpose) *models.DeviceCapability {
 	return &models.DeviceCapability{
 		Name:      name,
 		Type:      capType,
-		Access:    expose.Access,
 		ValueMin:  expose.ValueMin,
 		ValueMax:  expose.ValueMax,
 		ValueStep: expose.ValueStep,

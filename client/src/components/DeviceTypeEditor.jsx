@@ -6,11 +6,12 @@ import { useState, useEffect } from 'react';
 import {
   Modal,
   TextInput,
+  TextArea,
   Select,
   SelectItem,
   Button,
   InlineNotification,
-  NumberInput,
+  Checkbox,
   Tag
 } from '@carbon/react';
 import { Add, TrashCan } from '@carbon/icons-react';
@@ -19,9 +20,12 @@ import apiClient from '../api/client';
 const CATEGORIES = ['switch', 'light', 'sensor', 'thermostat', 'cover', 'other'];
 const PROTOCOLS = ['mqtt', 'websocket-json'];
 const CAPABILITY_TYPES = ['binary', 'numeric', 'enum', 'text'];
+const CONTROL_UI_TYPES = ['toggle', 'scalar', 'button', 'text', 'plug', 'dimmer'];
+
 
 function DeviceTypeEditor({ deviceType, onSave, onClose }) {
   const isEdit = !!deviceType;
+  const readOnly = deviceType?.is_built_in || false;
 
   const [id, setId] = useState(deviceType?.id || '');
   const [name, setName] = useState(deviceType?.name || '');
@@ -29,8 +33,11 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
   const [category, setCategory] = useState(deviceType?.category || 'switch');
   const [subtype, setSubtype] = useState(deviceType?.subtype || '');
   const [protocol, setProtocol] = useState(deviceType?.protocol || 'mqtt');
-  const [topicPattern, setTopicPattern] = useState(deviceType?.topic_pattern || '');
   const [capabilities, setCapabilities] = useState(deviceType?.capabilities || []);
+  const [supportedTypes, setSupportedTypes] = useState(deviceType?.supported_types || []);
+  const [commands, setCommands] = useState(deviceType?.commands || {});
+  const [stateQuery, setStateQuery] = useState(deviceType?.state_query || null);
+  const [response, setResponse] = useState(deviceType?.response || null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -45,7 +52,6 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
     setCapabilities([...capabilities, {
       name: '',
       type: 'binary',
-      access: 7,
       description: '',
       state_path: ''
     }]);
@@ -54,7 +60,6 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
   const updateCapability = (index, field, value) => {
     const updated = [...capabilities];
     updated[index] = { ...updated[index], [field]: value };
-    // Auto-set state_path from name
     if (field === 'name' && value) {
       updated[index].state_path = '$.' + value;
     }
@@ -65,7 +70,48 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
     setCapabilities(capabilities.filter((_, i) => i !== index));
   };
 
+  const toggleSupportedType = (type) => {
+    if (readOnly) return;
+    if (supportedTypes.includes(type)) {
+      setSupportedTypes(supportedTypes.filter(t => t !== type));
+      const newCommands = { ...commands };
+      delete newCommands[type];
+      setCommands(newCommands);
+    } else {
+      setSupportedTypes([...supportedTypes, type]);
+      setCommands({
+        ...commands,
+        [type]: { template: {} }
+      });
+    }
+  };
+
+  const updateCommandTemplate = (controlType, jsonStr) => {
+    try {
+      const parsed = JSON.parse(jsonStr);
+      setCommands({
+        ...commands,
+        [controlType]: { ...commands[controlType], template: parsed }
+      });
+    } catch {
+      // Allow invalid JSON while editing
+    }
+  };
+
+  const updateCommandValueMap = (controlType, jsonStr) => {
+    try {
+      const parsed = JSON.parse(jsonStr);
+      setCommands({
+        ...commands,
+        [controlType]: { ...commands[controlType], value_map: parsed }
+      });
+    } catch {
+      // Allow invalid JSON while editing
+    }
+  };
+
   const handleSave = async () => {
+    if (readOnly) return;
     if (!id || !name || !category || !protocol) {
       setError('ID, Name, Category, and Protocol are required');
       return;
@@ -75,28 +121,23 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
     setError(null);
 
     try {
+      const payload = {
+        name,
+        description,
+        category,
+        subtype,
+        protocol,
+        capabilities,
+        supported_types: supportedTypes,
+        commands,
+        state_query: stateQuery,
+        response
+      };
+
       if (isEdit) {
-        await apiClient.updateDeviceType(deviceType.id, {
-          name,
-          description,
-          category,
-          subtype,
-          protocol,
-          topic_pattern: topicPattern,
-          capabilities
-        });
+        await apiClient.updateDeviceType(deviceType.id, payload);
       } else {
-        await apiClient.createDeviceType({
-          id,
-          name,
-          description,
-          category,
-          subtype,
-          protocol,
-          schema_ids: [],
-          topic_pattern: topicPattern,
-          capabilities
-        });
+        await apiClient.createDeviceType({ id, ...payload });
       }
       onSave();
     } catch (err) {
@@ -106,14 +147,20 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
     }
   };
 
+  const modalHeading = readOnly
+    ? `Device Type: ${deviceType.name}`
+    : isEdit
+      ? `Edit Device Type: ${deviceType.name}`
+      : 'New Device Type';
+
   return (
     <Modal
       open
-      modalHeading={isEdit ? `Edit Device Type: ${deviceType.name}` : 'New Device Type'}
-      primaryButtonText={saving ? 'Saving...' : 'Save'}
-      secondaryButtonText="Cancel"
+      modalHeading={modalHeading}
+      primaryButtonText={readOnly ? 'Close' : saving ? 'Saving...' : 'Save'}
+      secondaryButtonText={readOnly ? undefined : 'Cancel'}
       onRequestClose={onClose}
-      onRequestSubmit={handleSave}
+      onRequestSubmit={readOnly ? onClose : handleSave}
       primaryButtonDisabled={saving}
       size="lg"
     >
@@ -128,6 +175,7 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
       )}
 
       <div style={{ display: 'grid', gap: '1rem' }}>
+        {/* Basic info */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <TextInput
             id="dt-id"
@@ -135,13 +183,14 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
             value={id}
             onChange={e => setId(e.target.value)}
             disabled={isEdit}
-            helperText="Unique slug identifier"
+            readOnly={readOnly}
           />
           <TextInput
             id="dt-name"
             labelText="Name"
             value={name}
             onChange={e => setName(e.target.value)}
+            readOnly={readOnly}
           />
         </div>
 
@@ -150,6 +199,7 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
           labelText="Description"
           value={description}
           onChange={e => setDescription(e.target.value)}
+          readOnly={readOnly}
         />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
@@ -158,6 +208,7 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
             labelText="Category"
             value={category}
             onChange={e => setCategory(e.target.value)}
+            disabled={readOnly}
           >
             {CATEGORIES.map(c => (
               <SelectItem key={c} value={c} text={c.charAt(0).toUpperCase() + c.slice(1)} />
@@ -169,12 +220,14 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
             value={subtype}
             onChange={e => setSubtype(e.target.value)}
             placeholder="e.g., plug, dimmer"
+            readOnly={readOnly}
           />
           <Select
             id="dt-protocol"
             labelText="Protocol"
             value={protocol}
             onChange={e => setProtocol(e.target.value)}
+            disabled={readOnly}
           >
             {PROTOCOLS.map(p => (
               <SelectItem key={p} value={p} text={p} />
@@ -182,23 +235,17 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
           </Select>
         </div>
 
-        <TextInput
-          id="dt-topic-pattern"
-          labelText="Topic Pattern"
-          value={topicPattern}
-          onChange={e => setTopicPattern(e.target.value)}
-          placeholder="e.g., zigbee2mqtt/{device_name}"
-          helperText="Use {device_name} as placeholder"
-        />
-
+        {/* Capabilities */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.875rem', color: 'var(--cds-text-secondary)' }}>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--cds-text-primary)' }}>
               Capabilities ({capabilities.length})
             </span>
-            <Button kind="ghost" size="sm" renderIcon={Add} onClick={addCapability}>
-              Add Capability
-            </Button>
+            {!readOnly && (
+              <Button kind="ghost" size="sm" renderIcon={Add} onClick={addCapability}>
+                Add Capability
+              </Button>
+            )}
           </div>
 
           {capabilities.map((cap, index) => (
@@ -206,7 +253,7 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
               key={index}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '2fr 1fr 1fr auto',
+                gridTemplateColumns: readOnly ? '2fr 1fr' : '2fr 1fr auto',
                 gap: '0.5rem',
                 marginBottom: '0.5rem',
                 alignItems: 'end'
@@ -219,6 +266,7 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
                 value={cap.name}
                 onChange={e => updateCapability(index, 'name', e.target.value)}
                 placeholder="state, brightness..."
+                readOnly={readOnly}
               />
               <Select
                 id={`cap-type-${index}`}
@@ -226,29 +274,118 @@ function DeviceTypeEditor({ deviceType, onSave, onClose }) {
                 size="sm"
                 value={cap.type}
                 onChange={e => updateCapability(index, 'type', e.target.value)}
+                disabled={readOnly}
               >
                 {CAPABILITY_TYPES.map(t => (
                   <SelectItem key={t} value={t} text={t} />
                 ))}
               </Select>
-              <TextInput
-                id={`cap-access-${index}`}
-                labelText={index === 0 ? 'Access' : ''}
-                size="sm"
-                value={String(cap.access)}
-                onChange={e => updateCapability(index, 'access', parseInt(e.target.value) || 0)}
-                helperText="1=R 2=W 4=Report"
-              />
-              <Button
-                kind="ghost"
-                size="sm"
-                hasIconOnly
-                renderIcon={TrashCan}
-                iconDescription="Remove"
-                onClick={() => removeCapability(index)}
-              />
+              {!readOnly && (
+                <Button
+                  kind="ghost"
+                  size="sm"
+                  hasIconOnly
+                  renderIcon={TrashCan}
+                  iconDescription="Remove"
+                  onClick={() => removeCapability(index)}
+                />
+              )}
             </div>
           ))}
+        </div>
+
+        {/* Command Protocol Section — always visible */}
+        <div>
+          <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--cds-text-primary)', display: 'block', marginBottom: '0.5rem' }}>
+            Command Protocol ({supportedTypes.length} control types)
+          </span>
+
+          {/* Supported control types */}
+          <div style={{ marginBottom: '1rem' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+              Supported Control Types
+            </span>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              {CONTROL_UI_TYPES.map(type => (
+                <Checkbox
+                  key={type}
+                  id={`supported-type-${type}`}
+                  labelText={type}
+                  checked={supportedTypes.includes(type)}
+                  onChange={() => toggleSupportedType(type)}
+                  disabled={readOnly}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Command templates per supported type */}
+          {supportedTypes.map(type => (
+            <div key={type} style={{ borderLeft: '2px solid var(--cds-border-subtle-01)', paddingLeft: '1rem', marginBottom: '0.75rem' }}>
+              <Tag type="cyan" size="sm" style={{ marginBottom: '0.5rem' }}>{type}</Tag>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <TextArea
+                  id={`cmd-template-${type}`}
+                  labelText="Command Template (JSON)"
+                  value={JSON.stringify(commands[type]?.template || {}, null, 2)}
+                  onChange={e => updateCommandTemplate(type, e.target.value)}
+                  rows={3}
+                  placeholder='{"state": "{{value}}"}'
+                  helperText="Use {{value}} and {{target}} placeholders"
+                  readOnly={readOnly}
+                />
+                <TextArea
+                  id={`cmd-valuemap-${type}`}
+                  labelText="Value Map (JSON, optional)"
+                  value={commands[type]?.value_map ? JSON.stringify(commands[type].value_map, null, 2) : ''}
+                  onChange={e => updateCommandValueMap(type, e.target.value)}
+                  rows={3}
+                  placeholder='{"true": "ON", "false": "OFF"}'
+                  helperText="Map control values to protocol values"
+                  readOnly={readOnly}
+                />
+              </div>
+            </div>
+          ))}
+
+          {supportedTypes.length === 0 && (
+            <div style={{ color: 'var(--cds-text-secondary)', fontSize: '0.875rem', fontStyle: 'italic' }}>
+              No control types configured. Check the boxes above to add command templates.
+            </div>
+          )}
+
+          {/* Response parsing */}
+          <div style={{ marginTop: '0.75rem' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--cds-text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+              Response Parsing (optional)
+            </span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <TextInput
+                id="dt-response-state-path"
+                labelText="State Path"
+                size="sm"
+                value={response?.state_path || ''}
+                onChange={e => setResponse({ ...response, state_path: e.target.value })}
+                placeholder="$.state"
+                helperText="JSONPath to state value"
+                readOnly={readOnly}
+              />
+              <TextInput
+                id="dt-response-valuemap"
+                labelText="Response Value Map (JSON)"
+                size="sm"
+                value={response?.value_map ? JSON.stringify(response.value_map) : ''}
+                onChange={e => {
+                  try {
+                    const parsed = JSON.parse(e.target.value);
+                    setResponse({ ...response, value_map: parsed });
+                  } catch { /* allow invalid while editing */ }
+                }}
+                placeholder='{"ON": true, "OFF": false}'
+                readOnly={readOnly}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </Modal>

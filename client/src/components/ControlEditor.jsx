@@ -39,7 +39,7 @@ function ControlEditor({
   const [loadingConnections, setLoadingConnections] = useState(true);
   const [mqttTopics, setMqttTopics] = useState([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
-  const [mqttSchemas, setMqttSchemas] = useState([]);
+  const [mqttDeviceTypes, setMqttDeviceTypes] = useState([]);
 
   // Extract config values with defaults
   const controlType = controlConfig?.control_type || CONTROL_TYPES.BUTTON;
@@ -64,10 +64,10 @@ function ControlEditor({
     };
     fetchConnections();
 
-    // Fetch available MQTT schemas
-    apiClient.getControlSchemasForProtocol('mqtt')
-      .then(result => setMqttSchemas(result?.schemas || []))
-      .catch(() => setMqttSchemas([]));
+    // Fetch available MQTT device types (for command templates)
+    apiClient.getDeviceTypes({ protocol: 'mqtt' })
+      .then(result => setMqttDeviceTypes(result?.device_types || []))
+      .catch(() => setMqttDeviceTypes([]));
   }, []);
 
   // Update selected connection when connectionId changes
@@ -118,12 +118,12 @@ function ControlEditor({
     ? controlConfig.target.slice(0, -4)
     : controlConfig?.target || '';
 
-  // Handle MQTT topic selection — sets target but does NOT auto-assign a schema
+  // Handle MQTT topic selection — sets target but does NOT auto-assign a device type
   const handleTopicSelect = (topic) => {
     if (!topic) {
       const newConfig = { ...controlConfig };
       delete newConfig.target;
-      delete newConfig.schema_id;
+      delete newConfig.device_type_id;
       delete newConfig.command_config;
       onControlConfigChange(newConfig);
       return;
@@ -135,30 +135,30 @@ function ControlEditor({
       target: commandTopic,
       command_config: null
     };
-    // Don't force a schema — keep existing if set, or leave empty
+    // Don't force a device type — keep existing if set, or leave empty
     onControlConfigChange(newConfig);
   };
 
-  // Handle MQTT schema selection
-  const handleSchemaSelect = (schemaId) => {
+  // Handle MQTT device type selection
+  const handleDeviceTypeSelect = (deviceTypeId) => {
     const newConfig = { ...controlConfig };
-    if (schemaId) {
-      newConfig.schema_id = schemaId;
-      newConfig.command_config = null; // Schema handles commands
+    if (deviceTypeId) {
+      newConfig.device_type_id = deviceTypeId;
+      newConfig.command_config = null; // Device type handles commands
     } else {
-      delete newConfig.schema_id;
+      delete newConfig.device_type_id;
     }
     onControlConfigChange(newConfig);
   };
 
-  // Get payload preview from the selected schema
+  // Get payload preview from the selected device type
   const getPayloadPreview = () => {
-    if (!controlConfig?.schema_id) return null;
-    const schema = mqttSchemas.find(s => s.id === controlConfig.schema_id);
-    if (!schema?.commands) return null;
+    if (!controlConfig?.device_type_id) return null;
+    const dt = mqttDeviceTypes.find(d => d.id === controlConfig.device_type_id);
+    if (!dt?.commands) return null;
 
     // Find the command definition for the current control type, or the first available
-    const cmdDef = schema.commands[controlType] || Object.values(schema.commands)[0];
+    const cmdDef = dt.commands[controlType] || Object.values(dt.commands)[0];
     if (!cmdDef?.template) return null;
 
     const template = cmdDef.template;
@@ -332,15 +332,15 @@ function ControlEditor({
             </Column>
             <Column lg={3} md={2} sm={4}>
               <Select
-                id="mqtt-schema-select"
-                labelText="Schema"
-                value={controlConfig?.schema_id || ''}
-                onChange={(e) => handleSchemaSelect(e.target.value || null)}
+                id="mqtt-device-type-select"
+                labelText="Device Type"
+                value={controlConfig?.device_type_id || ''}
+                onChange={(e) => handleDeviceTypeSelect(e.target.value || null)}
                 helperText="Optional — defines payload format"
               >
                 <SelectItem value="" text="None (manual payload)" />
-                {mqttSchemas.map(s => (
-                  <SelectItem key={s.id} value={s.id} text={s.name} />
+                {mqttDeviceTypes.map(dt => (
+                  <SelectItem key={dt.id} value={dt.id} text={dt.name} />
                 ))}
               </Select>
             </Column>
@@ -354,13 +354,13 @@ function ControlEditor({
                 helperText="MQTT topic to publish commands to"
               />
             </Column>
-            {controlConfig?.schema_id && (() => {
+            {controlConfig?.device_type_id && (() => {
               const previews = getPayloadPreview();
               if (!previews) return null;
               return (
                 <Column lg={12} md={8} sm={4}>
                   <div className="mqtt-schema-info">
-                    <Tag type="teal">Schema: {controlConfig.schema_id}</Tag>
+                    <Tag type="teal">Device Type: {controlConfig.device_type_id}</Tag>
                     <div className="payload-preview">
                       {previews.map((p, i) => (
                         <span key={i}>

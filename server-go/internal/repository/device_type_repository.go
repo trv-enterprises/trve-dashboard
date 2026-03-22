@@ -33,6 +33,7 @@ func (r *DeviceTypeRepository) CreateIndexes(ctx context.Context) error {
 		{Keys: bson.D{{Key: "protocol", Value: 1}}},
 		{Keys: bson.D{{Key: "is_built_in", Value: 1}}},
 		{Keys: bson.D{{Key: "name", Value: 1}}},
+		{Keys: bson.D{{Key: "supported_types", Value: 1}}},
 		{Keys: bson.D{{Key: "updated", Value: -1}}},
 	}
 
@@ -84,14 +85,20 @@ func (r *DeviceTypeRepository) Update(ctx context.Context, id string, update *mo
 	if update.Protocol != nil {
 		updateFields["protocol"] = *update.Protocol
 	}
-	if update.SchemaIDs != nil {
-		updateFields["schema_ids"] = *update.SchemaIDs
-	}
 	if update.Capabilities != nil {
 		updateFields["capabilities"] = *update.Capabilities
 	}
-	if update.TopicPattern != nil {
-		updateFields["topic_pattern"] = *update.TopicPattern
+	if update.SupportedTypes != nil {
+		updateFields["supported_types"] = *update.SupportedTypes
+	}
+	if update.Commands != nil {
+		updateFields["commands"] = *update.Commands
+	}
+	if update.StateQuery != nil {
+		updateFields["state_query"] = update.StateQuery
+	}
+	if update.Response != nil {
+		updateFields["response"] = update.Response
 	}
 	if update.Metadata != nil {
 		updateFields["metadata"] = *update.Metadata
@@ -132,6 +139,9 @@ func (r *DeviceTypeRepository) List(ctx context.Context, params *models.DeviceTy
 	}
 	if params.Protocol != "" {
 		filter["protocol"] = params.Protocol
+	}
+	if params.SupportedType != "" {
+		filter["supported_types"] = params.SupportedType
 	}
 	if params.BuiltInOnly {
 		filter["is_built_in"] = true
@@ -183,20 +193,26 @@ func (r *DeviceTypeRepository) UpsertBuiltIn(ctx context.Context, dt *models.Dev
 	opts := options.Update().SetUpsert(true)
 	update := bson.M{
 		"$set": bson.M{
-			"name":          dt.Name,
-			"description":   dt.Description,
-			"category":      dt.Category,
-			"subtype":       dt.Subtype,
-			"protocol":      dt.Protocol,
-			"schema_ids":    dt.SchemaIDs,
-			"capabilities":  dt.Capabilities,
-			"topic_pattern": dt.TopicPattern,
-			"is_built_in":   dt.IsBuiltIn,
-			"metadata":      dt.Metadata,
-			"updated":       now,
+			"name":            dt.Name,
+			"description":     dt.Description,
+			"category":        dt.Category,
+			"subtype":         dt.Subtype,
+			"protocol":        dt.Protocol,
+			"capabilities":    dt.Capabilities,
+			"supported_types": dt.SupportedTypes,
+			"commands":        dt.Commands,
+			"state_query":     dt.StateQuery,
+			"response":        dt.Response,
+			"is_built_in":     dt.IsBuiltIn,
+			"metadata":        dt.Metadata,
+			"updated":         now,
 		},
 		"$setOnInsert": bson.M{
 			"created": now,
+		},
+		"$unset": bson.M{
+			"schema_ids":    "", // Remove legacy field
+			"topic_pattern": "", // Moved to device instances
 		},
 	}
 
