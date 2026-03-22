@@ -1,0 +1,166 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
+@use '@carbon/react/scss/spacing' as spacing;
+
+.notification-panel {
+  position: fixed;
+  top: 48px; // Below header
+  right: 96px; // Align under bell icon (user menu + bell offset)
+  width: 360px;
+  max-height: 420px;
+  background-color: var(--cds-layer-02, #393939);
+  border: 1px solid var(--cds-border-subtle-01, #525252);
+  border-top: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 8100;
+  display: flex;
+  flex-direction: column;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: spacing.$spacing-04 spacing.$spacing-05;
+    border-bottom: 1px solid var(--cds-border-subtle-01, #525252);
+  }
+
+  &__title {
+    color: var(--cds-text-primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  &__clear {
+    background: none;
+    border: none;
+    color: var(--cds-link-primary, #78a9ff);
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 2px 4px;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__list {
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  &__empty {
+    padding: spacing.$spacing-06;
+    text-align: center;
+    color: var(--cds-text-helper);
+    font-size: 0.8125rem;
+  }
+
+  &__item {
+    display: flex;
+    align-items: flex-start;
+    gap: spacing.$spacing-03;
+    padding: spacing.$spacing-03 spacing.$spacing-05;
+    border-bottom: 1px solid rgba(82, 82, 82, 0.4);
+    transition: background-color 0.1s;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.04);
+    }
+
+    &--success .notification-panel__item-icon {
+      fill: #42be65;
+    }
+
+    &--error .notification-panel__item-icon {
+      fill: #fa4d56;
+    }
+
+    &--warning .notification-panel__item-icon {
+      fill: #f1c21b;
+    }
+
+    &--info .notification-panel__item-icon {
+      fill: #78a9ff;
+    }
+  }
+
+  &__item-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  &__item-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__item-title {
+    color: var(--cds-text-primary);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  &__item-subtitle {
+    color: var(--cds-text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.3;
+    word-break: break-word;
+  }
+
+  &__item-time {
+    color: var(--cds-text-helper);
+    font-size: 0.6875rem;
+  }
+
+  &__item-close {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--cds-text-secondary);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: var(--cds-text-primary);
+    }
+
+    svg {
+      fill: currentColor !important;
+    }
+  }
+}
+
+// Badge on the bell icon
+.notification-badge {
+  position: relative;
+
+  .notification-badge__count {
+    position: absolute;
+    top: 8px;
+    right: 6px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background-color: #da1e28; // red60
+    color: #ffffff;
+    font-size: 0.625rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    pointer-events: none;
+    line-height: 1;
+  }
+}

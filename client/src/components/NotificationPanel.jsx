@@ -1,0 +1,98 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
+import { useRef, useEffect } from 'react';
+import { Close } from '@carbon/icons-react';
+import {
+  CheckmarkFilled,
+  ErrorFilled,
+  WarningFilled,
+  InformationFilled
+} from '@carbon/icons-react';
+import { useNotifications } from '../context/NotificationContext';
+import './NotificationPanel.scss';
+
+const KIND_ICONS = {
+  success: CheckmarkFilled,
+  error: ErrorFilled,
+  warning: WarningFilled,
+  info: InformationFilled
+};
+
+function formatTime(timestamp) {
+  const d = new Date(timestamp);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+/**
+ * NotificationPanel
+ *
+ * Dropdown panel anchored below the header notification bell icon.
+ * Shows a scrollable list of notifications with dismiss (X) per item.
+ */
+function NotificationPanel({ open, onClose }) {
+  const { notifications, removeNotification, clearAll } = useNotifications();
+  const panelRef = useRef(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) {
+        onClose();
+      }
+    };
+    // Delay listener to avoid catching the click that opened the panel
+    const timer = setTimeout(() => document.addEventListener('mousedown', handleClick), 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleClick);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="notification-panel" ref={panelRef}>
+      <div className="notification-panel__header">
+        <span className="notification-panel__title">Notifications</span>
+        {notifications.length > 0 && (
+          <button className="notification-panel__clear" onClick={clearAll}>
+            Clear all
+          </button>
+        )}
+      </div>
+      <div className="notification-panel__list">
+        {notifications.length === 0 ? (
+          <div className="notification-panel__empty">No notifications</div>
+        ) : (
+          notifications.map((n) => {
+            const Icon = KIND_ICONS[n.kind] || KIND_ICONS.info;
+            return (
+              <div key={n.id} className={`notification-panel__item notification-panel__item--${n.kind || 'info'}`}>
+                <Icon size={16} className="notification-panel__item-icon" />
+                <div className="notification-panel__item-content">
+                  <span className="notification-panel__item-title">{n.title}</span>
+                  {n.subtitle && (
+                    <span className="notification-panel__item-subtitle">{n.subtitle}</span>
+                  )}
+                  <span className="notification-panel__item-time">{formatTime(n.timestamp)}</span>
+                </div>
+                <button
+                  className="notification-panel__item-close"
+                  onClick={() => removeNotification(n.id)}
+                  aria-label="Dismiss notification"
+                >
+                  <Close size={14} />
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default NotificationPanel;
