@@ -30,6 +30,8 @@ type AISession struct {
 	ChartVersion int         `json:"chart_version" bson:"chart_version"`       // Version being edited (always a draft)
 	Messages     []AIMessage `json:"messages" bson:"messages"`                 // Conversation history
 	Status       string      `json:"status" bson:"status"`                     // "active" | "completed" | "cancelled"
+	DashboardID  string      `json:"dashboard_id,omitempty" bson:"dashboard_id,omitempty"` // Auto-attach to this dashboard on save
+	PanelID      string      `json:"panel_id,omitempty" bson:"panel_id,omitempty"`         // Auto-attach to this panel on save
 	Created      time.Time   `json:"created" bson:"created"`
 	Updated      time.Time   `json:"updated" bson:"updated"`
 }
@@ -58,6 +60,16 @@ type ToolCall struct {
 type CreateAISessionRequest struct {
 	ChartID        string `json:"chart_id"`        // Existing chart ID to edit (optional, omit for new chart)
 	InitialMessage string `json:"initial_message"` // First user message (optional)
+
+	// Pre-flight context (optional) - sets fields on the draft directly
+	ComponentType  string `json:"component_type,omitempty"`  // "chart", "control", or "display"
+	ChartType      string `json:"chart_type,omitempty"`      // For charts: bar, line, pie, etc.
+	ControlType    string `json:"control_type,omitempty"`    // For controls: button, toggle, slider, etc.
+	ConnectionID   string `json:"connection_id,omitempty"`   // Pre-selected connection ID
+
+	// Dashboard panel context (optional) - if set, saved component is auto-attached to this panel
+	DashboardID    string `json:"dashboard_id,omitempty"`    // Dashboard to attach to on save
+	PanelID        string `json:"panel_id,omitempty"`        // Panel within the dashboard
 }
 
 // SendMessageRequest represents a request to send a message in an AI session

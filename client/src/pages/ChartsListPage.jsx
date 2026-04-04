@@ -31,6 +31,8 @@ import {
   Checkbox
 } from '@carbon/react';
 import { TrashCan, ChartLineSmooth, ChartBar, ChartArea, ChartPie, Meter, TableSplit, Code, List, Grid, Edit, DataBase, Information, Dashboard, Keyboard, TouchInteraction, Filter, ChevronDown, ChevronRight } from '@carbon/icons-react';
+import MdiIcon from '@mdi/react';
+import { CONTROL_TYPE_INFO } from '../components/controls';
 import AiIcon from '../components/icons/AiIcon';
 import apiClient from '../api/client';
 import ChartDeleteDialog from '../components/ChartDeleteDialog';
@@ -70,7 +72,7 @@ function ChartsListPage() {
   const [aiPreflightOpen, setAiPreflightOpen] = useState(false);
   const [connectionFilter, setConnectionFilter] = useState(savedFilters.ds || 'all'); // 'all' or connection id
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);
-  const [collapsedTypes, setCollapsedTypes] = useState(new Set(['display', 'control'])); // Start collapsed
+  const [collapsedTypes, setCollapsedTypes] = useState(new Set(['display', 'control'])); // Display and Control start collapsed
   const typeFilterRef = useRef(null); // Ref for click-outside detection
 
   // Hierarchical type filter - tracks selected types
@@ -85,10 +87,10 @@ function ChartsListPage() {
   });
 
   // Type hierarchy definition
-  // Note: DB stores 'chart' but UI shows 'display'. We use 'display' for filtering keys.
+  // Three component types: chart (data viz), display (non-chart visuals), control (interactive)
   const TYPE_HIERARCHY = {
-    display: {
-      label: 'Displays',
+    chart: {
+      label: 'Charts',
       dbValue: 'chart', // What's stored in DB (component_type)
       subtypes: [
         { id: 'bar', label: 'Bar Chart' },
@@ -100,6 +102,13 @@ function ChartsListPage() {
         { id: 'dataview', label: 'Data Table' },
         { id: 'number', label: 'Number' },
         { id: 'custom', label: 'Custom' }
+      ]
+    },
+    display: {
+      label: 'Displays',
+      dbValue: 'display',
+      subtypes: [
+        { id: 'frigate_camera', label: 'Frigate Camera' }
       ]
     },
     control: {
@@ -387,9 +396,15 @@ function ChartsListPage() {
   };
 
   // Get icon component for chart type
-  const getChartTypeIcon = (chartType, componentType) => {
-    // Controls get a special icon
+  const getChartTypeIcon = (chartType, componentType, controlType) => {
+    // Controls use MDI icons from CONTROL_TYPE_INFO
     if (componentType === 'control') {
+      const typeInfo = CONTROL_TYPE_INFO[controlType];
+      if (typeInfo?.icon) {
+        // Return a wrapper component that renders the MDI icon
+        const iconPath = typeInfo.icon;
+        return ({ size }) => <MdiIcon path={iconPath} size={`${size}px`} color="currentColor" />;
+      }
       return TouchInteraction;
     }
     const icons = {
@@ -429,11 +444,16 @@ function ChartsListPage() {
         return [];
       }
       result = result.filter(item => {
-        // Map legacy 'chart' to 'display' for filtering
-        const componentType = item.component_type === 'control' ? 'control' : 'display';
-        const subtype = componentType === 'control'
-          ? (item.control_config?.control_type || 'button')
-          : (item.chart_type || 'custom');
+        // Map component_type to hierarchy key
+        const componentType = item.component_type || 'chart';
+        let subtype;
+        if (componentType === 'control') {
+          subtype = item.control_config?.control_type || 'button';
+        } else if (componentType === 'display') {
+          subtype = item.display_config?.display_type || 'frigate_camera';
+        } else {
+          subtype = item.chart_type || 'custom';
+        }
         const typeKey = `${componentType}:${subtype}`;
         return selectedTypes.has(typeKey);
       });
@@ -687,7 +707,7 @@ function ChartsListPage() {
           ) : (
             <div className="charts-rows">
               {filteredAndSortedCharts.map((chart) => {
-                const TypeIcon = getChartTypeIcon(chart.chart_type, chart.component_type);
+                const TypeIcon = getChartTypeIcon(chart.chart_type, chart.component_type, chart.control_config?.control_type);
                 return (
                   <Tile
                     key={chart.id}
@@ -704,8 +724,8 @@ function ChartsListPage() {
                       <div className="tile-header">
                         <h3>{chart.name}</h3>
                         <div className="tile-meta">
-                          <Tag type={chart.component_type === 'control' ? 'purple' : 'blue'} size="sm">
-                            {chart.component_type === 'control' ? 'CONTROL' : 'DISPLAY'}
+                          <Tag type={chart.component_type === 'control' ? 'purple' : chart.component_type === 'display' ? 'teal' : 'blue'} size="sm">
+                            {chart.component_type === 'control' ? 'CONTROL' : chart.component_type === 'display' ? 'DISPLAY' : 'CHART'}
                           </Tag>
                           <Tag type={getChartTypeColor(chart.chart_type)} size="sm">
                             {chart.chart_type?.toUpperCase() || 'N/A'}
@@ -824,11 +844,12 @@ function ChartsListPage() {
                         >
                           {row.cells.map((cell) => {
                             if (cell.info.header === 'component_type') {
-                              const isControl = cell.value === 'control';
+                              const tagType = cell.value === 'control' ? 'purple' : cell.value === 'display' ? 'teal' : 'blue';
+                              const tagLabel = cell.value === 'control' ? 'CONTROL' : cell.value === 'display' ? 'DISPLAY' : 'CHART';
                               return (
                                 <TableCell key={cell.id}>
-                                  <Tag type={isControl ? 'purple' : 'blue'} size="md">
-                                    {isControl ? 'CONTROL' : 'DISPLAY'}
+                                  <Tag type={tagType} size="md">
+                                    {tagLabel}
                                   </Tag>
                                 </TableCell>
                               );

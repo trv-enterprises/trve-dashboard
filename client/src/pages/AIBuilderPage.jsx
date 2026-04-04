@@ -23,7 +23,7 @@ import {
   Information
 } from '@carbon/icons-react';
 import AiIcon from '../components/icons/AiIcon';
-import AIChartPreview from '../components/AIChartPreview';
+import AIComponentPreview from '../components/AIComponentPreview';
 import { useAISession } from '../hooks/useAISession';
 import apiClient from '../api/client';
 import './AIBuilderPage.scss';
@@ -56,16 +56,20 @@ function AIBuilderPage() {
     name: preflightName,
     description: preflightDescription,
     connectionId,
+    connectionName,
+    connectionType,
     chartType,
-    controlType
+    controlType,
+    dashboardId,
+    panelId
   } = preflightContext;
 
   // Determine return path - either from state (if coming from dashboard) or default to charts list
   const returnPath = preflightContext.from || '/design/charts';
 
   const [input, setInput] = useState('');
-  const [chartName, setChartName] = useState(preflightName || '');
-  const [chartNameInitialized, setChartNameInitialized] = useState(!!preflightName);
+  const [componentName, setComponentName] = useState(preflightName || '');
+  const [componentNameInitialized, setComponentNameInitialized] = useState(!!preflightName);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -75,7 +79,7 @@ function AIBuilderPage() {
   const {
     session,
     messages,
-    chart,
+    component,
     loading,
     sending,
     error,
@@ -86,7 +90,7 @@ function AIBuilderPage() {
     saveSession,
     cancelSession,
     clearError
-  } = useAISession(isNewChart ? null : chartId);
+  } = useAISession(isNewChart ? null : chartId, isNewChart ? preflightContext : {});
 
   // Start session when page loads
   useEffect(() => {
@@ -100,13 +104,13 @@ function AIBuilderPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, thinking]);
 
-  // Update chart name from chart data (only initialize once)
+  // Update component name from component data (only initialize once)
   useEffect(() => {
-    if (chart?.name && !chartNameInitialized) {
-      setChartName(chart.name);
-      setChartNameInitialized(true);
+    if (component?.name && !componentNameInitialized) {
+      setComponentName(component.name);
+      setComponentNameInitialized(true);
     }
-  }, [chart?.name, chartNameInitialized]);
+  }, [component?.name, componentNameInitialized]);
 
   // Send initial message based on pre-flight context
   useEffect(() => {
@@ -116,11 +120,12 @@ function AIBuilderPage() {
       // Build initial message from pre-flight context
       const parts = [];
 
-      // Component type
-      const typeLabel = componentType === 'control' ? 'control' : 'display';
+      // Component type label
+      const typeLabels = { chart: 'chart', display: 'display', control: 'control' };
+      const typeLabel = typeLabels[componentType] || 'component';
       parts.push(`Create a new ${typeLabel}`);
 
-      // Specific type
+      // Specific sub-type
       if (componentType === 'chart' && chartType) {
         parts.push(`of type "${chartType}"`);
       } else if (componentType === 'control' && controlType) {
@@ -137,9 +142,13 @@ function AIBuilderPage() {
         parts.push(`that ${preflightDescription}`);
       }
 
-      // Connection
+      // Connection - include name and type so agent can skip list_datasources
       if (connectionId) {
-        parts.push(`using connection ID "${connectionId}"`);
+        let connDesc = `using connection ID "${connectionId}"`;
+        if (connectionName) {
+          connDesc += ` (name: "${connectionName}", type: ${connectionType})`;
+        }
+        parts.push(connDesc);
       }
 
       const initialMessage = parts.join(' ') + '.';
@@ -162,12 +171,20 @@ function AIBuilderPage() {
   };
 
   const handleSave = async () => {
-    if (!chartName.trim()) return;
+    if (!componentName.trim()) return;
 
     setSaving(true);
     try {
-      await saveSession(chartName.trim());
-      navigate(returnPath);
+      const savedComponent = await saveSession(componentName.trim());
+      // If launched from a dashboard panel, pass back the component ID so
+      // DashboardDetailPage can attach it to the panel in its unsaved state
+      if (panelId && savedComponent?.id) {
+        navigate(returnPath, {
+          state: { attachComponentId: savedComponent.id, attachPanelId: panelId }
+        });
+      } else {
+        navigate(returnPath);
+      }
     } catch (err) {
       // Error is handled by the hook
     } finally {
@@ -199,7 +216,7 @@ function AIBuilderPage() {
   };
 
   const handleBack = () => {
-    if (messages.length > 0 || chart) {
+    if (messages.length > 0 || component) {
       setShowDiscardDialog(true);
     } else {
       navigate(returnPath);
@@ -264,7 +281,7 @@ function AIBuilderPage() {
           <h1>
             <AiIcon size={24} />
             {isNewChart
-              ? `Create ${componentType === 'control' ? 'Control' : 'Component'} with AI`
+              ? `Create ${componentType === 'control' ? 'Control' : componentType === 'display' ? 'Display' : componentType === 'chart' ? 'Chart' : 'Component'} with AI`
               : 'Edit Component with AI'}
           </h1>
           {connected && <Tag type="green" size="sm">Connected</Tag>}
@@ -282,7 +299,7 @@ function AIBuilderPage() {
             kind="primary"
             renderIcon={Save}
             onClick={() => setShowSaveDialog(true)}
-            disabled={loading || !chart}
+            disabled={loading || !component}
             size="md"
           >
             Save Component
@@ -306,10 +323,10 @@ function AIBuilderPage() {
                 {messages.length === 0 && (
                   <div className="welcome-message">
                     <AiIcon size={48} />
-                    <h3>Welcome to AI Chart Builder</h3>
+                    <h3>Welcome to AI Component Builder</h3>
                     <p>
-                      Describe the chart you want to create, and I'll help you build it.
-                      You can specify chart type, data source, styling, and more.
+                      Describe the component you want to create, and I'll help you build it.
+                      I can create charts, displays, and controls.
                     </p>
                     <div className="suggestions">
                       <p className="suggestions-label">Try one of these:</p>
@@ -318,7 +335,7 @@ function AIBuilderPage() {
                           className="suggestion-btn"
                           onClick={() => setInput('Create a bar chart showing sales by region')}
                         >
-                          Bar chart for sales by region
+                          Bar chart for sales
                         </button>
                         <button
                           className="suggestion-btn"
@@ -328,15 +345,15 @@ function AIBuilderPage() {
                         </button>
                         <button
                           className="suggestion-btn"
-                          onClick={() => setInput('Show a pie chart of market share')}
+                          onClick={() => setInput('Create a toggle control to turn a device on/off via MQTT')}
                         >
-                          Pie chart for market share
+                          Toggle control for MQTT
                         </button>
                         <button
                           className="suggestion-btn"
-                          onClick={() => setInput('List available data sources')}
+                          onClick={() => setInput('Create a slider to set brightness level')}
                         >
-                          List data sources
+                          Dimmer slider control
                         </button>
                       </div>
                     </div>
@@ -418,9 +435,9 @@ function AIBuilderPage() {
 
         {/* Preview Panel (Right) */}
         <div className="preview-panel">
-          <AIChartPreview
-            chart={chart}
-            onNameChange={(newName) => setChartName(newName)}
+          <AIComponentPreview
+            component={component}
+            onNameChange={(newName) => setComponentName(newName)}
           />
         </div>
       </div>
@@ -434,16 +451,16 @@ function AIBuilderPage() {
           modalHeading="Save Component"
           primaryButtonText={saving ? 'Saving...' : 'Save'}
           secondaryButtonText="Cancel"
-          primaryButtonDisabled={!chartName.trim() || chartName.toLowerCase().startsWith('untitled') || saving}
+          primaryButtonDisabled={!componentName.trim() || componentName.toLowerCase().startsWith('untitled') || saving}
           size="sm"
         >
           <TextInput
-            id="chart-name"
+            id="component-name"
             labelText="Component Name"
             placeholder="Enter a name for your component"
-            value={chartName}
-            onChange={(e) => setChartName(e.target.value)}
-            invalid={chartName.toLowerCase().startsWith('untitled')}
+            value={componentName}
+            onChange={(e) => setComponentName(e.target.value)}
+            invalid={componentName.toLowerCase().startsWith('untitled')}
             invalidText="Please provide a proper name for the component"
           />
           <p className="save-dialog-note">

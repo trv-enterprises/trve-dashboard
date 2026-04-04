@@ -2,11 +2,10 @@
 // Licensed under Apache 2.0
 // See LICENSE file for details.
 
-import { useState } from 'react';
 import { Button, InlineLoading } from '@carbon/react';
 import PropTypes from 'prop-types';
-import apiClient from '../../api/client';
-import { useNotifications } from '../../context/NotificationContext';
+import { useControlCommand } from './useControlCommand';
+import { registerControl } from './controlRegistry';
 import './controls.scss';
 
 /**
@@ -17,36 +16,19 @@ import './controls.scss';
  * No state subscription — buttons are fire-and-forget.
  */
 function ControlButton({ control, onSuccess, onError }) {
-  const [loading, setLoading] = useState(false);
-  const { addNotification } = useNotifications();
-
   const uiConfig = control.control_config?.ui_config || {};
   const label = uiConfig.label || 'Execute';
   const kind = uiConfig.kind || 'primary';
-  const target = control.control_config?.target || '';
 
-  const handleClick = async () => {
-    setLoading(true);
+  const { execute, loading } = useControlCommand({
+    controlId: control.id,
+    label,
+    target: control.control_config?.target || '',
+    onSuccess,
+    onError
+  });
 
-    try {
-      const result = await apiClient.executeControlCommand(control.id, null);
-      addNotification({
-        kind: 'success',
-        title: `${label} executed`,
-        subtitle: target ? `Published to ${target}` : result.message
-      });
-      if (onSuccess) onSuccess(result);
-    } catch (err) {
-      addNotification({
-        kind: 'error',
-        title: `${label} failed`,
-        subtitle: err.message
-      });
-      if (onError) onError(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleClick = () => execute(null, `${label} executed`);
 
   return (
     <div className="control-button-container">
@@ -56,11 +38,7 @@ function ControlButton({ control, onSuccess, onError }) {
         disabled={loading}
         size="lg"
       >
-        {loading ? (
-          <InlineLoading description="Executing..." />
-        ) : (
-          label
-        )}
+        {loading ? <InlineLoading description="Executing..." /> : label}
       </Button>
     </div>
   );
@@ -79,4 +57,5 @@ ControlButton.propTypes = {
   onError: PropTypes.func
 };
 
+registerControl('button', ControlButton);
 export default ControlButton;

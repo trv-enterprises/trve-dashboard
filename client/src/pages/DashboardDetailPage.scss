@@ -590,12 +590,18 @@
               font-size: calc(0.75rem * var(--title-scale, 1));
               font-weight: 600;
               font-family: 'IBM Plex Mono', monospace;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              min-width: 0;
+              flex: 1;
             }
 
             .panel-header-right {
               display: flex;
               align-items: center;
               gap: spacing.$spacing-02;
+              flex-shrink: 0;
 
               .panel-size {
                 color: #c6c6c6;

@@ -29,8 +29,9 @@ type WSClient struct {
 
 // AISessionService handles AI session business logic
 type AISessionService struct {
-	sessionRepo *repository.AISessionRepository
-	chartRepo   *repository.ChartRepository
+	sessionRepo   *repository.AISessionRepository
+	chartRepo     *repository.ChartRepository
+	dashboardRepo *repository.DashboardRepository
 
 	// WebSocket client management
 	clients   map[string]map[string]*WSClient // sessionID -> clientID -> client
@@ -38,11 +39,12 @@ type AISessionService struct {
 }
 
 // NewAISessionService creates a new AI session service
-func NewAISessionService(sessionRepo *repository.AISessionRepository, chartRepo *repository.ChartRepository) *AISessionService {
+func NewAISessionService(sessionRepo *repository.AISessionRepository, chartRepo *repository.ChartRepository, dashboardRepo *repository.DashboardRepository) *AISessionService {
 	return &AISessionService{
-		sessionRepo: sessionRepo,
-		chartRepo:   chartRepo,
-		clients:     make(map[string]map[string]*WSClient),
+		sessionRepo:   sessionRepo,
+		chartRepo:     chartRepo,
+		dashboardRepo: dashboardRepo,
+		clients:       make(map[string]map[string]*WSClient),
 	}
 }
 
@@ -115,6 +117,23 @@ func (s *AISessionService) CreateSession(ctx context.Context, req *models.Create
 			Name:    fmt.Sprintf("Untitled Chart %s", chartID[:8]),
 		}
 		chartVersion = 1
+
+		// Apply pre-flight context to the draft
+		if req.ComponentType != "" {
+			chart.ComponentType = req.ComponentType
+		}
+		if req.ChartType != "" {
+			chart.ChartType = req.ChartType
+		}
+		if req.ConnectionID != "" {
+			chart.DatasourceID = req.ConnectionID
+		}
+		if req.ControlType != "" {
+			if chart.ControlConfig == nil {
+				chart.ControlConfig = &models.ControlConfig{}
+			}
+			chart.ControlConfig.ControlType = req.ControlType
+		}
 	}
 
 	// Create the session
@@ -124,6 +143,8 @@ func (s *AISessionService) CreateSession(ctx context.Context, req *models.Create
 		ChartVersion: chartVersion,
 		Messages:     []models.AIMessage{},
 		Status:       models.AISessionStatusActive,
+		DashboardID:  req.DashboardID,
+		PanelID:      req.PanelID,
 	}
 
 	// Link chart to session

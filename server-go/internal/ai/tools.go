@@ -12,14 +12,57 @@ import (
 func GetAnthropicTools() []anthropic.ToolUnionParam {
 	toolParams := []anthropic.ToolParam{
 		{
-			Name:        "update_chart_config",
-			Description: anthropic.String("Update basic chart configuration like description and chart type. Note: Chart name is set by the user when saving, do NOT try to set the name."),
+			Name:        "update_component_type",
+			Description: anthropic.String("Set the component type for the current draft. Call this first when creating a control or display component. For charts, this is set automatically."),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
-					"description": map[string]interface{}{"type": "string", "description": "Chart description"},
+					"component_type": map[string]interface{}{
+						"type":        "string",
+						"description": "Component type",
+						"enum":        []string{"chart", "control", "display"},
+					},
+				},
+				Required: []string{"component_type"},
+			},
+		},
+		{
+			Name:        "update_control_config",
+			Description: anthropic.String(`Configure a control component. Sets the control type, connection, target device, command configuration, and UI settings.
+
+Control types and their UI config:
+- button: { label, kind (primary/secondary/danger/ghost) }
+- toggle: { label, offLabel }
+- slider: { label, min, max, step }
+- text_input: { label, placeholder, submitLabel }
+- plug: { label, onLabel, offLabel }
+- dimmer: { label, min, max, step }`),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"control_type": map[string]interface{}{
+						"type":        "string",
+						"description": "Type of control",
+						"enum":        []string{"button", "toggle", "slider", "text_input", "plug", "dimmer"},
+					},
+					"connection_id": map[string]interface{}{"type": "string", "description": "ID of the connection to send commands through (e.g., MQTT, WebSocket)"},
+					"target": map[string]interface{}{"type": "string", "description": "Device or endpoint identifier for command targeting"},
+					"device_type_id": map[string]interface{}{"type": "string", "description": "Reference to a device type for template-based command generation"},
+					"command_action": map[string]interface{}{"type": "string", "description": "Command action name (e.g., 'set_power', 'set_level', 'send')"},
+					"command_target": map[string]interface{}{"type": "string", "description": "Command target identifier"},
+					"payload_template": map[string]interface{}{"type": "object", "description": "Payload template with {{value}} placeholder for dynamic values"},
+					"ui_config": map[string]interface{}{"type": "object", "description": "Type-specific UI configuration (label, min, max, step, kind, etc.)"},
+				},
+				Required: []string{"control_type"},
+			},
+		},
+		{
+			Name:        "update_component_config",
+			Description: anthropic.String("Update basic component configuration like description and chart type. Note: Component name is set by the user when saving, do NOT try to set the name."),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"description": map[string]interface{}{"type": "string", "description": "Component description"},
 					"chart_type": map[string]interface{}{
 						"type":        "string",
-						"description": "Type of chart",
+						"description": "Type of chart (only for chart components)",
 						"enum":        []string{"bar", "line", "area", "pie", "scatter", "gauge", "heatmap", "radar", "funnel", "dataview", "custom"},
 					},
 				},
@@ -30,7 +73,7 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 			Description: anthropic.String("Configure how data maps to chart axes and series"),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
-					"datasource_id":  map[string]interface{}{"type": "string", "description": "ID of the data source to use"},
+					"datasource_id":  map[string]interface{}{"type": "string", "description": "ID of the connection to use"},
 					"x_axis":         map[string]interface{}{"type": "string", "description": "Column for X axis"},
 					"x_axis_label":   map[string]interface{}{"type": "string", "description": "Label for X axis"},
 					"x_axis_format":  map[string]interface{}{"type": "string", "description": "Format for X axis values"},
@@ -127,7 +170,7 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 		},
 		{
 			Name:        "set_custom_code",
-			Description: anthropic.String("Enable custom code mode and set React component code. Use this for complex charts not supported by standard config."),
+			Description: anthropic.String("Enable custom code mode and set React component code. Use this for complex components not supported by standard config."),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
 					"component_code": map[string]interface{}{"type": "string", "description": "Full React component code"},
@@ -152,28 +195,35 @@ func GetAnthropicTools() []anthropic.ToolUnionParam {
 			},
 		},
 		{
-			Name:        "query_datasource",
-			Description: anthropic.String("Execute a test query against a data source to see sample data"),
+			Name:        "query_connection",
+			Description: anthropic.String("Execute a test query against a connection to see sample data"),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
-					"datasource_id": map[string]interface{}{"type": "string", "description": "ID of the data source"},
+					"connection_id": map[string]interface{}{"type": "string", "description": "ID of the connection"},
 					"query":         map[string]interface{}{"type": "string", "description": "Query to execute (SQL, filter, etc.)"},
 					"limit":         map[string]interface{}{"type": "integer", "description": "Maximum rows to return", "default": 10},
 				},
-				Required: []string{"datasource_id"},
+				Required: []string{"connection_id"},
 			},
 		},
 		{
-			Name:        "list_datasources",
-			Description: anthropic.String("List all available data sources with their types and descriptions"),
+			Name:        "list_connections",
+			Description: anthropic.String("List all available connections with their types and descriptions"),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{},
+			},
+		},
+		{
+			Name:        "list_device_types",
+			Description: anthropic.String("List all available device types. Device types define how controls communicate with devices (command templates, value mappings, etc.). REQUIRED when creating controls - you must set device_type_id to match the target device."),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{},
 			},
 		},
 		{
 			Name: "get_schema",
-			Description: anthropic.String(`Get the schema for a data source including column names, types, and unique values.
-Works for all data source types (SQL, Prometheus, EdgeLake, API, CSV, Socket, TSStore).
+			Description: anthropic.String(`Get the schema for a connection including column names, types, and unique values.
+Works for all connection types (SQL, Prometheus, EdgeLake, API, CSV, Socket, TSStore).
 
 Returns:
 - Column names and inferred types (timestamp, integer, float, string, boolean)
@@ -185,14 +235,14 @@ For SQL and EdgeLake: Returns tables with columns
 For Prometheus: Returns metrics and labels
 For API/CSV/Socket/TSStore: Infers schema from sample data
 
-Use this BEFORE configuring chart data mapping to understand the data structure.`),
+Use this BEFORE configuring data mapping to understand the data structure.`),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
-					"datasource_id": map[string]interface{}{"type": "string", "description": "ID of the data source"},
+					"connection_id": map[string]interface{}{"type": "string", "description": "ID of the connection"},
 					"table":         map[string]interface{}{"type": "string", "description": "Table name (optional, for SQL/EdgeLake when you want columns for a specific table)"},
 					"database":      map[string]interface{}{"type": "string", "description": "Database name (optional, for EdgeLake)"},
 				},
-				Required: []string{"datasource_id"},
+				Required: []string{"connection_id"},
 			},
 		},
 		{
@@ -229,7 +279,7 @@ Use this BEFORE configuring chart data mapping to understand the data structure.
 		},
 		{
 			Name:        "preview_data",
-			Description: anthropic.String("Get sample data for the current chart configuration"),
+			Description: anthropic.String("Get sample data for the current component configuration"),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
 					"limit": map[string]interface{}{"type": "integer", "description": "Maximum rows to return", "default": 10},
@@ -237,16 +287,16 @@ Use this BEFORE configuring chart data mapping to understand the data structure.
 			},
 		},
 		{
-			Name:        "get_chart_state",
-			Description: anthropic.String("Get the current state of the chart being edited"),
+			Name:        "get_component_state",
+			Description: anthropic.String("Get the current state of the component being edited"),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{},
 			},
 		},
 		{
-			Name: "get_chart_template",
+			Name: "get_component_template",
 			Description: anthropic.String(`Get a React component template for a chart type.
-Call AFTER setting chart_type with update_chart_config.
+Call AFTER setting chart_type with update_component_config.
 Returns Carbon g100 dark theme styled code to customize with your column names.
 For non-standard charts, use "custom" to get general formatting guidelines and color tokens.`),
 			InputSchema: anthropic.ToolInputSchemaParam{
@@ -284,7 +334,9 @@ For non-standard charts, use "custom" to get general formatting guidelines and c
 
 // ToolName constants for easier reference
 const (
-	ToolUpdateChartConfig     = "update_chart_config"
+	ToolUpdateComponentType   = "update_component_type"
+	ToolUpdateControlConfig   = "update_control_config"
+	ToolUpdateComponentConfig = "update_component_config"
 	ToolUpdateDataMapping     = "update_data_mapping"
 	ToolUpdateQueryConfig     = "update_query_config"
 	ToolUpdateFilters         = "update_filters"
@@ -293,22 +345,24 @@ const (
 	ToolUpdateTimeBucket      = "update_time_bucket"
 	ToolSetCustomCode         = "set_custom_code"
 	ToolUpdateChartOptions    = "update_chart_options"
-	ToolQueryDatasource       = "query_datasource"
-	ToolListDatasources       = "list_datasources"
+	ToolQueryConnection       = "query_connection"
+	ToolListConnections       = "list_connections"
 	ToolGetSchema             = "get_schema"
 	ToolGetDatasourceSchema   = "get_datasource_schema"   // Deprecated
 	ToolGetPrometheusSchema   = "get_prometheus_schema"   // Deprecated
 	ToolGetEdgeLakeSchema     = "get_edgelake_schema"     // Deprecated
+	ToolListDeviceTypes       = "list_device_types"
 	ToolPreviewData           = "preview_data"
-	ToolGetChartState         = "get_chart_state"
-	ToolGetChartTemplate      = "get_chart_template"
+	ToolGetComponentState     = "get_component_state"
+	ToolGetComponentTemplate  = "get_component_template"
 	ToolSuggestMissing        = "suggest_missing_tools" // Deprecated
 )
 
-// IsChartUpdateTool returns true if the tool modifies the chart
-func IsChartUpdateTool(toolName string) bool {
+// IsComponentUpdateTool returns true if the tool modifies the component
+func IsComponentUpdateTool(toolName string) bool {
 	switch toolName {
-	case ToolUpdateChartConfig, ToolUpdateDataMapping, ToolUpdateQueryConfig,
+	case ToolUpdateComponentType, ToolUpdateControlConfig,
+		ToolUpdateComponentConfig, ToolUpdateDataMapping, ToolUpdateQueryConfig,
 		ToolUpdateFilters, ToolUpdateAggregation, ToolUpdateSlidingWindow, ToolUpdateTimeBucket, ToolSetCustomCode, ToolUpdateChartOptions:
 		return true
 	default:

@@ -26,12 +26,16 @@ import {
   Edit,
   View,
   ChartBar,
+  TouchInteraction,
+  VideoPlayer,
   Information,
   ZoomIn,
   ZoomOut,
   ArrowLeft
 } from '@carbon/icons-react';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
+import ControlRenderer from '../components/controls/ControlRenderer';
+import FrigateCameraViewer from '../components/frigate/FrigateCameraViewer';
 import ChartEditorModal from '../components/ChartEditorModal';
 import PanelEditMenu from '../components/PanelEditMenu';
 import ComponentPickerModal from '../components/ComponentPickerModal';
@@ -137,11 +141,20 @@ function DashboardDetailPage() {
   const CELL_HEIGHT = 36;
 
   // Calculate grid dimensions based on selected dimension preset
+  // The viewer has chrome that reduces the available area:
+  //   - App header: 48px, viewer toolbar: 57px, grid padding: 8px top + 8px bottom
+  // The viewer grid uses 8px gaps between cells, so each cell effectively uses
+  //   cellSize + gap pixels, except the last cell (no trailing gap).
+  // Formula: N * cellSize + (N-1) * gap + padding <= screenDimension
+  //   => N <= (available + gap) / (cellSize + gap)
+  const VIEWER_CHROME_V = 113; // 48 + 57 + 8 (top padding only, bottom can bleed)
+  const VIEWER_CHROME_H = 8;   // 8px left padding only, right can bleed
+  const VIEWER_GAP = 8;        // spacing.$spacing-03 gap between cells
   const currentDim = dimensions.find(d => d.name === currentDimension);
-  const gridWidth = currentDim?.max_width || 1920;
-  const gridHeight = currentDim?.max_height || 1080;
-  const GRID_COLS = Math.floor(gridWidth / CELL_WIDTH);
-  const GRID_ROWS = Math.floor(gridHeight / CELL_HEIGHT);
+  const availableWidth = (currentDim?.max_width || 1920) - VIEWER_CHROME_H;
+  const availableHeight = (currentDim?.max_height || 1080) - VIEWER_CHROME_V;
+  const GRID_COLS = Math.floor((availableWidth + VIEWER_GAP) / (CELL_WIDTH + VIEWER_GAP));
+  const GRID_ROWS = Math.floor((availableHeight + VIEWER_GAP) / (CELL_HEIGHT + VIEWER_GAP));
   const OVERFLOW_ROWS = 10; // Extra rows below visible area for drawing new panels
 
   // Get minimum panel size based on assigned component's subtype
@@ -159,6 +172,7 @@ function DashboardDetailPage() {
       fetchDashboard();
     }
   }, [id]);
+
 
   // Load layout dimensions on mount
   useEffect(() => {
@@ -297,10 +311,21 @@ function DashboardDetailPage() {
 
       // Load panels (now contain chart_id references)
       if (data.panels && data.panels.length > 0) {
-        setPanels(data.panels);
+        let loadedPanels = data.panels;
 
-        // Fetch all referenced charts
-        const chartIds = [...new Set(data.panels.map(p => p.chart_id).filter(Boolean))];
+        // If returning from AI builder with a component to attach, apply it now
+        const { attachComponentId, attachPanelId } = location.state || {};
+        if (attachComponentId && attachPanelId) {
+          loadedPanels = loadedPanels.map(p =>
+            p.id === attachPanelId ? { ...p, chart_id: attachComponentId } : p
+          );
+          setHasChanges(true);
+        }
+
+        setPanels(loadedPanels);
+
+        // Fetch all referenced charts (including the newly attached one)
+        const chartIds = [...new Set(loadedPanels.map(p => p.chart_id).filter(Boolean))];
         if (chartIds.length > 0) {
           const chartPromises = chartIds.map(chartId => apiClient.getChart(chartId).catch(() => null));
           const charts = await Promise.all(chartPromises);
@@ -503,17 +528,50 @@ function DashboardDetailPage() {
     setAiPreflightOpen(true);
   };
 
-  const handleAIPreflightContinue = (context) => {
+  const handleAIPreflightContinue = async (context) => {
     setAiPreflightOpen(false);
-    const returnUrl = isCreateMode ? '/design/dashboards' : `/design/dashboards/${id}`;
-    navigate('/design/charts/ai/new', {
-      state: {
-        ...context,
-        from: returnUrl,
-        panelId: aiPreflightPanelId
-      }
-    });
+    const panelId = aiPreflightPanelId;
     setAiPreflightPanelId(null);
+
+    // Auto-save the dashboard before navigating to the AI builder
+    // so the panel persists when we return and re-fetch from the server
+    try {
+      const payload = {
+        name,
+        description,
+        panels,
+        settings: {
+          theme,
+          refresh_interval: refreshInterval,
+          title_scale: titleScale,
+          is_public: isPublic,
+          allow_export: allowExport,
+          layout_dimension: currentDimension
+        }
+      };
+
+      let dashboardId = id;
+      if (isCreateMode) {
+        const data = await apiClient.createDashboard(payload);
+        dashboardId = data.id;
+        // Navigate to the real URL so we're no longer in create mode when we return
+        window.history.replaceState({}, '', `/design/dashboards/${dashboardId}`);
+      } else {
+        await apiClient.updateDashboard(id, payload);
+      }
+      setHasChanges(false);
+
+      navigate('/design/charts/ai/new', {
+        state: {
+          ...context,
+          from: `/design/dashboards/${dashboardId}`,
+          dashboardId,
+          panelId
+        }
+      });
+    } catch (err) {
+      console.error('Failed to save dashboard before AI builder:', err);
+    }
   };
 
   // Grid mouse handlers for Layout Mode
@@ -1265,7 +1323,7 @@ function DashboardDetailPage() {
                     }}
                     style={{ cursor: isDesignMode ? 'move' : 'default' }}
                   >
-                    <span className="panel-id">{chart?.title || chart?.name || panel.id}</span>
+                    <span className="panel-id">{chart?.title || chart?.name || 'Empty'}</span>
                     <div className="panel-header-right">
                       <span className="panel-size">{panel.w}×{panel.h}</span>
                       {isDesignMode && (
@@ -1288,20 +1346,32 @@ function DashboardDetailPage() {
                   <div className="panel-body">
                     {isPreviewMode && hasChart ? (
                       <div className="component-preview">
-                        <DynamicComponentLoader
-                          code={chart.component_code}
-                          props={{}}
-                          dataMapping={chart.data_mapping}
-                          datasourceId={chart.datasource_id}
-                          queryConfig={chart.query_config}
-                        />
+                        {chart.component_type === 'control' ? (
+                          <ControlRenderer control={chart} />
+                        ) : chart.component_type === 'display' ? (
+                          <FrigateCameraViewer config={chart.display_config} />
+                        ) : (
+                          <DynamicComponentLoader
+                            code={chart.component_code}
+                            props={{}}
+                            dataMapping={chart.data_mapping}
+                            datasourceId={chart.datasource_id}
+                            queryConfig={chart.query_config}
+                          />
+                        )}
                       </div>
                     ) : isDesignMode ? (
                       <div className="design-body">
                         {hasChart ? (
                           <div className="chart-info">
                             <div className="chart-title">
-                              <ChartBar size={20} />
+                              {chart.component_type === 'control' ? (
+                                <TouchInteraction size={20} />
+                              ) : chart.component_type === 'display' ? (
+                                <VideoPlayer size={20} />
+                              ) : (
+                                <ChartBar size={20} />
+                              )}
                               <span className="chart-name">{chart.title || chart.name}</span>
                             </div>
                             <PanelEditMenu
@@ -1314,7 +1384,7 @@ function DashboardDetailPage() {
                                 openChartEditor(panel.id, null);
                               }}
                               onNewWithAI={() => openAIPreflightModal(panel.id)}
-                              onSelectExisting={() => openComponentPicker(panel.id, 'chart')}
+                              onSelectExisting={() => openComponentPicker(panel.id, 'all')}
                             />
                           </div>
                         ) : (
@@ -1324,7 +1394,7 @@ function DashboardDetailPage() {
                               hasExisting={false}
                               onNew={() => openChartEditor(panel.id, null)}
                               onNewWithAI={() => openAIPreflightModal(panel.id)}
-                              onSelectExisting={() => openComponentPicker(panel.id, 'chart')}
+                              onSelectExisting={() => openComponentPicker(panel.id, 'all')}
                             />
                           </div>
                         )}

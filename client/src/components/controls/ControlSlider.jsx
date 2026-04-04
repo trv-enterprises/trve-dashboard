@@ -2,13 +2,12 @@
 // Licensed under Apache 2.0
 // See LICENSE file for details.
 
-import { useState, useEffect, useCallback, useRef } from 'react';
 import { Slider, Button, InlineLoading } from '@carbon/react';
 import { Send } from '@carbon/icons-react';
 import PropTypes from 'prop-types';
-import apiClient from '../../api/client';
-import StreamConnectionManager from '../../utils/streamConnectionManager';
-import { useNotifications } from '../../context/NotificationContext';
+import { useControlState } from './useControlState';
+import { useControlCommand } from './useControlCommand';
+import { registerControl } from './controlRegistry';
 import './controls.scss';
 
 /**
@@ -17,84 +16,37 @@ import './controls.scss';
  * A slider control that sends numeric values.
  * Subscribes to MQTT state topic for live external updates.
  */
-function ControlSlider({ control, onSuccess, onError }) {
-  const [loading, setLoading] = useState(false);
-  const { addNotification } = useNotifications();
-  const suppressUntilRef = useRef(0);
-
+function ControlSlider({ control, readOnly = false, onSuccess, onError }) {
   const uiConfig = control.control_config?.ui_config || {};
   const label = uiConfig.label || 'Value';
   const min = uiConfig.min ?? 0;
   const max = uiConfig.max ?? 100;
   const step = uiConfig.step ?? 1;
   const sendOnRelease = uiConfig.send_on_release !== false;
-  const target = control.control_config?.target || '';
-  const connectionId = control.connection_id;
-  const stateField = uiConfig.state_field || 'value';
 
-  const [value, setValue] = useState(min);
+  const { value, setValue, suppress, clearSuppress } = useControlState({
+    connectionId: control.connection_id,
+    target: control.control_config?.target || '',
+    stateField: uiConfig.state_field || 'value',
+    transform: (raw) => typeof raw === 'number' ? raw : undefined,
+    initialValue: min
+  });
 
-  // Derive state topic from command target (strip /set suffix)
-  const stateTopic = target.endsWith('/set') ? target.slice(0, -4) : '';
+  const { execute, loading } = useControlCommand({
+    controlId: control.id,
+    label,
+    target: control.control_config?.target || '',
+    onSuppress: suppress,
+    onClearSuppress: clearSuppress,
+    onSuccess,
+    onError
+  });
 
-  // Subscribe to state topic for live updates
-  useEffect(() => {
-    if (!connectionId || !stateTopic) return;
+  const sendValue = (v) => execute(v, `${label} set to ${v}`);
 
-    const manager = StreamConnectionManager.getInstance();
-    const unsubscribe = manager.subscribe(connectionId, (record) => {
-      if (record.topic && record.topic !== stateTopic) return;
-      if (Date.now() < suppressUntilRef.current) return;
-
-      const newValue = record[stateField];
-      if (newValue === undefined || typeof newValue !== 'number') return;
-
-      setValue(newValue);
-    }, {
-      topics: stateTopic
-    });
-
-    return () => unsubscribe();
-  }, [connectionId, stateTopic, stateField]);
-
-  const sendValue = useCallback(async (valueToSend) => {
-    setLoading(true);
-    suppressUntilRef.current = Date.now() + 3000;
-
-    try {
-      const result = await apiClient.executeControlCommand(control.id, valueToSend);
-      addNotification({
-        kind: 'success',
-        title: `${label} set to ${valueToSend}`,
-        subtitle: target ? `Published to ${target}` : result.message
-      });
-      if (onSuccess) onSuccess(result);
-    } catch (err) {
-      suppressUntilRef.current = 0;
-      addNotification({
-        kind: 'error',
-        title: `${label} command failed`,
-        subtitle: err.message
-      });
-      if (onError) onError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [control.id, label, target, onSuccess, onError, addNotification]);
-
-  const handleChange = ({ value: newValue }) => {
-    setValue(newValue);
-  };
-
-  const handleRelease = () => {
-    if (sendOnRelease) {
-      sendValue(value);
-    }
-  };
-
-  const handleSendClick = () => {
-    sendValue(value);
-  };
+  const handleChange = ({ value: newValue }) => setValue(newValue);
+  const handleRelease = () => { if (sendOnRelease && !readOnly) sendValue(value); };
+  const handleSendClick = () => sendValue(value);
 
   return (
     <div className="control-slider-container">
@@ -112,10 +64,10 @@ function ControlSlider({ control, onSuccess, onError }) {
           value={value}
           onChange={handleChange}
           onRelease={handleRelease}
-          disabled={loading}
+          disabled={loading || readOnly}
           hideTextInput
         />
-        {!sendOnRelease && (
+        {!sendOnRelease && !readOnly && (
           <Button
             kind="primary"
             size="sm"
@@ -126,9 +78,7 @@ function ControlSlider({ control, onSuccess, onError }) {
             disabled={loading}
           />
         )}
-        {loading && (
-          <InlineLoading description="" className="slider-loading" />
-        )}
+        {loading && <InlineLoading description="" className="slider-loading" />}
       </div>
     </div>
   );
@@ -143,8 +93,10 @@ ControlSlider.propTypes = {
       ui_config: PropTypes.object
     })
   }).isRequired,
+  readOnly: PropTypes.bool,
   onSuccess: PropTypes.func,
   onError: PropTypes.func
 };
 
+registerControl('slider', ControlSlider);
 export default ControlSlider;

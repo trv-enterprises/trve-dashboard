@@ -17,76 +17,10 @@ export { default as ControlPlug } from './ControlPlug';
 export { default as ControlDimmer } from './ControlDimmer';
 export { default as ControlRenderer } from './ControlRenderer';
 
-// Control type constants - must match backend models.ControlType* constants
-export const CONTROL_TYPES = {
-  BUTTON: 'button',
-  TOGGLE: 'toggle',
-  SLIDER: 'slider',
-  TEXT_INPUT: 'text_input',
-  PLUG: 'plug',
-  DIMMER: 'dimmer'
-};
+// Shared hooks and utilities
+export { useControlState } from './useControlState';
+export { useControlCommand } from './useControlCommand';
+export * from './controlUtils';
 
-// Control type metadata for UI
-export const CONTROL_TYPE_INFO = {
-  [CONTROL_TYPES.BUTTON]: {
-    label: 'Button',
-    description: 'Simple action button that triggers a command when clicked',
-    icon: 'TouchInteraction',
-    defaultUIConfig: {
-      label: 'Execute',
-      kind: 'primary' // primary, secondary, danger, ghost
-    }
-  },
-  [CONTROL_TYPES.TOGGLE]: {
-    label: 'Toggle',
-    description: 'On/off switch that sends true or false',
-    icon: 'Toggle',
-    defaultUIConfig: {
-      label: 'Enable',
-      offLabel: 'Disable'
-    }
-  },
-  [CONTROL_TYPES.SLIDER]: {
-    label: 'Slider',
-    description: 'Numeric slider for setting values within a range',
-    icon: 'Slider',
-    defaultUIConfig: {
-      label: 'Value',
-      min: 0,
-      max: 100,
-      step: 1
-    }
-  },
-  [CONTROL_TYPES.TEXT_INPUT]: {
-    label: 'Text Input',
-    description: 'Text field for entering custom values or commands',
-    icon: 'TextInput',
-    defaultUIConfig: {
-      label: 'Command',
-      placeholder: 'Enter value...',
-      submitLabel: 'Send'
-    }
-  },
-  [CONTROL_TYPES.PLUG]: {
-    label: 'Plug',
-    description: 'Smart plug toggle with HomeKit-style pill design',
-    icon: 'Power',
-    defaultUIConfig: {
-      label: 'Plug',
-      onLabel: 'On',
-      offLabel: 'Off'
-    }
-  },
-  [CONTROL_TYPES.DIMMER]: {
-    label: 'Dimmer',
-    description: 'Vertical slider for dimming lights, drag to set level',
-    icon: 'Light',
-    defaultUIConfig: {
-      label: 'Light',
-      min: 0,
-      max: 100,
-      step: 1
-    }
-  }
-};
+// Re-export types and metadata from controlTypes (avoids circular deps)
+export { CONTROL_TYPES, CONTROL_TYPE_INFO, CONTROL_CATEGORIES } from './controlTypes';

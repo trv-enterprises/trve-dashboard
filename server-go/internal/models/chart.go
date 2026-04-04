@@ -18,6 +18,12 @@ const (
 const (
 	ComponentTypeChart   = "chart"   // Default - data visualization chart
 	ComponentTypeControl = "control" // Interactive control component
+	ComponentTypeDisplay = "display" // Non-chart visual component (cameras, iframes, etc.)
+)
+
+// Display type constants
+const (
+	DisplayTypeFrigateCamera = "frigate_camera" // Frigate NVR camera viewer
 )
 
 // Control type constants
@@ -53,6 +59,19 @@ type CommandConfig struct {
 	PayloadTemplate map[string]interface{} `json:"payload_template,omitempty" bson:"payload_template,omitempty"` // Template with {{value}} placeholder
 }
 
+// DisplayConfig defines configuration for display components
+// @Description Configuration for non-chart visual components (cameras, iframes, etc.)
+type DisplayConfig struct {
+	DisplayType string `json:"display_type" bson:"display_type"` // "frigate_camera" (future: "datatable", "iframe", etc.)
+
+	// Frigate-specific fields (only used when display_type = "frigate_camera")
+	FrigateConnectionID string `json:"frigate_connection_id,omitempty" bson:"frigate_connection_id,omitempty"` // API connection to Frigate NVR
+	DefaultCamera       string `json:"default_camera,omitempty" bson:"default_camera,omitempty"`               // Pre-selected camera name
+	MqttConnectionID    string `json:"mqtt_connection_id,omitempty" bson:"mqtt_connection_id,omitempty"`       // MQTT connection for alert subscription
+	AlertTopic          string `json:"alert_topic,omitempty" bson:"alert_topic,omitempty"`                     // MQTT topic for alerts (default: "frigate/reviews")
+	SnapshotInterval    int    `json:"snapshot_interval,omitempty" bson:"snapshot_interval,omitempty"`          // Polling interval in ms (default 10000)
+}
+
 // Chart represents a standalone chart or control configuration
 // @Description Chart/Control with data source binding, query config, and visualization settings
 // Primary key is composite (id, version) - id stays same across versions
@@ -69,6 +88,7 @@ type Chart struct {
 	QueryConfig   *ChartQueryConfig      `json:"query_config" bson:"query_config"`       // How to query data (charts only)
 	DataMapping   *ChartDataMapping      `json:"data_mapping" bson:"data_mapping"`       // How to map data to chart (charts only)
 	ControlConfig *ControlConfig         `json:"control_config,omitempty" bson:"control_config,omitempty"` // Control configuration (controls only)
+	DisplayConfig *DisplayConfig         `json:"display_config,omitempty" bson:"display_config,omitempty"` // Display configuration (displays only)
 	ComponentCode string                 `json:"component_code" bson:"component_code"`   // React component code
 	UseCustomCode bool                   `json:"use_custom_code" bson:"use_custom_code"` // Whether custom code mode is enabled
 	Options       map[string]interface{} `json:"options" bson:"options"`                 // ECharts options overrides (charts only)
@@ -91,6 +111,7 @@ type CreateChartRequest struct {
 	QueryConfig   *ChartQueryConfig      `json:"query_config"`
 	DataMapping   *ChartDataMapping      `json:"data_mapping"`
 	ControlConfig *ControlConfig         `json:"control_config"`
+	DisplayConfig *DisplayConfig         `json:"display_config"`
 	ComponentCode string                 `json:"component_code"`
 	UseCustomCode bool                   `json:"use_custom_code"`
 	Options       map[string]interface{} `json:"options"`
@@ -98,8 +119,8 @@ type CreateChartRequest struct {
 	Tags          []string               `json:"tags"`
 }
 
-// UpdateChartRequest represents a request to update a chart or control
-// @Description Request body for updating an existing chart or control
+// UpdateChartRequest represents a request to update a chart, control, or display
+// @Description Request body for updating an existing chart, control, or display
 type UpdateChartRequest struct {
 	ComponentType *string                 `json:"component_type,omitempty"`
 	Name          *string                 `json:"name,omitempty"`
@@ -110,6 +131,7 @@ type UpdateChartRequest struct {
 	QueryConfig   *ChartQueryConfig       `json:"query_config,omitempty"`
 	DataMapping   *ChartDataMapping       `json:"data_mapping,omitempty"`
 	ControlConfig *ControlConfig          `json:"control_config,omitempty"`
+	DisplayConfig *DisplayConfig          `json:"display_config,omitempty"`
 	ComponentCode *string                 `json:"component_code,omitempty"`
 	UseCustomCode *bool                   `json:"use_custom_code,omitempty"`
 	Options       *map[string]interface{} `json:"options,omitempty"`

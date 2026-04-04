@@ -455,6 +455,43 @@ const Component = () => {
 };
 ```
 
+## Control Components
+
+Controls are interactive UI elements (buttons, toggles, sliders, plugs, dimmers) that send commands to connections (MQTT, WebSocket). They live in `client/src/components/controls/`.
+
+### Architecture
+
+- **Shared hooks**: `useControlState` (MQTT subscription) and `useControlCommand` (command execution + notifications)
+- **Shared utilities**: `controlUtils.js` (topic derivation, boolean normalization, state extraction)
+- **Self-registration**: Controls call `registerControl(type, Component)` at module load. `ControlRenderer` looks up components from the registry — no manual switch/map needed.
+- **Type metadata**: `controlTypes.js` defines `CONTROL_TYPES`, `CONTROL_TYPE_INFO` (labels, icons, categories, capabilities, default UI config), and `CONTROL_CATEGORIES`
+- **Barrel export**: `index.js` re-exports all controls, hooks, utils, and types. Importing a control triggers its self-registration.
+
+### Adding a New Control Type
+
+1. **Create the component** in `controls/ControlMyType.jsx`:
+   - Use `useControlState` for MQTT state subscription (if the control reads state)
+   - Use `useControlCommand` for sending commands (if the control is writable)
+   - Accept `readOnly` prop to support state-only mode
+   - Call `registerControl('mytype', ControlMyType)` before the default export
+   - Import `./controls.scss` and add styles there
+
+2. **Add metadata** in `controls/controlTypes.js`:
+   - Add to `CONTROL_TYPES` constant
+   - Add to `CONTROL_TYPE_INFO` with: `label`, `description`, `icon` (MDI name), `category`, `canWrite`, `canRead`, `defaultUIConfig` (including `state_field`)
+
+3. **Add export** in `controls/index.js`:
+   - Add `export { default as ControlMyType } from './ControlMyType'`
+   - (This triggers the self-registration — no changes to ControlRenderer needed)
+
+4. **Backend**: Add the control type constant in `server-go/internal/models/chart.go` (`ControlType*` constants)
+
+5. **AI support**: Update `update_control_config` tool enum in `server-go/internal/ai/tools.go` and control types list in `server-go/internal/ai/system_prompt.go`
+
+### Read-Only Controls
+
+Controls with `canWrite: false` in `CONTROL_TYPE_INFO` are automatically passed `readOnly={true}` by `ControlRenderer`. Use this for state indicators (garage door status, temperature sensors, door/window contacts) that subscribe to MQTT but don't send commands. The `useControlCommand` hook is not needed for read-only controls.
+
 ## Grid System
 
 12-column grid with 32px row height (based on Carbon $spacing-08):

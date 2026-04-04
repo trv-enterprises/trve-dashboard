@@ -12,12 +12,12 @@ import apiClient from '../api/client';
  * - Session creation and lifecycle
  * - WebSocket subscription for real-time updates
  * - Message history
- * - Chart preview state
+ * - Component preview state
  */
-export function useAISession(chartId = null) {
+export function useAISession(chartId = null, preflightContext = {}) {
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [chart, setChart] = useState(null);
+  const [component, setComponent] = useState(null);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
@@ -42,14 +42,14 @@ export function useAISession(chartId = null) {
     setError(null);
 
     try {
-      const response = await apiClient.createAISession(chartId);
+      const response = await apiClient.createAISession(chartId, preflightContext);
       // API returns {session: {...}, chart: {...}}
       setSession(response.session);
       sessionIdRef.current = response.session.id;
 
-      // Set initial chart state if provided
+      // Set initial component state if provided
       if (response.chart) {
-        setChart(response.chart);
+        setComponent(response.chart);
       }
 
       // Set initial messages if any
@@ -65,7 +65,7 @@ export function useAISession(chartId = null) {
     } finally {
       setLoading(false);
     }
-  }, [chartId]);
+  }, [chartId, preflightContext]);
 
   // Connect to WebSocket
   const connectWebSocket = useCallback(() => {
@@ -175,10 +175,10 @@ export function useAISession(chartId = null) {
         break;
 
       case 'chart_update':
-        // Chart was modified by AI
-        console.log('[WS] Chart update received:', eventData.chart?.id, 'type:', eventData.chart?.chart_type, 'datasource:', eventData.chart?.datasource_id);
+        // Component was modified by AI
+        console.log('[WS] Component update received:', eventData.chart?.id, 'type:', eventData.chart?.chart_type);
         if (eventData.chart) {
-          setChart(eventData.chart);
+          setComponent(eventData.chart);
         }
         break;
 
@@ -237,14 +237,14 @@ export function useAISession(chartId = null) {
   }, []);
 
   // Save the session (publish draft as final)
-  const saveSession = useCallback(async (chartName) => {
+  const saveSession = useCallback(async (componentName) => {
     if (!sessionIdRef.current) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const result = await apiClient.saveAISession(sessionIdRef.current, chartName);
+      const result = await apiClient.saveAISession(sessionIdRef.current, componentName);
       return result;
     } catch (err) {
       setError(err.message);
@@ -273,7 +273,7 @@ export function useAISession(chartId = null) {
       }
       setSession(null);
       setMessages([]);
-      setChart(null);
+      setComponent(null);
       sessionIdRef.current = null;
       // Keep startingRef.current = true to prevent useEffect from restarting session
       // after cancel. The component will unmount/navigate away, and a fresh mount
@@ -316,7 +316,7 @@ export function useAISession(chartId = null) {
     // State
     session,
     messages,
-    chart,
+    component,
     loading,
     sending,
     error,

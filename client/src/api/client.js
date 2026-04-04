@@ -391,6 +391,31 @@ class APIClient {
     });
   }
 
+  // Frigate NVR proxy endpoints
+  async getFrigateCameras(connectionId) {
+    return this.request(`/api/frigate/${connectionId}/cameras`);
+  }
+
+  getFrigateSnapshotUrl(connectionId, camera) {
+    return `${this.baseURL}/api/frigate/${connectionId}/snapshot/${encodeURIComponent(camera)}`;
+  }
+
+  async getFrigateEvents(connectionId, camera, limit = 10) {
+    return this.request(`/api/frigate/${connectionId}/events/${encodeURIComponent(camera)}?limit=${limit}`);
+  }
+
+  getFrigateEventClipUrl(connectionId, eventId) {
+    return `${this.baseURL}/api/frigate/${connectionId}/event/${encodeURIComponent(eventId)}/clip`;
+  }
+
+  getFrigateEventSnapshotUrl(connectionId, eventId) {
+    return `${this.baseURL}/api/frigate/${connectionId}/event/${encodeURIComponent(eventId)}/snapshot`;
+  }
+
+  async getFrigateInfo(connectionId) {
+    return this.request(`/api/frigate/${connectionId}/info`);
+  }
+
   // Deprecated aliases - keep for backwards compatibility
   async getDatasources(filters = {}) {
     return this.getConnections(filters);
@@ -429,8 +454,15 @@ class APIClient {
   }
 
   // AI Session endpoints
-  async createAISession(chartId = null) {
+  async createAISession(chartId = null, context = {}) {
     const payload = chartId ? { chart_id: chartId } : {};
+    // Apply pre-flight context to session creation
+    if (context.componentType) payload.component_type = context.componentType;
+    if (context.chartType) payload.chart_type = context.chartType;
+    if (context.controlType) payload.control_type = context.controlType;
+    if (context.connectionId) payload.connection_id = context.connectionId;
+    if (context.dashboardId) payload.dashboard_id = context.dashboardId;
+    if (context.panelId) payload.panel_id = context.panelId;
     return this.request('/api/ai/sessions', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -467,6 +499,13 @@ class APIClient {
     const wsProtocol = this.baseURL.startsWith('https') ? 'wss' : 'ws';
     const host = this.baseURL.replace(/^https?:\/\//, '');
     return `${wsProtocol}://${host}/api/ai/sessions/${sessionId}/ws`;
+  }
+
+  // Returns WebSocket URL for Frigate JSMPEG live stream proxy
+  getFrigateLiveStreamUrl(connectionId, camera) {
+    const wsProtocol = this.baseURL.startsWith('https') ? 'wss' : 'ws';
+    const host = this.baseURL.replace(/^https?:\/\//, '');
+    return `${wsProtocol}://${host}/api/frigate/${connectionId}/live/${encodeURIComponent(camera)}`;
   }
 
   // Config endpoints

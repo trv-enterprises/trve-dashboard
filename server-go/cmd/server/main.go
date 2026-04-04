@@ -160,7 +160,7 @@ func main() {
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	chartService := service.NewChartService(chartRepo)
 	dashboardService := service.NewDashboardService(dashboardRepo, mongodb.Database)
-	aiSessionService := service.NewAISessionService(aiSessionRepo, chartRepo)
+	aiSessionService := service.NewAISessionService(aiSessionRepo, chartRepo, dashboardRepo)
 	configService := service.NewConfigService(configRepo, cfg)
 	userService := service.NewUserService(userRepo)
 	deviceTypeService := service.NewDeviceTypeService(deviceTypeRepo)
@@ -210,7 +210,7 @@ func main() {
 	fmt.Println("✓ InboundHandler initialized for ts-store push connections")
 
 	// Initialize AI agent (optional - requires ANTHROPIC_API_KEY)
-	toolExecutor := ai.NewToolExecutor(chartRepo, datasourceRepo, datasourceService, chartHub)
+	toolExecutor := ai.NewToolExecutor(chartRepo, datasourceRepo, datasourceService, deviceTypeRepo, chartHub)
 	var aiAgent *ai.Agent
 	agent, err := ai.NewAgent(toolExecutor, aiSessionService, nil) // nil uses default config
 	if err != nil {
@@ -232,6 +232,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(userService)
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	commandHandler := handlers.NewCommandHandler(datasourceService, chartService, deviceTypeService)
+	frigateHandler := handlers.NewFrigateHandler(datasourceService)
 	registryHandler := handlers.NewRegistryHandler()
 	deviceTypeHandler := handlers.NewDeviceTypeHandler(deviceTypeService)
 	deviceHandler := handlers.NewDeviceHandler(deviceService, deviceDiscoveryService)
@@ -358,6 +359,18 @@ func main() {
 		controls := api.Group("/controls")
 		{
 			controls.POST("/:id/execute", commandHandler.ExecuteControlCommand)
+		}
+
+		// Frigate NVR proxy routes
+		frigate := api.Group("/frigate/:connection_id")
+		{
+			frigate.GET("/cameras", frigateHandler.GetCameras)
+			frigate.GET("/snapshot/:camera", frigateHandler.GetSnapshot)
+			frigate.GET("/events/:camera", frigateHandler.GetEvents)
+			frigate.GET("/event/:event_id/clip", frigateHandler.GetEventClip)
+			frigate.GET("/event/:event_id/snapshot", frigateHandler.GetEventSnapshot)
+			frigate.GET("/info", frigateHandler.GetInfo)
+			frigate.GET("/live/:camera", frigateHandler.ProxyLiveStream)
 		}
 
 		// Device Type routes

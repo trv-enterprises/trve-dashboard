@@ -216,6 +216,28 @@ func (r *DashboardRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// AttachChartToPanel sets the chart_id on a specific panel within a dashboard
+func (r *DashboardRepository) AttachChartToPanel(ctx context.Context, dashboardID, panelID, chartID string) error {
+	filter := bson.M{
+		"_id":       dashboardID,
+		"panels.id": panelID,
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"panels.$.chart_id": chartID,
+			"updated":           time.Now(),
+		},
+	}
+	result, err := r.collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to attach chart to panel: %w", err)
+	}
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("dashboard or panel not found")
+	}
+	return nil
+}
+
 // FindByChartID retrieves all dashboards using a specific chart
 // Used for notifying dashboards when a chart is updated
 func (r *DashboardRepository) FindByChartID(ctx context.Context, chartID string) ([]models.Dashboard, error) {

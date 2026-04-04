@@ -18,6 +18,7 @@ type ToolExecutor struct {
 	chartRepo      ChartRepository
 	datasourceRepo DatasourceRepository
 	datasourceSvc  DatasourceService
+	deviceTypeRepo DeviceTypeRepository
 	chartHub       *hub.ChartHub
 }
 
@@ -33,6 +34,11 @@ type DatasourceRepository interface {
 	FindByID(ctx context.Context, id string) (*models.Datasource, error)
 }
 
+// DeviceTypeRepository interface for device type operations
+type DeviceTypeRepository interface {
+	List(ctx context.Context, params *models.DeviceTypeQueryParams) ([]models.DeviceType, int64, error)
+}
+
 // DatasourceService interface for data source queries
 type DatasourceService interface {
 	QueryDatasource(ctx context.Context, id string, req *models.QueryRequest) (*models.QueryResponse, error)
@@ -44,11 +50,12 @@ type DatasourceService interface {
 }
 
 // NewToolExecutor creates a new tool executor
-func NewToolExecutor(chartRepo ChartRepository, dsRepo DatasourceRepository, dsSvc DatasourceService, chartHub *hub.ChartHub) *ToolExecutor {
+func NewToolExecutor(chartRepo ChartRepository, dsRepo DatasourceRepository, dsSvc DatasourceService, dtRepo DeviceTypeRepository, chartHub *hub.ChartHub) *ToolExecutor {
 	return &ToolExecutor{
 		chartRepo:      chartRepo,
 		datasourceRepo: dsRepo,
 		datasourceSvc:  dsSvc,
+		deviceTypeRepo: dtRepo,
 		chartHub:       chartHub,
 	}
 }
@@ -76,8 +83,12 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, chartID string, chartVer
 	fmt.Printf("[ToolExecutor] Input: %s\n", string(input))
 
 	switch toolName {
-	case ToolUpdateChartConfig:
-		return e.executeUpdateChartConfig(ctx, chartID, chartVersion, input)
+	case ToolUpdateComponentType:
+		return e.executeUpdateComponentType(ctx, chartID, chartVersion, input)
+	case ToolUpdateControlConfig:
+		return e.executeUpdateControlConfig(ctx, chartID, chartVersion, input)
+	case ToolUpdateComponentConfig:
+		return e.executeUpdateComponentConfig(ctx, chartID, chartVersion, input)
 	case ToolUpdateDataMapping:
 		return e.executeUpdateDataMapping(ctx, chartID, chartVersion, input)
 	case ToolUpdateQueryConfig:
@@ -94,10 +105,10 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, chartID string, chartVer
 		return e.executeSetCustomCode(ctx, chartID, chartVersion, input)
 	case ToolUpdateChartOptions:
 		return e.executeUpdateChartOptions(ctx, chartID, chartVersion, input)
-	case ToolQueryDatasource:
-		return e.executeQueryDatasource(ctx, input)
-	case ToolListDatasources:
-		return e.executeListDatasources(ctx)
+	case ToolQueryConnection:
+		return e.executeQueryConnection(ctx, input)
+	case ToolListConnections:
+		return e.executeListConnections(ctx)
 	case ToolGetSchema:
 		return e.executeGetSchema(ctx, input)
 	case ToolGetDatasourceSchema:
@@ -108,10 +119,12 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, chartID string, chartVer
 		return e.executeGetEdgeLakeSchema(ctx, input)
 	case ToolPreviewData:
 		return e.executePreviewData(ctx, chartID, chartVersion, input)
-	case ToolGetChartState:
-		return e.executeGetChartState(ctx, chartID, chartVersion)
-	case ToolGetChartTemplate:
-		return e.executeGetChartTemplate(input)
+	case ToolGetComponentState:
+		return e.executeGetComponentState(ctx, chartID, chartVersion)
+	case ToolGetComponentTemplate:
+		return e.executeGetComponentTemplate(input)
+	case ToolListDeviceTypes:
+		return e.executeListDeviceTypes(ctx)
 	case ToolSuggestMissing:
 		return e.executeSuggestMissing(input)
 	default:
@@ -122,8 +135,154 @@ func (e *ToolExecutor) ExecuteTool(ctx context.Context, chartID string, chartVer
 	}
 }
 
-// executeUpdateChartConfig updates basic chart configuration (not name - that's user-controlled)
-func (e *ToolExecutor) executeUpdateChartConfig(ctx context.Context, chartID string, chartVersion int, input json.RawMessage) (*ToolResult, error) {
+// executeUpdateComponentType sets the component type on the draft
+func (e *ToolExecutor) executeUpdateComponentType(ctx context.Context, chartID string, chartVersion int, input json.RawMessage) (*ToolResult, error) {
+	var params struct {
+		ComponentType string `json:"component_type"`
+	}
+	if err := json.Unmarshal(input, &params); err != nil {
+		return &ToolResult{Success: false, Error: "invalid input: " + err.Error()}, nil
+	}
+
+	validTypes := map[string]bool{"chart": true, "control": true, "display": true}
+	if !validTypes[params.ComponentType] {
+		return &ToolResult{Success: false, Error: "invalid component_type, must be: chart, control, or display"}, nil
+	}
+
+	chart, err := e.chartRepo.FindByIDAndVersion(ctx, chartID, chartVersion)
+	if err != nil {
+		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
+	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
+	}
+
+	chart.ComponentType = params.ComponentType
+
+	// Initialize type-specific configs
+	if params.ComponentType == "control" && chart.ControlConfig == nil {
+		chart.ControlConfig = &models.ControlConfig{}
+	}
+	if params.ComponentType == "display" && chart.DisplayConfig == nil {
+		chart.DisplayConfig = &models.DisplayConfig{}
+	}
+
+	if err := e.chartRepo.Update(ctx, chartID, chartVersion, chart); err != nil {
+		return &ToolResult{Success: false, Error: "failed to update chart: " + err.Error()}, nil
+	}
+
+	e.broadcastChartUpdate(chart)
+
+	return &ToolResult{
+		Success:      true,
+		Message:      fmt.Sprintf("Set component type to '%s'", params.ComponentType),
+		ChartUpdated: true,
+	}, nil
+}
+
+// executeUpdateControlConfig configures a control component
+func (e *ToolExecutor) executeUpdateControlConfig(ctx context.Context, chartID string, chartVersion int, input json.RawMessage) (*ToolResult, error) {
+	var params struct {
+		ControlType     *string                `json:"control_type,omitempty"`
+		ConnectionID    *string                `json:"connection_id,omitempty"`
+		Target          *string                `json:"target,omitempty"`
+		DeviceTypeID    *string                `json:"device_type_id,omitempty"`
+		CommandAction   *string                `json:"command_action,omitempty"`
+		CommandTarget   *string                `json:"command_target,omitempty"`
+		PayloadTemplate map[string]interface{} `json:"payload_template,omitempty"`
+		UIConfig        map[string]interface{} `json:"ui_config,omitempty"`
+	}
+	if err := json.Unmarshal(input, &params); err != nil {
+		return &ToolResult{Success: false, Error: "invalid input: " + err.Error()}, nil
+	}
+
+	chart, err := e.chartRepo.FindByIDAndVersion(ctx, chartID, chartVersion)
+	if err != nil {
+		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
+	}
+	if chart == nil {
+		return &ToolResult{Success: false, Error: fmt.Sprintf("chart not found: %s v%d", chartID, chartVersion)}, nil
+	}
+
+	// Ensure component type is control
+	if chart.ComponentType != models.ComponentTypeControl {
+		chart.ComponentType = models.ComponentTypeControl
+	}
+
+	// Initialize ControlConfig if nil
+	if chart.ControlConfig == nil {
+		chart.ControlConfig = &models.ControlConfig{}
+	}
+
+	updates := []string{}
+
+	if params.ControlType != nil {
+		validTypes := map[string]bool{"button": true, "toggle": true, "slider": true, "text_input": true, "plug": true, "dimmer": true}
+		if !validTypes[*params.ControlType] {
+			return &ToolResult{Success: false, Error: "invalid control_type"}, nil
+		}
+		chart.ControlConfig.ControlType = *params.ControlType
+		updates = append(updates, "control_type")
+	}
+
+	if params.ConnectionID != nil {
+		chart.DatasourceID = *params.ConnectionID
+		updates = append(updates, "connection_id")
+	}
+
+	if params.Target != nil {
+		chart.ControlConfig.Target = *params.Target
+		updates = append(updates, "target")
+	}
+
+	if params.DeviceTypeID != nil {
+		chart.ControlConfig.DeviceTypeID = *params.DeviceTypeID
+		updates = append(updates, "device_type_id")
+	}
+
+	// Build CommandConfig if any command fields provided
+	if params.CommandAction != nil || params.CommandTarget != nil || params.PayloadTemplate != nil {
+		if chart.ControlConfig.CommandConfig == nil {
+			chart.ControlConfig.CommandConfig = &models.CommandConfig{}
+		}
+		if params.CommandAction != nil {
+			chart.ControlConfig.CommandConfig.Action = *params.CommandAction
+			updates = append(updates, "command_action")
+		}
+		if params.CommandTarget != nil {
+			chart.ControlConfig.CommandConfig.Target = *params.CommandTarget
+			updates = append(updates, "command_target")
+		}
+		if params.PayloadTemplate != nil {
+			chart.ControlConfig.CommandConfig.PayloadTemplate = params.PayloadTemplate
+			updates = append(updates, "payload_template")
+		}
+	}
+
+	if params.UIConfig != nil {
+		chart.ControlConfig.UIConfig = params.UIConfig
+		updates = append(updates, "ui_config")
+	}
+
+	if len(updates) == 0 {
+		return &ToolResult{Success: true, Message: "No changes specified"}, nil
+	}
+
+	if err := e.chartRepo.Update(ctx, chartID, chartVersion, chart); err != nil {
+		return &ToolResult{Success: false, Error: "failed to update chart: " + err.Error()}, nil
+	}
+
+	e.broadcastChartUpdate(chart)
+
+	return &ToolResult{
+		Success:      true,
+		Message:      fmt.Sprintf("Updated control config: %v", updates),
+		ChartUpdated: true,
+	}, nil
+}
+
+// executeUpdateComponentConfig updates basic component configuration (not name - that's user-controlled)
+func (e *ToolExecutor) executeUpdateComponentConfig(ctx context.Context, chartID string, chartVersion int, input json.RawMessage) (*ToolResult, error) {
 	var params struct {
 		Description *string `json:"description,omitempty"`
 		ChartType   *string `json:"chart_type,omitempty"`
@@ -599,10 +758,10 @@ func (e *ToolExecutor) executeUpdateChartOptions(ctx context.Context, chartID st
 	}, nil
 }
 
-// executeQueryDatasource executes a query against a data source
-func (e *ToolExecutor) executeQueryDatasource(ctx context.Context, input json.RawMessage) (*ToolResult, error) {
+// executeQueryConnection executes a query against a connection
+func (e *ToolExecutor) executeQueryConnection(ctx context.Context, input json.RawMessage) (*ToolResult, error) {
 	var params struct {
-		DatasourceID string  `json:"datasource_id"`
+		DatasourceID string  `json:"connection_id"`
 		Query        *string `json:"query,omitempty"`
 		Limit        *int    `json:"limit,omitempty"`
 	}
@@ -650,15 +809,15 @@ func (e *ToolExecutor) executeQueryDatasource(ctx context.Context, input json.Ra
 	}, nil
 }
 
-// executeListDatasources lists all available data sources
-func (e *ToolExecutor) executeListDatasources(ctx context.Context) (*ToolResult, error) {
+// executeListConnections lists all available connections
+func (e *ToolExecutor) executeListConnections(ctx context.Context) (*ToolResult, error) {
 	datasources, err := e.datasourceRepo.FindAll(ctx, 100, 0) // limit 100, offset 0
 	if err != nil {
-		return &ToolResult{Success: false, Error: "failed to list datasources: " + err.Error()}, nil
+		return &ToolResult{Success: false, Error: "failed to list connections: " + err.Error()}, nil
 	}
 
 	// Build summary list
-	type dsSummary struct {
+	type connSummary struct {
 		ID          string   `json:"id"`
 		Name        string   `json:"name"`
 		Type        string   `json:"type"`
@@ -666,21 +825,54 @@ func (e *ToolExecutor) executeListDatasources(ctx context.Context) (*ToolResult,
 		Columns     []string `json:"columns,omitempty"`
 	}
 
-	summaries := make([]dsSummary, len(datasources))
+	summaries := make([]connSummary, len(datasources))
 	for i, ds := range datasources {
-		summaries[i] = dsSummary{
+		summaries[i] = connSummary{
 			ID:          ds.ID.Hex(),
 			Name:        ds.Name,
 			Type:        string(ds.Type),
 			Description: ds.Description,
 		}
-		// Note: Schema discovery would require querying the data source
-		// For now, we just list the available data sources
 	}
 
 	return &ToolResult{
 		Success: true,
-		Message: fmt.Sprintf("Found %d data source(s)", len(datasources)),
+		Message: fmt.Sprintf("Found %d connection(s)", len(datasources)),
+		Data:    summaries,
+	}, nil
+}
+
+// executeListDeviceTypes lists all available device types for control configuration
+func (e *ToolExecutor) executeListDeviceTypes(ctx context.Context) (*ToolResult, error) {
+	deviceTypes, _, err := e.deviceTypeRepo.List(ctx, &models.DeviceTypeQueryParams{PageSize: 100})
+	if err != nil {
+		return &ToolResult{Success: false, Error: "failed to list device types: " + err.Error()}, nil
+	}
+
+	type dtSummary struct {
+		ID             string   `json:"id"`
+		Name           string   `json:"name"`
+		Description    string   `json:"description,omitempty"`
+		Category       string   `json:"category"`
+		Protocol       string   `json:"protocol"`
+		SupportedTypes []string `json:"supported_types"`
+	}
+
+	summaries := make([]dtSummary, len(deviceTypes))
+	for i, dt := range deviceTypes {
+		summaries[i] = dtSummary{
+			ID:             dt.ID,
+			Name:           dt.Name,
+			Description:    dt.Description,
+			Category:       dt.Category,
+			Protocol:       dt.Protocol,
+			SupportedTypes: dt.SupportedTypes,
+		}
+	}
+
+	return &ToolResult{
+		Success: true,
+		Message: fmt.Sprintf("Found %d device type(s). Set device_type_id in update_control_config to one of these IDs.", len(deviceTypes)),
 		Data:    summaries,
 	}, nil
 }
@@ -882,8 +1074,8 @@ func (e *ToolExecutor) executePreviewData(ctx context.Context, chartID string, c
 	}, nil
 }
 
-// executeGetChartState returns the current chart state
-func (e *ToolExecutor) executeGetChartState(ctx context.Context, chartID string, chartVersion int) (*ToolResult, error) {
+// executeGetComponentState returns the current component state
+func (e *ToolExecutor) executeGetComponentState(ctx context.Context, chartID string, chartVersion int) (*ToolResult, error) {
 	chart, err := e.chartRepo.FindByIDAndVersion(ctx, chartID, chartVersion)
 	if err != nil {
 		return &ToolResult{Success: false, Error: "failed to get chart: " + err.Error()}, nil
@@ -921,7 +1113,7 @@ func (e *ToolExecutor) executeSuggestMissing(input json.RawMessage) (*ToolResult
 // executeGetSchema returns unified schema information for any datasource type
 func (e *ToolExecutor) executeGetSchema(ctx context.Context, input json.RawMessage) (*ToolResult, error) {
 	var params struct {
-		DatasourceID string `json:"datasource_id"`
+		DatasourceID string `json:"connection_id"`
 		Database     string `json:"database,omitempty"`
 		Table        string `json:"table,omitempty"`
 	}

@@ -2,7 +2,7 @@
 // Licensed under Apache 2.0
 // See LICENSE file for details.
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Button,
@@ -27,6 +27,7 @@ import html2canvas from 'html2canvas';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import ChartDataModal from '../components/ChartDataModal';
 import { ControlRenderer } from '../components/controls';
+import FrigateCameraViewer from '../components/frigate/FrigateCameraViewer';
 import apiClient from '../api/client';
 import './DashboardViewerPage.scss';
 
@@ -58,6 +59,11 @@ function DashboardViewerPage({ canDesign = false }) {
   const [selectedChart, setSelectedChart] = useState(null);
   const [configRefreshInterval, setConfigRefreshInterval] = useState(120); // Default 120s for dashboard/chart config refresh
   const [isDefaultDashboard, setIsDefaultDashboard] = useState(false);
+
+  // Dashboard switching state
+  const [dashboardList, setDashboardList] = useState([]);
+  const [switchIndicator, setSwitchIndicator] = useState(null); // { name, index, total }
+  const switchTimerRef = useRef(null);
 
   // Grid configuration - fixed 64x36px cells (16:9 aspect ratio)
   // Must match DashboardDetailPage.jsx
@@ -125,6 +131,61 @@ function DashboardViewerPage({ canDesign = false }) {
     };
     fetchSystemConfig();
   }, []);
+
+  // Fetch dashboard list for keyboard switching
+  useEffect(() => {
+    const fetchDashboardList = async () => {
+      try {
+        const data = await apiClient.getDashboards();
+        const dashboards = data.dashboards || [];
+        // Sort alphabetically by name for consistent ordering
+        dashboards.sort((a, b) => a.name.localeCompare(b.name));
+        setDashboardList(dashboards);
+      } catch (err) {
+        console.warn('Failed to fetch dashboard list:', err);
+      }
+    };
+    fetchDashboardList();
+  }, []);
+
+  // Show switch indicator briefly
+  const showSwitchIndicator = useCallback((name, index, total) => {
+    setSwitchIndicator({ name, index, total });
+    if (switchTimerRef.current) clearTimeout(switchTimerRef.current);
+    switchTimerRef.current = setTimeout(() => setSwitchIndicator(null), 2000);
+  }, []);
+
+  // Keyboard navigation: Alt+Left/Right to switch dashboards
+  useEffect(() => {
+    if (dashboardList.length < 2) return;
+
+    const handleKeyDown = (e) => {
+      if (!e.altKey) return;
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+
+      e.preventDefault();
+      const currentIndex = dashboardList.findIndex(d => d.id === id);
+      if (currentIndex === -1) return;
+
+      let nextIndex;
+      if (e.key === 'ArrowRight') {
+        nextIndex = (currentIndex + 1) % dashboardList.length;
+      } else {
+        nextIndex = (currentIndex - 1 + dashboardList.length) % dashboardList.length;
+      }
+
+      const next = dashboardList[nextIndex];
+      showSwitchIndicator(next.name, nextIndex + 1, dashboardList.length);
+      navigate(`/view/dashboards/${next.id}`);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (switchTimerRef.current) clearTimeout(switchTimerRef.current);
+    };
+  }, [dashboardList, id, navigate, showSwitchIndicator]);
+
 
   // Initial load
   useEffect(() => {
@@ -224,6 +285,7 @@ function DashboardViewerPage({ canDesign = false }) {
   };
 
   // Save thumbnail by capturing the dashboard grid
+  const [savingThumbnail, setSavingThumbnail] = useState(false);
   const saveThumbnail = async () => {
     const gridContainer = document.querySelector('.dashboard-grid-container');
     if (!gridContainer) {
@@ -231,12 +293,14 @@ function DashboardViewerPage({ canDesign = false }) {
       return;
     }
 
+    setSavingThumbnail(true);
     try {
       const canvas = await html2canvas(gridContainer, {
         backgroundColor: '#161616',
         scale: 0.5, // Reduce size for thumbnail
-        logging: false,
-        useCORS: true
+        logging: true,
+        useCORS: true,
+        allowTaint: true
       });
 
       const thumbnailDataUrl = canvas.toDataURL('image/png');
@@ -251,6 +315,8 @@ function DashboardViewerPage({ canDesign = false }) {
       fetchDashboard();
     } catch (err) {
       console.error('Failed to save thumbnail:', err);
+    } finally {
+      setSavingThumbnail(false);
     }
   };
 
@@ -275,6 +341,14 @@ function DashboardViewerPage({ canDesign = false }) {
 
   return (
     <div className={`dashboard-viewer-page ${isFullscreen ? 'fullscreen' : ''}`}>
+      {/* Dashboard switch indicator */}
+      {switchIndicator && (
+        <div className="dashboard-switch-indicator">
+          <span className="switch-name">{switchIndicator.name}</span>
+          <span className="switch-position">{switchIndicator.index} of {switchIndicator.total}</span>
+        </div>
+      )}
+
       {/* Header toolbar */}
       <div className="viewer-toolbar">
         <div className="toolbar-left">
@@ -343,8 +417,9 @@ function DashboardViewerPage({ canDesign = false }) {
             )}
             {canDesign && (
               <OverflowMenuItem
-                itemText="Save Thumbnail"
+                itemText={savingThumbnail ? "Saving..." : "Save Thumbnail"}
                 onClick={saveThumbnail}
+                disabled={savingThumbnail}
               />
             )}
             <OverflowMenuItem
@@ -378,7 +453,7 @@ function DashboardViewerPage({ canDesign = false }) {
           >
             {dashboard.panels.map((panel) => {
               const chart = panel.chart_id ? chartsMap[panel.chart_id] : null;
-              const hasChart = !!chart?.component_code;
+              const hasChart = !!chart?.component_code || chart?.component_type === 'control' || chart?.component_type === 'display';
 
               return (
                 <div
@@ -393,10 +468,15 @@ function DashboardViewerPage({ canDesign = false }) {
                 >
                   {hasChart ? (
                     <>
-                      {/* Render control components differently */}
+                      {/* Render control components */}
                       {chart.component_type === 'control' ? (
                         <div className="component-wrapper control-wrapper">
                           <ControlRenderer control={chart} />
+                        </div>
+                      ) : chart.component_type === 'display' ? (
+                        /* Render display components (Frigate camera, etc.) */
+                        <div className="component-wrapper display-wrapper">
+                          <FrigateCameraViewer config={chart.display_config} />
                         </div>
                       ) : (
                         <>

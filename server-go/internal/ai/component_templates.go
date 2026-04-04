@@ -10,7 +10,7 @@ import (
 )
 
 // chartTemplates contains React component templates for each chart type
-var chartTemplates = map[string]string{
+var componentTemplates = map[string]string{
 	"line": `const Component = ({ data }) => {
   const chartData = toObjects(data);
   if (!chartData.length) return <div style={{color: '#f4f4f4', padding: '20px'}}>No data available</div>;
@@ -542,8 +542,8 @@ formatter: function(params) {
 */`,
 }
 
-// executeGetChartTemplate returns the template for a specific chart type
-func (e *ToolExecutor) executeGetChartTemplate(input json.RawMessage) (*ToolResult, error) {
+// executeGetComponentTemplate returns the template for a specific chart type
+func (e *ToolExecutor) executeGetComponentTemplate(input json.RawMessage) (*ToolResult, error) {
 	var params struct {
 		ChartType string `json:"chart_type"`
 	}
@@ -555,7 +555,7 @@ func (e *ToolExecutor) executeGetChartTemplate(input json.RawMessage) (*ToolResu
 		return &ToolResult{Success: false, Error: "chart_type is required"}, nil
 	}
 
-	template, exists := chartTemplates[params.ChartType]
+	template, exists := componentTemplates[params.ChartType]
 	if !exists {
 		return &ToolResult{
 			Success: false,
@@ -565,7 +565,7 @@ func (e *ToolExecutor) executeGetChartTemplate(input json.RawMessage) (*ToolResu
 
 	message := fmt.Sprintf("Template for %s chart. Replace column names (timestamp, value, etc.) with actual columns from get_schema.", params.ChartType)
 	if params.ChartType == "custom" {
-		message = "Custom chart template with Carbon g100 colors and formatting guidelines."
+		message = "Custom component template with Carbon g100 colors and formatting guidelines."
 	}
 
 	return &ToolResult{

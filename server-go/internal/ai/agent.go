@@ -306,14 +306,15 @@ func (a *Agent) buildMessages(history []models.AIMessage, newUserContent string)
 func summarizeToolResultForHistory(toolName, output string) string {
 	// Tools whose results should be summarized (read-only discovery tools)
 	summarizableTools := map[string]bool{
-		ToolListDatasources:     true,
+		ToolListConnections:     true,
+		ToolListDeviceTypes:     true,
 		ToolGetSchema:           true,
 		ToolGetDatasourceSchema: true,
 		ToolGetPrometheusSchema: true,
 		ToolGetEdgeLakeSchema:   true,
-		ToolQueryDatasource:     true,
+		ToolQueryConnection:     true,
 		ToolPreviewData:         true,
-		ToolGetChartState:       true,
+		ToolGetComponentState:   true,
 	}
 
 	if !summarizableTools[toolName] {
@@ -339,16 +340,16 @@ func summarizeToolResultForHistory(toolName, output string) string {
 
 	// For tools with data arrays, just note the count
 	switch toolName {
-	case ToolListDatasources:
+	case ToolListConnections:
 		if data, ok := result.Data.([]interface{}); ok {
-			summary.Message = fmt.Sprintf("Returned %d datasource(s) - use get_schema to explore", len(data))
+			summary.Message = fmt.Sprintf("Returned %d connection(s) - use get_schema to explore", len(data))
 		}
 	case ToolGetSchema, ToolGetDatasourceSchema, ToolGetPrometheusSchema, ToolGetEdgeLakeSchema:
 		summary.Message = result.Message + " (schema already retrieved)"
-	case ToolQueryDatasource, ToolPreviewData:
+	case ToolQueryConnection, ToolPreviewData:
 		summary.Message = result.Message + " (data already retrieved)"
-	case ToolGetChartState:
-		summary.Message = "Chart state retrieved (see previous response)"
+	case ToolGetComponentState:
+		summary.Message = "Component state retrieved (see previous response)"
 	}
 
 	summaryJSON, err := json.Marshal(summary)

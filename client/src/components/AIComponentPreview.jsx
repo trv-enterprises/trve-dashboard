@@ -12,10 +12,12 @@ import {
   Loading
 } from '@carbon/react';
 import { Play, Edit, Checkmark, Close } from '@carbon/icons-react';
+import Icon from '@mdi/react';
 import DynamicComponentLoader from './DynamicComponentLoader';
+import { ControlRenderer, CONTROL_TYPE_INFO } from './controls';
 import { transformData } from '../utils/dataTransforms';
 import apiClient from '../api/client';
-import './AIChartPreview.scss';
+import './AIComponentPreview.scss';
 
 // Filter operator labels for display
 const FILTER_OP_LABELS = {
@@ -35,17 +37,17 @@ const FILTER_OP_LABELS = {
 };
 
 /**
- * AIChartPreview Component
+ * AIComponentPreview Component
  *
- * Read-only preview of a chart configuration created by AI.
+ * Read-only preview of a component configuration created by AI.
  * Similar layout to ChartEditor but without editing capabilities,
- * except for the chart name which can be edited inline.
+ * except for the component name which can be edited inline.
  */
-function AIChartPreview({ chart, onNameChange }) {
+function AIComponentPreview({ component, onNameChange }) {
   const [activeTab, setActiveTab] = useState(1); // Default to Preview tab
-  const [datasourceName, setDatasourceName] = useState('');
-  const [datasourceType, setDatasourceType] = useState('');
-  const [datasourceDescription, setDatasourceDescription] = useState('');
+  const [connectionName, setConnectionName] = useState('');
+  const [connectionType, setConnectionType] = useState('');
+  const [connectionDescription, setConnectionDescription] = useState('');
 
   // Name editing state
   const [editingName, setEditingName] = useState(false);
@@ -57,44 +59,44 @@ function AIChartPreview({ chart, onNameChange }) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
 
-  // Fetch datasource info when chart changes
+  // Fetch connection info when component changes
   useEffect(() => {
-    const fetchDatasourceInfo = async () => {
-      if (chart?.datasource_id) {
+    const fetchConnectionInfo = async () => {
+      if (component?.datasource_id) {
         try {
-          const datasource = await apiClient.getDatasource(chart.datasource_id);
-          setDatasourceName(datasource.name || chart.datasource_id);
-          setDatasourceType(datasource.type || '');
-          setDatasourceDescription(datasource.description || '');
+          const datasource = await apiClient.getDatasource(component.datasource_id);
+          setConnectionName(datasource.name || component.datasource_id);
+          setConnectionType(datasource.type || '');
+          setConnectionDescription(datasource.description || '');
         } catch (err) {
           console.error('Failed to fetch datasource:', err);
-          setDatasourceName(chart.datasource_id);
+          setConnectionName(component.datasource_id);
         }
       } else {
-        setDatasourceName('');
-        setDatasourceType('');
-        setDatasourceDescription('');
+        setConnectionName('');
+        setConnectionType('');
+        setConnectionDescription('');
       }
     };
-    fetchDatasourceInfo();
-  }, [chart?.datasource_id]);
+    fetchConnectionInfo();
+  }, [component?.datasource_id]);
 
-  // Check if chart component fetches its own data (has useData embedded)
+  // Check if component fetches its own data (has useData embedded)
   // If so, we don't need to fetch data ourselves - the component will do it
-  const chartFetchesOwnData = chart?.component_code?.includes('useData(');
+  const componentFetchesOwnData = component?.component_code?.includes('useData(');
 
   // Auto-run query when datasource or query config changes
-  // Only fetch if the chart expects data as a prop (doesn't have useData embedded)
+  // Only fetch if the component expects data as a prop (doesn't have useData embedded)
   useEffect(() => {
-    if (chart?.datasource_id && !chartFetchesOwnData) {
-      console.log('[AIChartPreview] Auto-running query - chart expects data as prop');
+    if (component?.datasource_id && !componentFetchesOwnData) {
+      console.log('[AIComponentPreview] Auto-running query - component expects data as prop');
       runQuery();
     }
-  }, [chart?.datasource_id, chart?.query_config?.raw, chartFetchesOwnData]);
+  }, [component?.datasource_id, component?.query_config?.raw, componentFetchesOwnData]);
 
   // Handle name editing
   const startEditName = () => {
-    setEditNameValue(chart?.name || 'Untitled');
+    setEditNameValue(component?.name || 'Untitled');
     setNameError('');
     setEditingName(true);
   };
@@ -121,14 +123,14 @@ function AIChartPreview({ chart, onNameChange }) {
       const charts = response.charts || [];
       const duplicate = charts.find(c =>
         c.name.toLowerCase() === newName.toLowerCase() &&
-        c.id !== chart?.id
+        c.id !== component?.id
       );
       if (duplicate) {
-        setNameError('A chart with this name already exists');
+        setNameError('A component with this name already exists');
         return;
       }
     } catch (err) {
-      console.error('Error checking chart names:', err);
+      console.error('Error checking component names:', err);
     }
 
     if (onNameChange) {
@@ -140,20 +142,20 @@ function AIChartPreview({ chart, onNameChange }) {
 
   // Run query for preview
   const runQuery = async () => {
-    if (!chart?.datasource_id) return;
+    if (!component?.datasource_id) return;
 
     setPreviewLoading(true);
     setPreviewError(null);
     try {
       // Use query_config if available, otherwise query with empty/default
-      const queryRaw = chart?.query_config?.raw || '';
-      const queryType = chart?.query_config?.type || 'sql';
+      const queryRaw = component?.query_config?.raw || '';
+      const queryType = component?.query_config?.type || 'sql';
 
-      const response = await apiClient.queryDatasource(chart.datasource_id, {
+      const response = await apiClient.queryDatasource(component.datasource_id, {
         query: {
           raw: queryRaw,
           type: queryType,
-          params: chart?.query_config?.params || {}
+          params: component?.query_config?.params || {}
         }
       });
       if (response.success && response.result_set) {
@@ -172,7 +174,7 @@ function AIChartPreview({ chart, onNameChange }) {
   const transformedData = useMemo(() => {
     if (!previewData) return null;
 
-    const dataMapping = chart?.data_mapping;
+    const dataMapping = component?.data_mapping;
     if (!dataMapping) return previewData;
 
     const filters = dataMapping.filters || [];
@@ -202,21 +204,110 @@ function AIChartPreview({ chart, onNameChange }) {
         filtered: filters.length > 0
       }
     };
-  }, [previewData, chart?.data_mapping]);
+  }, [previewData, component?.data_mapping]);
 
-  if (!chart) {
+  if (!component) {
     return (
       <div className="ai-chart-preview empty">
         <div className="empty-state">
-          <p>Chart preview will appear here</p>
-          <p className="hint">Start a conversation to create your chart</p>
+          <p>Component preview will appear here</p>
+          <p className="hint">Start a conversation to create your component</p>
         </div>
       </div>
     );
   }
 
-  const dataMapping = chart.data_mapping || {};
-  const queryConfig = chart.query_config || {};
+  const isControl = component.component_type === 'control';
+
+  // Control preview - render actual control component + config details
+  if (isControl) {
+    const controlConfig = component.control_config || {};
+    const controlType = controlConfig.control_type || 'button';
+    const typeInfo = CONTROL_TYPE_INFO[controlType] || {};
+    const iconPath = typeInfo.icon;
+    const uiConfig = controlConfig.ui_config || {};
+
+    return (
+      <div className="ai-chart-preview">
+        <div className="control-preview">
+          {/* Live control preview */}
+          <div className="control-preview-live">
+            <ControlRenderer control={component} />
+          </div>
+
+          {/* Config details below */}
+          <div className="control-preview-config">
+            <div className="config-section">
+              <label>Configuration</label>
+              <div className="config-grid">
+                <div className="config-item">
+                  <span className="config-label">Type</span>
+                  <span className="config-value">
+                    {iconPath && <Icon path={iconPath} size="16px" color="var(--cds-icon-primary)" />}
+                    <Tag type="blue" size="sm">{typeInfo.label || controlType}</Tag>
+                  </span>
+                </div>
+                <div className="config-item">
+                  <span className="config-label">Connection</span>
+                  <span className="config-value">
+                    {connectionName || 'None'}
+                    {connectionType && <Tag type="blue" size="sm">{connectionType}</Tag>}
+                  </span>
+                </div>
+                {controlConfig.target && (
+                  <div className="config-item">
+                    <span className="config-label">Target</span>
+                    <code className="config-value">{controlConfig.target}</code>
+                  </div>
+                )}
+                {controlConfig.device_type_id && (
+                  <div className="config-item">
+                    <span className="config-label">Device Type</span>
+                    <Tag type="teal" size="sm">{controlConfig.device_type_id}</Tag>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {Object.keys(uiConfig).length > 0 && (
+              <div className="config-section">
+                <label>UI Settings</label>
+                <div className="config-grid">
+                  {Object.entries(uiConfig).map(([key, value]) => (
+                    <div className="config-item" key={key}>
+                      <span className="config-label">{key}</span>
+                      <span className="config-value">{String(value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Metadata Footer */}
+        <div className="metadata-footer">
+          <div className="metadata-row">
+            <div className="metadata-item">
+              <span className="metadata-label">Name</span>
+              <span className="metadata-value">{component.name || 'Untitled'}</span>
+            </div>
+            <div className="metadata-item">
+              <span className="metadata-label">Type</span>
+              <span className="metadata-value">
+                <Tag type="purple" size="sm">Control</Tag>
+                <Tag type="blue" size="sm">{typeInfo.label || controlType}</Tag>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Chart/Display preview - existing tabbed layout
+  const dataMapping = component.data_mapping || {};
+  const queryConfig = component.query_config || {};
   const filters = dataMapping.filters || [];
   const aggregation = dataMapping.aggregation;
 
@@ -229,28 +320,28 @@ function AIChartPreview({ chart, onNameChange }) {
           onChange={({ index }) => setActiveTab(index)}
           className="preview-switcher"
         >
-          <Switch name="datasource" text="Data Source" />
+          <Switch name="connection" text="Connection" />
           <Switch name="preview" text="Preview" />
           <Switch name="code" text="Code" />
         </ContentSwitcher>
       </div>
 
       <div className="tab-panels">
-        {/* Data Source Tab */}
+        {/* Connection Tab */}
         {activeTab === 0 && (
           <div className="tab-content">
-            {/* Datasource info */}
+            {/* Connection info */}
             <div className="datasource-section">
               <div className="datasource-header">
-                <label>Data Source</label>
+                <label>Connection</label>
               </div>
               <div className="datasource-display">
-                <span className="datasource-name">{datasourceName || 'None selected'}</span>
-                {datasourceType && (
+                <span className="datasource-name">{connectionName || 'None selected'}</span>
+                {connectionType && (
                   <>
-                    <Tag type="blue" size="sm">{datasourceType}</Tag>
-                    {datasourceDescription && (
-                      <span className="datasource-description">{datasourceDescription}</span>
+                    <Tag type="blue" size="sm">{connectionType}</Tag>
+                    {connectionDescription && (
+                      <span className="datasource-description">{connectionDescription}</span>
                     )}
                   </>
                 )}
@@ -261,7 +352,7 @@ function AIChartPreview({ chart, onNameChange }) {
             {queryConfig.raw && (
               <div className="query-section">
                 <div className="query-header">
-                  <label>{datasourceType === 'api' ? 'API Endpoint Path' : 'Query'}</label>
+                  <label>{connectionType === 'api' ? 'API Endpoint Path' : 'Query'}</label>
                   <Button
                     kind="tertiary"
                     size="sm"
@@ -370,17 +461,17 @@ function AIChartPreview({ chart, onNameChange }) {
                   Retry
                 </Button>
               </div>
-            ) : chart.component_code ? (
+            ) : component.component_code ? (
               <div className="chart-preview-container">
                 <DynamicComponentLoader
-                  code={chart.component_code}
-                  props={chartFetchesOwnData ? {} : { data: transformedData }}
+                  code={component.component_code}
+                  props={componentFetchesOwnData ? {} : { data: transformedData }}
                 />
               </div>
             ) : (
               <div className="no-preview">
-                <p>No chart preview available</p>
-                <p className="hint">Run query in Data Source tab to see preview</p>
+                <p>No component preview available</p>
+                <p className="hint">Run query in Connection tab to see preview</p>
               </div>
             )}
           </div>
@@ -389,9 +480,9 @@ function AIChartPreview({ chart, onNameChange }) {
         {/* Code Tab */}
         {activeTab === 2 && (
           <div className="tab-content code-tab">
-            {chart.component_code ? (
+            {component.component_code ? (
               <div className="code-display">
-                <pre><code>{chart.component_code}</code></pre>
+                <pre><code>{component.component_code}</code></pre>
               </div>
             ) : (
               <div className="no-code">
@@ -407,21 +498,21 @@ function AIChartPreview({ chart, onNameChange }) {
         <div className="metadata-row">
           <div className="metadata-item">
             <span className="metadata-label">Name</span>
-            <span className="metadata-value">{chart.name || 'Untitled'}</span>
+            <span className="metadata-value">{component.name || 'Untitled'}</span>
           </div>
           <div className="metadata-item">
-            <span className="metadata-label">Data Source</span>
+            <span className="metadata-label">Connection</span>
             <span className="metadata-value">
-              {datasourceName || 'None'}
-              {datasourceType && <Tag type="blue" size="sm">{datasourceType}</Tag>}
+              {connectionName || 'None'}
+              {connectionType && <Tag type="blue" size="sm">{connectionType}</Tag>}
             </span>
           </div>
         </div>
-        {chart.description && (
+        {component.description && (
           <div className="metadata-row description-row">
             <div className="metadata-item full-width">
               <span className="metadata-label">Description</span>
-              <span className="metadata-value">{chart.description}</span>
+              <span className="metadata-value">{component.description}</span>
             </div>
           </div>
         )}
@@ -430,4 +521,4 @@ function AIChartPreview({ chart, onNameChange }) {
   );
 }
 
-export default AIChartPreview;
+export default AIComponentPreview;

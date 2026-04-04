@@ -13,9 +13,10 @@ import {
   RadioButton
 } from '@carbon/react';
 import apiClient from '../api/client';
+import { CONTROL_TYPE_INFO } from './controls';
 import './AIPreflightModal.scss';
 
-// Chart types for display components (same as ChartEditor)
+// Chart types for chart components (data-driven ECharts visualizations)
 const CHART_TYPES = [
   { id: 'bar', label: 'Bar Chart' },
   { id: 'line', label: 'Line Chart' },
@@ -23,17 +24,17 @@ const CHART_TYPES = [
   { id: 'pie', label: 'Pie Chart' },
   { id: 'scatter', label: 'Scatter Plot' },
   { id: 'gauge', label: 'Gauge' },
+  { id: 'number', label: 'Number / KPI' },
   { id: 'dataview', label: 'Data Table' },
   { id: 'custom', label: 'Custom Component' }
 ];
 
-// Control types (from controls/index.js)
-const CONTROL_TYPES = [
-  { id: 'button', label: 'Button' },
-  { id: 'toggle', label: 'Toggle' },
-  { id: 'slider', label: 'Slider' },
-  { id: 'text_input', label: 'Text Input' }
-];
+// Build control types list from the config-driven registry
+const CONTROL_TYPES = Object.entries(CONTROL_TYPE_INFO).map(([id, info]) => ({
+  id,
+  label: info.label,
+  description: info.description
+}));
 
 /**
  * AIPreflightModal Component
@@ -46,7 +47,7 @@ const CONTROL_TYPES = [
  * @param {Function} onContinue - Handler when user clicks Continue, receives context object
  */
 function AIPreflightModal({ open, onClose, onContinue }) {
-  const [componentType, setComponentType] = useState(''); // 'chart' or 'control'
+  const [componentType, setComponentType] = useState(''); // 'chart', 'display', or 'control'
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [connectionId, setConnectionId] = useState('');
@@ -91,11 +92,18 @@ function AIPreflightModal({ open, onClose, onContinue }) {
   };
 
   const handleContinue = () => {
+    // Find selected connection details so agent can skip list_datasources
+    const selectedConnection = connectionId
+      ? connections.find(c => c.id === connectionId)
+      : null;
+
     const context = {
       componentType,
       name: name.trim() || undefined,
       description: description.trim() || undefined,
       connectionId: connectionId || undefined,
+      connectionName: selectedConnection?.name || undefined,
+      connectionType: selectedConnection?.type || undefined,
       chartType: componentType === 'chart' ? (chartType || undefined) : undefined,
       controlType: componentType === 'control' ? (controlType || undefined) : undefined
     };
@@ -131,8 +139,13 @@ function AIPreflightModal({ open, onClose, onContinue }) {
             orientation="horizontal"
           >
             <RadioButton
-              labelText="Display"
+              labelText="Chart"
               value="chart"
+              id="type-chart"
+            />
+            <RadioButton
+              labelText="Display"
+              value="display"
               id="type-display"
             />
             <RadioButton
@@ -184,7 +197,7 @@ function AIPreflightModal({ open, onClose, onContinue }) {
             ))}
           </Select>
 
-          {/* Display-specific: Chart Type */}
+          {/* Chart-specific: Chart Type */}
           {componentType === 'chart' && (
             <Select
               id="chart-type-select"

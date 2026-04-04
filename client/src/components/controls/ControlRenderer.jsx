@@ -3,13 +3,8 @@
 // See LICENSE file for details.
 
 import PropTypes from 'prop-types';
-import ControlButton from './ControlButton';
-import ControlToggle from './ControlToggle';
-import ControlSlider from './ControlSlider';
-import ControlTextInput from './ControlTextInput';
-import ControlPlug from './ControlPlug';
-import ControlDimmer from './ControlDimmer';
-import { CONTROL_TYPES } from './index';
+import { getControlComponent } from './controlRegistry';
+import { CONTROL_TYPE_INFO } from './controlTypes';
 import './controls.scss';
 
 /**
@@ -17,6 +12,7 @@ import './controls.scss';
  *
  * Dispatcher component that renders the appropriate control type
  * based on the control_config.control_type field.
+ * Components self-register via controlRegistry — no manual wiring needed.
  */
 function ControlRenderer({ control, onSuccess, onError }) {
   const controlType = control.control_config?.control_type;
@@ -29,36 +25,29 @@ function ControlRenderer({ control, onSuccess, onError }) {
     );
   }
 
-  const title = control.title || control.name;
+  const Component = getControlComponent(controlType);
+  if (!Component) {
+    return (
+      <div className="control-error">
+        Unknown control type: {controlType}
+      </div>
+    );
+  }
 
-  const renderControl = () => {
-    switch (controlType) {
-      case CONTROL_TYPES.BUTTON:
-        return <ControlButton control={control} onSuccess={onSuccess} onError={onError} />;
-      case CONTROL_TYPES.TOGGLE:
-        return <ControlToggle control={control} onSuccess={onSuccess} onError={onError} />;
-      case CONTROL_TYPES.SLIDER:
-        return <ControlSlider control={control} onSuccess={onSuccess} onError={onError} />;
-      case CONTROL_TYPES.TEXT_INPUT:
-        return <ControlTextInput control={control} onSuccess={onSuccess} onError={onError} />;
-      case CONTROL_TYPES.PLUG:
-        return <ControlPlug control={control} onSuccess={onSuccess} onError={onError} />;
-      case CONTROL_TYPES.DIMMER:
-        return <ControlDimmer control={control} onSuccess={onSuccess} onError={onError} />;
-      default:
-        return (
-          <div className="control-error">
-            Unknown control type: {controlType}
-          </div>
-        );
-    }
-  };
+  const title = control.title || control.name;
+  const typeInfo = CONTROL_TYPE_INFO[controlType];
+  const readOnly = typeInfo && !typeInfo.canWrite;
 
   return (
     <div className="control-renderer">
       {title && <div className="control-title">{title}</div>}
       <div className="control-body">
-        {renderControl()}
+        <Component
+          control={control}
+          readOnly={readOnly}
+          onSuccess={onSuccess}
+          onError={onError}
+        />
       </div>
     </div>
   );
