@@ -214,9 +214,7 @@ class StreamConnectionManager {
       }
     });
 
-    eventSource.onerror = (err) => {
-      console.error(`[StreamConnectionManager] Error on ${key}:`, err);
-
+    eventSource.onerror = () => {
       // Stop watchdog and close current connection
       this._stopHeartbeatWatchdog(key);
       eventSource.close();
@@ -239,7 +237,13 @@ class StreamConnectionManager {
       connection.reconnectAttempts++;
 
       const delay = Math.min(1000 * Math.pow(2, connection.reconnectAttempts - 1), 30000);
-      console.log(`[StreamConnectionManager] Reconnecting to ${key} in ${delay}ms (attempt ${connection.reconnectAttempts})`);
+
+      // Only log after repeated failures to avoid console noise
+      if (connection.reconnectAttempts <= 1) {
+        console.debug(`[StreamConnectionManager] Reconnecting to ${key} in ${delay}ms`);
+      } else if (connection.reconnectAttempts % 5 === 0) {
+        console.warn(`[StreamConnectionManager] Reconnecting to ${key} (attempt ${connection.reconnectAttempts})`);
+      }
 
       // Notify subscribers of reconnecting state
       subscribers.forEach(sub => sub.onReconnecting(connection.reconnectAttempts, delay));

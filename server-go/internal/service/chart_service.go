@@ -60,6 +60,7 @@ func (s *ChartService) CreateChart(ctx context.Context, req *models.CreateChartR
 		QueryConfig:   req.QueryConfig,
 		DataMapping:   req.DataMapping,
 		ControlConfig: req.ControlConfig,
+		DisplayConfig: req.DisplayConfig,
 		ComponentCode: req.ComponentCode,
 		UseCustomCode: req.UseCustomCode,
 		Options:       req.Options,
@@ -230,6 +231,9 @@ func (s *ChartService) UpdateChart(ctx context.Context, id string, req *models.U
 	}
 	if req.ControlConfig != nil {
 		chart.ControlConfig = req.ControlConfig
+	}
+	if req.DisplayConfig != nil {
+		chart.DisplayConfig = req.DisplayConfig
 	}
 	if req.ComponentCode != nil {
 		chart.ComponentCode = *req.ComponentCode

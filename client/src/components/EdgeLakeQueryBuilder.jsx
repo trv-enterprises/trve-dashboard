@@ -34,12 +34,12 @@ import './EdgeLakeQueryBuilder.scss';
  * - Execute query
  */
 
-function EdgeLakeQueryBuilder({ datasourceId, onQueryChange, onExecute, initialQuery }) {
+function EdgeLakeQueryBuilder({ datasourceId, onQueryChange, onDatabaseChange, onExecute, initialQuery, initialDatabase }) {
   // Schema state
   const [databases, setDatabases] = useState([]);
   const [tables, setTables] = useState([]);
   const [columns, setColumns] = useState([]);
-  const [selectedDatabase, setSelectedDatabase] = useState('');
+  const [selectedDatabase, setSelectedDatabase] = useState(initialDatabase || '');
   const [selectedTable, setSelectedTable] = useState('');
   const [selectedColumns, setSelectedColumns] = useState([]);
 
@@ -250,6 +250,7 @@ function EdgeLakeQueryBuilder({ datasourceId, onQueryChange, onExecute, initialQ
               onChange={(e) => {
                 setSelectedDatabase(e.target.value);
                 setSelectedTable('');
+                if (onDatabaseChange) onDatabaseChange(e.target.value);
               }}
               disabled={loadingDatabases || databases.length === 0}
             >

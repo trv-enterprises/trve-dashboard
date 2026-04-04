@@ -30,6 +30,7 @@ import PrometheusQueryBuilder from './PrometheusQueryBuilder';
 import EdgeLakeQueryBuilder from './EdgeLakeQueryBuilder';
 import MQTTTopicSelector from './MQTTTopicSelector';
 import ControlEditor from './ControlEditor';
+import DisplayEditor from './DisplayEditor';
 import { transformData, formatCellValue } from '../utils/dataTransforms';
 import apiClient from '../api/client';
 import './ChartEditor.scss';
@@ -207,11 +208,14 @@ const ChartEditor = forwardRef(function ChartEditor({
   const [nameError, setNameError] = useState('');
   const [title, setTitle] = useState(''); // Display title (defaults to name)
   const [description, setDescription] = useState('');
-  const [componentType, setComponentType] = useState('chart'); // 'chart' or 'control'
+  const [componentType, setComponentType] = useState('chart'); // 'chart', 'control', or 'display'
   const [chartType, setChartType] = useState('bar');
 
   // Control configuration (when componentType === 'control')
   const [controlConfig, setControlConfig] = useState(null);
+
+  // Display configuration (when componentType === 'display')
+  const [displayConfig, setDisplayConfig] = useState(null);
 
   // Data source configuration
   const [datasources, setDatasources] = useState([]);
@@ -397,6 +401,7 @@ const ChartEditor = forwardRef(function ChartEditor({
       setComponentType(chart.component_type || 'chart');
       setChartType(chart.chart_type || 'bar');
       setControlConfig(chart.control_config || null);
+      setDisplayConfig(chart.display_config || null);
       setSelectedDatasourceId(chart.connection_id || chart.datasource_id || '');
       setQueryRaw(chart.query_config?.raw || '');
       setQueryType(chart.query_config?.type || 'sql');
@@ -929,6 +934,7 @@ const ChartEditor = forwardRef(function ChartEditor({
       component_type: componentType,
       chart_type: componentType === 'chart' ? chartType : '',
       control_config: componentType === 'control' ? controlConfig : null,
+      display_config: componentType === 'display' ? displayConfig : null,
       connection_id: componentType === 'control' ? (controlConfig?.connection_id || '') : (selectedDatasourceId || ''),
       query_config: selectedDatasourceId ? {
         raw: selectedDatasource?.type === 'tsstore'
@@ -1038,13 +1044,13 @@ const ChartEditor = forwardRef(function ChartEditor({
         />
       )}
 
-      {/* Component type selector - Display vs Control */}
+      {/* Component type selector - Chart vs Display vs Control */}
       <div className="component-type-section">
         <ContentSwitcher
-          selectedIndex={componentType === 'control' ? 1 : 0}
+          selectedIndex={componentType === 'display' ? 1 : componentType === 'control' ? 2 : 0}
           onChange={({ index }) => {
-            // Store 'chart' in DB for backward compatibility, but display as "Display"
-            const newType = index === 0 ? 'chart' : 'control';
+            const types = ['chart', 'display', 'control'];
+            const newType = types[index];
             setComponentType(newType);
             if (newType === 'control' && !controlConfig) {
               setControlConfig({
@@ -1053,9 +1059,18 @@ const ChartEditor = forwardRef(function ChartEditor({
                 ui_config: { label: 'Execute', kind: 'primary' }
               });
             }
+            if (newType === 'display' && !displayConfig) {
+              setDisplayConfig({
+                display_type: 'frigate_camera',
+                frigate_connection_id: '',
+                default_camera: '',
+                snapshot_interval: 10000
+              });
+            }
           }}
           className="component-type-switcher"
         >
+          <Switch name="chart" text="Chart" />
           <Switch name="display" text="Display" />
           <Switch name="control" text="Control" />
         </ContentSwitcher>
@@ -1066,19 +1081,19 @@ const ChartEditor = forwardRef(function ChartEditor({
         <div className="metadata-row">
           <TextInput
             id="chart-name"
-            labelText={componentType === 'control' ? 'Control Name' : 'Display Name'}
+            labelText={componentType === 'control' ? 'Control Name' : componentType === 'display' ? 'Display Name' : 'Chart Name'}
             value={name}
             onChange={(e) => {
               setName(e.target.value);
               if (nameError) setNameError('');
             }}
             onBlur={(e) => checkDuplicateChartName(e.target.value)}
-            placeholder={componentType === 'control' ? 'Enter control name' : 'Enter display name'}
+            placeholder={componentType === 'control' ? 'Enter control name' : componentType === 'display' ? 'Enter display name' : 'Enter chart name'}
             size="md"
             invalid={!!nameError}
             invalidText={nameError}
           />
-          {componentType !== 'control' && (
+          {componentType === 'chart' && (
             <Select
               id="chart-type"
               labelText="Chart Type"
@@ -1122,6 +1137,14 @@ const ChartEditor = forwardRef(function ChartEditor({
           connectionId={controlConfig?.connection_id || selectedDatasourceId || ''}
           onControlConfigChange={(newConfig) => setControlConfig(newConfig)}
           onConnectionIdChange={(connId) => setControlConfig(prev => ({ ...prev, connection_id: connId }))}
+        />
+      )}
+
+      {/* Display Editor - shown when componentType is 'display' */}
+      {componentType === 'display' && (
+        <DisplayEditor
+          displayConfig={displayConfig}
+          onDisplayConfigChange={(newConfig) => setDisplayConfig(newConfig)}
         />
       )}
 
@@ -1419,6 +1442,7 @@ const ChartEditor = forwardRef(function ChartEditor({
                     <EdgeLakeQueryBuilder
                       datasourceId={selectedDatasourceId}
                       onQueryChange={(query) => setQueryRaw(query)}
+                      onDatabaseChange={(db) => setEdgelakeDatabase(db)}
                       onExecute={(response) => {
                         if (response.success && response.result_set) {
                           setPreviewData(response.result_set);
@@ -1431,6 +1455,7 @@ const ChartEditor = forwardRef(function ChartEditor({
                         }
                       }}
                       initialQuery={queryRaw}
+                      initialDatabase={edgelakeDatabase}
                     />
                   ) : (
                     <TextArea

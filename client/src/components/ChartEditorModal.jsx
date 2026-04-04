@@ -18,15 +18,16 @@ function ChartEditorModal({ open, onClose, onSave, chart, panelId }) {
   const [saving, setSaving] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isValid, setIsValid] = useState(false);
+  const [editorKey, setEditorKey] = useState(0);
   const editorRef = useRef(null);
 
-  // Reset state when modal opens
+  // Reset state when modal opens — increment key to force ChartEditor remount
   useEffect(() => {
     if (open) {
       setSaving(false);
       setShowCancelConfirm(false);
-      // Set initial validity based on whether we're editing an existing chart
       setIsValid(!!chart?.name);
+      setEditorKey(k => k + 1);
     }
   }, [open, chart]);
 
@@ -93,6 +94,7 @@ function ChartEditorModal({ open, onClose, onSave, chart, panelId }) {
       >
         <div className="chart-editor-content">
           <ChartEditor
+            key={editorKey}
             ref={editorRef}
             chart={chart}
             onSave={handleSave}

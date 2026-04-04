@@ -104,8 +104,8 @@ export const COMPONENT_MIN_SIZES = {
   plug:       { w: 2, h: 7 },
   dimmer:     { w: 2, h: 7 },
 
-  // Displays (component_type='display') — future
-  camera:    { w: 3, h: 4 },
+  // Displays (component_type='display')
+  frigate_camera: { w: 3, h: 4 },
 };
 
 // Get minimum size for a component subtype

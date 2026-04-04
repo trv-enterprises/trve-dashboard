@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 	"time"
 
@@ -172,7 +173,7 @@ func (a *EdgeLakeAdapter) executeCommandInternal(ctx context.Context, command st
 	req.Header.Set("User-Agent", "anylog")
 	req.Header.Set("command", command)
 
-	if distributed || a.config.UseDistributedQuery {
+	if distributed {
 		req.Header.Set("destination", "network")
 	}
 
@@ -191,7 +192,31 @@ func (a *EdgeLakeAdapter) executeCommandInternal(ctx context.Context, command st
 		return nil, fmt.Errorf("EdgeLake returned status %d: %s", resp.StatusCode, string(body))
 	}
 
+	// EdgeLake uses HTTP/1.0 with chunked transfer encoding, which Go doesn't
+	// auto-dechunk. Strip chunk size prefixes if present.
+	body = decodeChunkedBody(body)
+
 	return body, nil
+}
+
+// decodeChunkedBody handles HTTP/1.0 responses that incorrectly use chunked transfer encoding.
+// Go's http.Client doesn't auto-dechunk HTTP/1.0 bodies, so chunk size prefixes leak into the data.
+// This detects and strips them using Go's built-in chunked reader.
+func decodeChunkedBody(body []byte) []byte {
+	// Quick check: if the body starts with a valid JSON character, it's not chunked
+	trimmed := strings.TrimSpace(string(body))
+	if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[' || trimmed[0] == '"') {
+		return body
+	}
+
+	// Use Go's built-in chunked reader to decode
+	reader := httputil.NewChunkedReader(strings.NewReader(string(body)))
+	decoded, err := io.ReadAll(reader)
+	if err != nil || len(decoded) == 0 {
+		// Not chunked or decode failed — return original
+		return body
+	}
+	return decoded
 }
 
 // parseQueryResponseRegistry parses EdgeLake response into registry.ResultSet
@@ -280,10 +305,15 @@ func (a *EdgeLakeAdapter) parseDatabaseListInternal(body []byte) ([]string, erro
 	if err := json.Unmarshal(body, &tables); err == nil {
 		dbSet := make(map[string]bool)
 		for _, t := range tables {
-			if db, ok := t["dbms"].(string); ok && db != "" {
+			// EdgeLake wraps each entry: {"table": {"dbms": "...", "name": "..."}}
+			entry := t
+			if nested, ok := t["table"].(map[string]interface{}); ok {
+				entry = nested
+			}
+			if db, ok := entry["dbms"].(string); ok && db != "" {
 				dbSet[db] = true
 			}
-			if db, ok := t["database"].(string); ok && db != "" {
+			if db, ok := entry["database"].(string); ok && db != "" {
 				dbSet[db] = true
 			}
 		}
@@ -359,7 +389,7 @@ func (e *EdgeLakeDataSource) executeCommand(ctx context.Context, command string,
 	req.Header.Set("User-Agent", "anylog")
 	req.Header.Set("command", command)
 
-	if distributed || e.config.UseDistributedQuery {
+	if distributed {
 		req.Header.Set("destination", "network")
 	}
 
@@ -377,6 +407,10 @@ func (e *EdgeLakeDataSource) executeCommand(ctx context.Context, command string,
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("EdgeLake returned status %d: %s", resp.StatusCode, string(body))
 	}
+
+	// EdgeLake uses HTTP/1.0 with chunked transfer encoding, which Go doesn't
+	// auto-dechunk. Strip chunk size prefixes if present.
+	body = decodeChunkedBody(body)
 
 	return body, nil
 }
@@ -528,10 +562,15 @@ func (e *EdgeLakeDataSource) parseDatabaseList(body []byte) ([]string, error) {
 	if err := json.Unmarshal(body, &tables); err == nil {
 		dbSet := make(map[string]bool)
 		for _, t := range tables {
-			if db, ok := t["dbms"].(string); ok && db != "" {
+			// EdgeLake wraps each entry: {"table": {"dbms": "...", "name": "..."}}
+			entry := t
+			if nested, ok := t["table"].(map[string]interface{}); ok {
+				entry = nested
+			}
+			if db, ok := entry["dbms"].(string); ok && db != "" {
 				dbSet[db] = true
 			}
-			if db, ok := t["database"].(string); ok && db != "" {
+			if db, ok := entry["database"].(string); ok && db != "" {
 				dbSet[db] = true
 			}
 		}
@@ -593,16 +632,19 @@ func (e *EdgeLakeDataSource) parseTableList(body []byte, database string) ([]str
 	if err := json.Unmarshal(body, &tables); err == nil {
 		var result []string
 		for _, t := range tables {
+			// EdgeLake wraps each entry: {"table": {"dbms": "...", "name": "..."}}
+			entry := t
+			if nested, ok := t["table"].(map[string]interface{}); ok {
+				entry = nested
+			}
 			db := ""
-			if d, ok := t["dbms"].(string); ok {
+			if d, ok := entry["dbms"].(string); ok {
 				db = d
-			} else if d, ok := t["database"].(string); ok {
+			} else if d, ok := entry["database"].(string); ok {
 				db = d
 			}
 			if db == database {
-				if name, ok := t["name"].(string); ok {
-					result = append(result, name)
-				} else if name, ok := t["table"].(string); ok {
+				if name, ok := entry["name"].(string); ok {
 					result = append(result, name)
 				}
 			}

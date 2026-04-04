@@ -38,6 +38,7 @@ const (
 	DatasourceTypePrometheus DatasourceType = "prometheus"
 	DatasourceTypeEdgeLake  DatasourceType = "edgelake"
 	DatasourceTypeMQTT     DatasourceType = "mqtt"
+	DatasourceTypeFrigate  DatasourceType = "frigate"
 )
 
 // HealthStatus represents the health status of a data source
@@ -146,6 +147,8 @@ func (d *Datasource) GetEffectiveTypeID() string {
 		return "api.edgelake"
 	case DatasourceTypeMQTT:
 		return "stream.mqtt"
+	case DatasourceTypeFrigate:
+		return "nvr.frigate"
 	default:
 		return ""
 	}
@@ -247,6 +250,14 @@ func (d *Datasource) GetEffectiveConfig() map[string]interface{} {
 			config["clean_start"] = d.Config.MQTT.CleanStart
 			config["buffer_size"] = d.Config.MQTT.BufferSize
 		}
+	case DatasourceTypeFrigate:
+		if d.Config.Frigate != nil {
+			config["host"] = d.Config.Frigate.Host
+			config["port"] = d.Config.Frigate.Port
+			config["username"] = d.Config.Frigate.Username
+			config["password"] = d.Config.Frigate.Password
+			config["go2rtc_port"] = d.Config.Frigate.Go2RTCPort
+		}
 	}
 
 	return config
@@ -262,6 +273,7 @@ type DatasourceConfig struct {
 	Prometheus *PrometheusConfig `json:"prometheus,omitempty" bson:"prometheus,omitempty"`
 	EdgeLake   *EdgeLakeConfig   `json:"edgelake,omitempty" bson:"edgelake,omitempty"`
 	MQTT       *MQTTConfig       `json:"mqtt,omitempty" bson:"mqtt,omitempty"`
+	Frigate    *FrigateConfig    `json:"frigate,omitempty" bson:"frigate,omitempty"`
 }
 
 // SQLConfig represents configuration for SQL databases
@@ -450,6 +462,42 @@ type MQTTConfig struct {
 	QoS        int    `json:"qos,omitempty" bson:"qos,omitempty"`                 // Default Quality of Service (0, 1, or 2)
 	CleanStart bool   `json:"clean_start" bson:"clean_start"`                     // Clean session on connect
 	BufferSize int    `json:"buffer_size,omitempty" bson:"buffer_size,omitempty"`  // Message buffer size (default 100)
+}
+
+// FrigateConfig represents configuration for Frigate NVR connections
+type FrigateConfig struct {
+	Host       string `json:"host" bson:"host" binding:"required"`                           // Frigate hostname or IP
+	Port       int    `json:"port" bson:"port"`                                              // Frigate API port (default: 5000)
+	Username   string `json:"username,omitempty" bson:"username,omitempty"`                   // Basic auth username (optional)
+	Password   string `json:"password,omitempty" bson:"password,omitempty"`                   // Basic auth password (optional)
+	Go2RTCPort int    `json:"go2rtc_port,omitempty" bson:"go2rtc_port,omitempty"`             // go2rtc port (default: 1984)
+}
+
+// BaseURL returns the Frigate API base URL
+func (c *FrigateConfig) BaseURL() string {
+	port := c.Port
+	if port == 0 {
+		port = 5000
+	}
+	return fmt.Sprintf("http://%s:%d", c.Host, port)
+}
+
+// JSMPEGURL returns the WebSocket base URL for JSMPEG live streams
+func (c *FrigateConfig) JSMPEGURL() string {
+	port := c.Port
+	if port == 0 {
+		port = 5000
+	}
+	return fmt.Sprintf("ws://%s:%d", c.Host, port)
+}
+
+// Go2RTCURL returns the go2rtc base URL
+func (c *FrigateConfig) Go2RTCURL() string {
+	port := c.Go2RTCPort
+	if port == 0 {
+		port = 1984
+	}
+	return fmt.Sprintf("http://%s:%d", c.Host, port)
 }
 
 // EdgeLakeConfig represents configuration for EdgeLake data sources
@@ -763,6 +811,15 @@ func (d *Datasource) SanitizeForAPI() *Datasource {
 		sanitized.Config.MQTT = &mqttCopy
 	}
 
+	// Sanitize Frigate config
+	if d.Config.Frigate != nil {
+		frigateCopy := *d.Config.Frigate
+		if frigateCopy.Password != "" {
+			frigateCopy.Password = SecretMaskedValue
+		}
+		sanitized.Config.Frigate = &frigateCopy
+	}
+
 	return &sanitized
 }
 
@@ -778,6 +835,8 @@ func (d *Datasource) HasSecret(fieldPath string) bool {
 		return d.Config.TSStore != nil && d.Config.TSStore.APIKey != ""
 	case "mqtt.password":
 		return d.Config.MQTT != nil && d.Config.MQTT.Password != ""
+	case "frigate.password":
+		return d.Config.Frigate != nil && d.Config.Frigate.Password != ""
 	default:
 		return false
 	}

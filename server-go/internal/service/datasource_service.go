@@ -239,6 +239,13 @@ func preserveSecrets(newConfig, existingConfig *models.DatasourceConfig) {
 			}
 		}
 	}
+
+	// Preserve Frigate secrets
+	if newConfig.Frigate != nil && existingConfig.Frigate != nil {
+		if newConfig.Frigate.Password == models.SecretMaskedValue {
+			newConfig.Frigate.Password = existingConfig.Frigate.Password
+		}
+	}
 }
 
 // DeleteDatasource deletes a datasource by ID
@@ -293,6 +300,8 @@ func (s *DatasourceService) TestDatasource(ctx context.Context, req *models.Test
 		response = s.testEdgeLakeConnection(ctx, req.Config.EdgeLake)
 	case models.DatasourceTypeMQTT:
 		response = s.testMQTTConnection(ctx, req.Config.MQTT)
+	case models.DatasourceTypeFrigate:
+		response = s.testFrigateConnection(ctx, req.Config.Frigate)
 	default:
 		return &models.TestDatasourceResponse{
 			Success: false,
@@ -343,6 +352,8 @@ func (s *DatasourceService) CheckHealth(ctx context.Context, id string) (*models
 		testResponse = s.testEdgeLakeConnection(ctx, datasource.Config.EdgeLake)
 	case models.DatasourceTypeMQTT:
 		testResponse = s.testMQTTConnection(ctx, datasource.Config.MQTT)
+	case models.DatasourceTypeFrigate:
+		testResponse = s.testFrigateConnection(ctx, datasource.Config.Frigate)
 	}
 
 	health.Status = testResponse.Status
@@ -413,6 +424,12 @@ func (s *DatasourceService) validateConfig(dsType models.DatasourceType, config 
 			return fmt.Errorf("MQTT configuration is required for MQTT datasource")
 		}
 		return s.validateMQTTConfig(config.MQTT)
+
+	case models.DatasourceTypeFrigate:
+		if config.Frigate == nil {
+			return fmt.Errorf("Frigate configuration is required for Frigate datasource")
+		}
+		return s.validateFrigateConfig(config.Frigate)
 
 	default:
 		return fmt.Errorf("unsupported datasource type: %s", dsType)
@@ -867,6 +884,74 @@ func (s *DatasourceService) testMQTTConnection(ctx context.Context, config *mode
 		Success: true,
 		Status:  models.HealthStatusHealthy,
 		Message: fmt.Sprintf("Connected to MQTT broker at %s", config.BrokerURL),
+	}
+}
+
+// validateFrigateConfig validates Frigate NVR configuration
+func (s *DatasourceService) validateFrigateConfig(config *models.FrigateConfig) error {
+	if config.Host == "" {
+		return fmt.Errorf("host is required")
+	}
+	if config.Port == 0 {
+		config.Port = 5000
+	}
+	if config.Go2RTCPort == 0 {
+		config.Go2RTCPort = 1984
+	}
+	return nil
+}
+
+// testFrigateConnection tests a Frigate NVR connection by hitting /api/version
+func (s *DatasourceService) testFrigateConnection(ctx context.Context, config *models.FrigateConfig) *models.TestDatasourceResponse {
+	if config == nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: "Frigate configuration is required",
+		}
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	url := config.BaseURL() + "/api/version"
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Failed to create request: %v", err),
+		}
+	}
+
+	if config.Username != "" {
+		req.SetBasicAuth(config.Username, config.Password)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Failed to connect to Frigate at %s: %v", config.BaseURL(), err),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Frigate returned status %d", resp.StatusCode),
+		}
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	version := strings.TrimSpace(string(body))
+
+	return &models.TestDatasourceResponse{
+		Success: true,
+		Status:  models.HealthStatusHealthy,
+		Message: fmt.Sprintf("Connected to Frigate %s at %s", version, config.BaseURL()),
 	}
 }
 

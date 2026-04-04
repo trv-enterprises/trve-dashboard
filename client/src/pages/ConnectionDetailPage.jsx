@@ -215,6 +215,16 @@ function ConnectionDetailPage() {
             buffer_size: 100
           }
         };
+      case 'frigate':
+        return {
+          frigate: {
+            host: '',
+            port: 5000,
+            username: '',
+            password: '',
+            go2rtc_port: 1984
+          }
+        };
       default:
         return {};
     }
@@ -269,6 +279,13 @@ function ConnectionDetailPage() {
     if (prepared.mqtt) {
       if (prepared.mqtt.password === '' && connection?.config?.mqtt?.password === SECRET_MASKED_VALUE) {
         prepared.mqtt.password = SECRET_MASKED_VALUE;
+      }
+    }
+
+    // For Frigate: if password is empty and was masked, keep the masked value
+    if (prepared.frigate) {
+      if (prepared.frigate.password === '' && connection?.config?.frigate?.password === SECRET_MASKED_VALUE) {
+        prepared.frigate.password = SECRET_MASKED_VALUE;
       }
     }
 
@@ -461,7 +478,7 @@ function ConnectionDetailPage() {
               id="sql-port"
               label="Port"
               value={sqlConfig.port || 5432}
-              onChange={(e) => updateConfig('sql.port', e.imaginaryTarget.value)}
+              onChange={(e, { value }) => updateConfig('sql.port', value)}
               min={1}
               max={65535}
             />
@@ -509,7 +526,7 @@ function ConnectionDetailPage() {
             id="sql-max-connections"
             label="Max Connections"
             value={sqlConfig.max_connections || 10}
-            onChange={(e) => updateConfig('sql.max_connections', e.imaginaryTarget.value)}
+            onChange={(e, { value }) => updateConfig('sql.max_connections', value)}
             min={1}
             max={100}
           />
@@ -517,7 +534,7 @@ function ConnectionDetailPage() {
             id="sql-timeout"
             label="Timeout (seconds)"
             value={sqlConfig.timeout || 30}
-            onChange={(e) => updateConfig('sql.timeout', e.imaginaryTarget.value)}
+            onChange={(e, { value }) => updateConfig('sql.timeout', value)}
             min={1}
             max={300}
           />
@@ -628,7 +645,7 @@ function ConnectionDetailPage() {
             id="socket-reconnect-delay"
             label="Reconnect Delay (ms)"
             value={socketConfig.reconnect_delay || 5000}
-            onChange={(e) => updateConfig('socket.reconnect_delay', e.imaginaryTarget.value)}
+            onChange={(e, { value }) => updateConfig('socket.reconnect_delay', value)}
             min={100}
             max={60000}
           />
@@ -636,7 +653,7 @@ function ConnectionDetailPage() {
             id="socket-ping-interval"
             label="Ping Interval (seconds)"
             value={socketConfig.ping_interval || 30}
-            onChange={(e) => updateConfig('socket.ping_interval', e.imaginaryTarget.value)}
+            onChange={(e, { value }) => updateConfig('socket.ping_interval', value)}
             min={1}
             max={300}
           />
@@ -646,7 +663,7 @@ function ConnectionDetailPage() {
           id="socket-buffer-size"
           label="Buffer Size (messages)"
           value={socketConfig.buffer_size || 100}
-          onChange={(e) => updateConfig('socket.buffer_size', e.imaginaryTarget.value)}
+          onChange={(e, { value }) => updateConfig('socket.buffer_size', value)}
           min={1}
           max={10000}
         />
@@ -838,7 +855,7 @@ function ConnectionDetailPage() {
             id="api-timeout"
             label="Timeout (seconds)"
             value={apiConfig.timeout || 30}
-            onChange={(e) => updateConfig('api.timeout', e.imaginaryTarget.value)}
+            onChange={(e, { value }) => updateConfig('api.timeout', value)}
             min={1}
             max={300}
           />
@@ -846,7 +863,7 @@ function ConnectionDetailPage() {
             id="api-retry-count"
             label="Retry Count"
             value={apiConfig.retry_count || 3}
-            onChange={(e) => updateConfig('api.retry_count', e.imaginaryTarget.value)}
+            onChange={(e, { value }) => updateConfig('api.retry_count', value)}
             min={0}
             max={10}
           />
@@ -856,7 +873,7 @@ function ConnectionDetailPage() {
           id="api-retry-delay"
           label="Retry Delay (ms)"
           value={apiConfig.retry_delay || 1000}
-          onChange={(e) => updateConfig('api.retry_delay', e.imaginaryTarget.value)}
+          onChange={(e, { value }) => updateConfig('api.retry_delay', value)}
           min={100}
           max={10000}
         />
@@ -894,7 +911,7 @@ function ConnectionDetailPage() {
             id="tsstore-port"
             label="Port"
             value={tsstoreConfig.port || 21080}
-            onChange={(e) => updateConfig('tsstore.port', e.imaginaryTarget.value)}
+            onChange={(e, { value }) => updateConfig('tsstore.port', value)}
             min={1}
             max={65535}
             helperText="TSStore server port"
@@ -924,7 +941,7 @@ function ConnectionDetailPage() {
           id="tsstore-timeout"
           label="Timeout (seconds)"
           value={tsstoreConfig.timeout || 30}
-          onChange={(e) => updateConfig('tsstore.timeout', e.imaginaryTarget.value)}
+          onChange={(e, { value }) => updateConfig('tsstore.timeout', value)}
           min={1}
           max={300}
           helperText="Request timeout in seconds"
@@ -985,9 +1002,9 @@ function ConnectionDetailPage() {
                   id="tsstore-agg-window-value"
                   label="Time Window"
                   value={parseInt(tsstoreConfig.push?.agg_window) || 1}
-                  onChange={(e) => {
+                  onChange={(e, { value }) => {
                     const unit = tsstoreConfig.push?.agg_window?.replace(/[0-9]/g, '') || 'm';
-                    updateConfig('tsstore.push.agg_window', `${e.imaginaryTarget.value}${unit}`);
+                    updateConfig('tsstore.push.agg_window', `${value}${unit}`);
                   }}
                   min={1}
                   max={60}
@@ -1173,7 +1190,7 @@ function ConnectionDetailPage() {
           id="prometheus-timeout"
           label="Timeout (seconds)"
           value={prometheusConfig.timeout || 30}
-          onChange={(e) => updateConfig('prometheus.timeout', e.imaginaryTarget.value)}
+          onChange={(e, { value }) => updateConfig('prometheus.timeout', value)}
           min={1}
           max={300}
           helperText="Query timeout in seconds"
@@ -1199,7 +1216,7 @@ function ConnectionDetailPage() {
             id="edgelake-port"
             label="Port"
             value={elConfig.port || 32049}
-            onChange={(e) => updateConfig('edgelake.port', e.imaginaryTarget.value)}
+            onChange={(e, { value }) => updateConfig('edgelake.port', value)}
             min={1}
             max={65535}
             helperText="REST API port (default: 32049)"
@@ -1210,7 +1227,7 @@ function ConnectionDetailPage() {
           id="edgelake-timeout"
           label="Timeout (seconds)"
           value={elConfig.timeout || 20}
-          onChange={(e) => updateConfig('edgelake.timeout', e.imaginaryTarget.value)}
+          onChange={(e, { value }) => updateConfig('edgelake.timeout', value)}
           min={1}
           max={300}
           helperText="Request timeout in seconds"
@@ -1271,7 +1288,7 @@ function ConnectionDetailPage() {
             id="mqtt-keep-alive"
             label="Keep Alive (seconds)"
             value={mqttConfig.keep_alive || 60}
-            onChange={(e) => updateConfig('mqtt.keep_alive', e.imaginaryTarget.value)}
+            onChange={(e, { value }) => updateConfig('mqtt.keep_alive', value)}
             min={5}
             max={3600}
             helperText="Ping interval to keep connection alive"
@@ -1292,7 +1309,7 @@ function ConnectionDetailPage() {
           id="mqtt-buffer-size"
           label="Buffer Size (messages)"
           value={mqttConfig.buffer_size || 100}
-          onChange={(e) => updateConfig('mqtt.buffer_size', e.imaginaryTarget.value)}
+          onChange={(e, { value }) => updateConfig('mqtt.buffer_size', value)}
           min={1}
           max={10000}
         />
@@ -1311,6 +1328,61 @@ function ConnectionDetailPage() {
             onChange={(e) => updateConfig('mqtt.clean_start', e.target.checked)}
           />
         </div>
+      </div>
+    );
+  };
+
+  const renderFrigateConfig = () => {
+    const frigateConfig = config.frigate || {};
+    return (
+      <div className="config-form">
+        <div className="form-row">
+          <TextInput
+            id="frigate-host"
+            labelText="Host"
+            value={frigateConfig.host || ''}
+            onChange={(e) => updateConfig('frigate.host', e.target.value)}
+            placeholder="192.168.1.100"
+            helperText="Frigate NVR hostname or IP address"
+          />
+          <NumberInput
+            id="frigate-port"
+            label="Port"
+            value={frigateConfig.port || 5000}
+            onChange={(e, { value }) => updateConfig('frigate.port', value)}
+            min={1}
+            max={65535}
+            helperText="Frigate API port (default: 5000)"
+          />
+        </div>
+
+        <div className="form-row">
+          <TextInput
+            id="frigate-username"
+            labelText="Username"
+            value={frigateConfig.username || ''}
+            onChange={(e) => updateConfig('frigate.username', e.target.value)}
+            placeholder="(optional)"
+          />
+          <TextInput
+            id="frigate-password"
+            type="password"
+            labelText="Password"
+            value={frigateConfig.password === SECRET_MASKED_VALUE ? '' : (frigateConfig.password || '')}
+            onChange={(e) => updateConfig('frigate.password', e.target.value)}
+            placeholder={connection?.config?.frigate?.password === SECRET_MASKED_VALUE ? '(secret set)' : '(optional)'}
+          />
+        </div>
+
+        <NumberInput
+          id="frigate-go2rtc-port"
+          label="go2rtc Port"
+          value={frigateConfig.go2rtc_port || 1984}
+          onChange={(e, { value }) => updateConfig('frigate.go2rtc_port', value)}
+          min={1}
+          max={65535}
+          helperText="go2rtc streaming port (default: 1984)"
+        />
       </div>
     );
   };
@@ -1419,6 +1491,7 @@ function ConnectionDetailPage() {
             <SelectItem value="prometheus" text="Prometheus" />
             <SelectItem value="edgelake" text="EdgeLake" />
             <SelectItem value="mqtt" text="MQTT Broker" />
+            <SelectItem value="frigate" text="Frigate NVR" />
           </Select>
         </div>
 
@@ -1444,6 +1517,7 @@ function ConnectionDetailPage() {
           {type === 'prometheus' && renderPrometheusConfig()}
           {type === 'edgelake' && renderEdgeLakeConfig()}
           {type === 'mqtt' && renderMQTTConfig()}
+          {type === 'frigate' && renderFrigateConfig()}
         </div>
       </div>
 

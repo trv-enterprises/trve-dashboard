@@ -329,13 +329,18 @@ const PrometheusQueryBuilder = ({
           id="metric-select"
           titleText=""
           placeholder="Search and select a metric..."
-          items={filteredMetrics}
+          items={schema?.metrics || []}
           itemToString={(item) => item?.name || ''}
-          selectedItem={filteredMetrics.find(m => m.name === selectedMetric) || null}
+          selectedItem={schema?.metrics?.find(m => m.name === selectedMetric) || null}
           onChange={({ selectedItem }) => setSelectedMetric(selectedItem?.name || '')}
+          onInputChange={(inputValue) => setMetricSearch(inputValue || '')}
+          shouldFilterItem={({ item, inputValue }) => {
+            if (!inputValue) return true;
+            return item?.name?.toLowerCase().includes(inputValue.toLowerCase());
+          }}
           disabled={disabled}
         />
-        {schema.metrics.length > 0 && (
+        {schema.metrics.length > 0 && metricSearch && (
           <div className="metric-count">
             {filteredMetrics.length} of {schema.metrics.length} metrics
           </div>
