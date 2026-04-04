@@ -27,7 +27,9 @@ export function useAISession(chartId = null, preflightContext = {}) {
   const wsRef = useRef(null);
   const sessionIdRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
+  const reconnectAttemptsRef = useRef(0);
   const startingRef = useRef(false); // Guard against duplicate startSession calls
+  const MAX_RECONNECT_ATTEMPTS = 5;
 
   // Start a new AI session
   const startSession = useCallback(async () => {
@@ -90,6 +92,7 @@ export function useAISession(chartId = null, preflightContext = {}) {
     ws.onopen = () => {
       console.log('[WS] Connected');
       setConnected(true);
+      reconnectAttemptsRef.current = 0;
     };
 
     ws.onmessage = (event) => {
@@ -101,19 +104,27 @@ export function useAISession(chartId = null, preflightContext = {}) {
       }
     };
 
-    ws.onerror = (err) => {
-      console.error('[WS] Error:', err);
+    ws.onerror = () => {
+      // Suppress WS error logs — reconnect logic handles failures
     };
 
     ws.onclose = (event) => {
-      console.log('[WS] Closed:', event.code, event.reason);
+      if (event.code !== 1000 && event.code !== 1006) {
+        console.log('[WS] Closed:', event.code, event.reason);
+      }
       setConnected(false);
 
-      // Only reconnect if session is still active and not a normal close
+      // Only reconnect if session is still active, not a normal close, and under retry limit
       if (sessionIdRef.current && event.code !== 1000) {
+        if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
+          console.log(`[WS] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached, giving up`);
+          setError('Lost connection to AI session. Please start a new session.');
+          return;
+        }
+        reconnectAttemptsRef.current += 1;
         reconnectTimeoutRef.current = setTimeout(() => {
           if (sessionIdRef.current) {
-            console.log('[WS] Attempting reconnect...');
+            console.log(`[WS] Attempting reconnect (${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})...`);
             connectWebSocket();
           }
         }, 3000);
