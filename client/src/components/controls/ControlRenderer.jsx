@@ -37,10 +37,11 @@ function ControlRenderer({ control, onSuccess, onError }) {
   const title = control.title || control.name;
   const typeInfo = CONTROL_TYPE_INFO[controlType];
   const readOnly = typeInfo && !typeInfo.canWrite;
+  const isTile = controlType.startsWith('tile_');
 
   return (
-    <div className="control-renderer">
-      {title && <div className="control-title">{title}</div>}
+    <div className={`control-renderer ${isTile ? 'control-renderer--tile' : ''}`}>
+      {title && !isTile && <div className="control-title">{title}</div>}
       <div className="control-body">
         <Component
           control={control}

@@ -255,7 +255,12 @@ func (h *CommandHandler) buildCommandFromDeviceType(c *gin.Context, controlConfi
 	}
 
 	// Get the command definition for this control type
-	commandDef, ok := deviceType.Commands[controlConfig.ControlType]
+	// Tile controls (tile_plug, tile_dimmer) map to their base type (plug, dimmer)
+	lookupType := controlConfig.ControlType
+	if strings.HasPrefix(lookupType, "tile_") {
+		lookupType = strings.TrimPrefix(lookupType, "tile_")
+	}
+	commandDef, ok := deviceType.Commands[lookupType]
 	if !ok {
 		return registry.Command{}, fmt.Errorf("device type '%s' does not support control type '%s'", deviceType.ID, controlConfig.ControlType)
 	}

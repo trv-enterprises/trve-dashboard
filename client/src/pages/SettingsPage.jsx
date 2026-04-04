@@ -21,6 +21,7 @@ import { Edit } from '@carbon/icons-react';
 import apiClient from '../api/client';
 import LayoutDimensionsEditorModal from '../components/LayoutDimensionsEditorModal';
 import DefaultLayoutDimensionEditorModal from '../components/DefaultLayoutDimensionEditorModal';
+import TileFontSizeEditorModal from '../components/TileFontSizeEditorModal';
 import './SettingsPage.scss';
 
 /**
@@ -39,6 +40,7 @@ function SettingsPage() {
   const [editingSetting, setEditingSetting] = useState(null);
   const [layoutDimensionsModalOpen, setLayoutDimensionsModalOpen] = useState(false);
   const [defaultLayoutDimensionModalOpen, setDefaultLayoutDimensionModalOpen] = useState(false);
+  const [tileFontSizeModalOpen, setTileFontSizeModalOpen] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -68,6 +70,9 @@ function SettingsPage() {
       case 'default_layout_dimension':
         setDefaultLayoutDimensionModalOpen(true);
         break;
+      case 'tile_font_size':
+        setTileFontSizeModalOpen(true);
+        break;
       default:
         // For unknown setting types, show a notification
         setNotification({
@@ -95,6 +100,11 @@ function SettingsPage() {
 
   const handleDefaultLayoutDimensionClose = () => {
     setDefaultLayoutDimensionModalOpen(false);
+    setEditingSetting(null);
+  };
+
+  const handleTileFontSizeClose = () => {
+    setTileFontSizeModalOpen(false);
     setEditingSetting(null);
   };
 
@@ -266,6 +276,16 @@ function SettingsPage() {
         onSave={(value) => {
           handleSave('default_layout_dimension', value);
           handleDefaultLayoutDimensionClose();
+        }}
+      />
+      {/* Tile Font Size Editor Modal */}
+      <TileFontSizeEditorModal
+        open={tileFontSizeModalOpen}
+        onClose={handleTileFontSizeClose}
+        currentValue={editingSetting?.key === 'tile_font_size' ? editingSetting.value : 'sm'}
+        onSave={(value) => {
+          handleSave('tile_font_size', value);
+          handleTileFontSizeClose();
         }}
       />
     </div>

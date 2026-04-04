@@ -28,11 +28,14 @@ const (
 
 // Control type constants
 const (
-	ControlTypeButton    = "button"     // Simple action button
-	ControlTypeToggle    = "toggle"     // On/off toggle switch
-	ControlTypeSlider    = "slider"     // Numeric slider
-	ControlTypeTextInput = "text_input" // Text input field
-	ControlTypePlug      = "plug"       // Smart plug toggle
+	ControlTypeButton    = "button"      // Simple action button
+	ControlTypeToggle    = "toggle"      // On/off toggle switch
+	ControlTypeSlider    = "slider"      // Numeric slider
+	ControlTypeTextInput = "text_input"  // Text input field
+	ControlTypePlug      = "plug"        // Smart plug toggle
+	ControlTypeDimmer    = "dimmer"      // Light dimmer
+	ControlTypeTilePlug  = "tile_plug"   // Compact tile plug
+	ControlTypeTileDimmer = "tile_dimmer" // Compact tile dimmer
 )
 
 // ControlConfig defines configuration for control components

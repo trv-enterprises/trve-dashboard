@@ -15,11 +15,14 @@ export { default as ControlSlider } from './ControlSlider';
 export { default as ControlTextInput } from './ControlTextInput';
 export { default as ControlPlug } from './ControlPlug';
 export { default as ControlDimmer } from './ControlDimmer';
+export { default as TilePlug } from './TilePlug';
+export { default as TileDimmer } from './TileDimmer';
 export { default as ControlRenderer } from './ControlRenderer';
 
 // Shared hooks and utilities
 export { useControlState } from './useControlState';
 export { useControlCommand } from './useControlCommand';
+export { useTileFontSize } from './useTileFontSize';
 export * from './controlUtils';
 
 // Re-export types and metadata from controlTypes (avoids circular deps)

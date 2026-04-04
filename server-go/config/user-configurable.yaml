@@ -21,3 +21,8 @@ settings:
       - {name: "2992x1934", max_width: 3008, max_height: 1934}
       - {name: "3456x2160", max_width: 3456, max_height: 2160}
       - {name: "3840x2160-4K", max_width: 3840, max_height: 2160}
+
+  - key: tile_font_size
+    category: appearance
+    description: "Font size for compact tile control labels (xs, sm, md, lg)"
+    value: "sm"

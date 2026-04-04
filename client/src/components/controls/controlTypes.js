@@ -24,7 +24,9 @@ export const CONTROL_TYPES = {
   SLIDER: 'slider',
   TEXT_INPUT: 'text_input',
   PLUG: 'plug',
-  DIMMER: 'dimmer'
+  DIMMER: 'dimmer',
+  TILE_PLUG: 'tile_plug',
+  TILE_DIMMER: 'tile_dimmer'
 };
 
 // Control type metadata for UI, discovery, and AI builder
@@ -100,6 +102,35 @@ export const CONTROL_TYPE_INFO = {
   [CONTROL_TYPES.DIMMER]: {
     label: 'Dimmer',
     description: 'Vertical slider for dimming lights, drag to set level',
+    icon: mdiLightbulbOn,
+    category: 'numeric',
+    canWrite: true,
+    canRead: true,
+    defaultUIConfig: {
+      label: 'Light',
+      min: 0,
+      max: 100,
+      step: 1,
+      state_field: 'level'
+    }
+  },
+  [CONTROL_TYPES.TILE_PLUG]: {
+    label: 'Tile Plug',
+    description: 'Compact tile showing plug on/off state. Tap to open full control.',
+    icon: mdiPowerPlug,
+    category: 'switch',
+    canWrite: true,
+    canRead: true,
+    defaultUIConfig: {
+      label: 'Plug',
+      onLabel: 'On',
+      offLabel: 'Off',
+      state_field: 'state'
+    }
+  },
+  [CONTROL_TYPES.TILE_DIMMER]: {
+    label: 'Tile Dimmer',
+    description: 'Compact tile showing dimmer level with vertical fill. Tap to open full control.',
     icon: mdiLightbulbOn,
     category: 'numeric',
     canWrite: true,
