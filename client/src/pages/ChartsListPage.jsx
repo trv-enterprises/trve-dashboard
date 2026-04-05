@@ -78,7 +78,7 @@ function ChartsListPage() {
   // Hierarchical type filter - tracks selected types
   // null = all selected (no filter), Set = specific selection (empty Set = nothing selected)
   // Chart subtypes: bar, line, area, pie, scatter, gauge, dataview, number, custom
-  // Control subtypes: button, toggle, slider, text_input
+  // Control subtypes: derived from CONTROL_TYPE_INFO
   const [selectedTypes, setSelectedTypes] = useState(() => {
     if (savedFilters.types) {
       return new Set(savedFilters.types.split(',').filter(t => t)); // Filter out empty strings
@@ -108,17 +108,16 @@ function ChartsListPage() {
       label: 'Displays',
       dbValue: 'display',
       subtypes: [
-        { id: 'frigate_camera', label: 'Frigate Camera' }
+        { id: 'frigate_camera', label: 'Frigate Camera' },
+        { id: 'weather', label: 'Weather' }
       ]
     },
     control: {
       label: 'Controls',
-      subtypes: [
-        { id: 'button', label: 'Button' },
-        { id: 'toggle', label: 'Toggle' },
-        { id: 'slider', label: 'Slider' },
-        { id: 'text_input', label: 'Text Input' }
-      ]
+      subtypes: Object.entries(CONTROL_TYPE_INFO).map(([id, info]) => ({
+        id,
+        label: info.label
+      }))
     }
   };
 

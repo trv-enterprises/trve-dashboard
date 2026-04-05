@@ -14,7 +14,8 @@ import {
   mdiTuneVertical,
   mdiFormTextbox,
   mdiPowerPlug,
-  mdiLightbulbOn
+  mdiLightbulbOn,
+  mdiFormatText
 } from '@mdi/js';
 
 // Control type constants - must match backend models.ControlType* constants
@@ -26,7 +27,8 @@ export const CONTROL_TYPES = {
   PLUG: 'plug',
   DIMMER: 'dimmer',
   TILE_PLUG: 'tile_plug',
-  TILE_DIMMER: 'tile_dimmer'
+  TILE_DIMMER: 'tile_dimmer',
+  TEXT_LABEL: 'text_label'
 };
 
 // Control type metadata for UI, discovery, and AI builder
@@ -142,6 +144,19 @@ export const CONTROL_TYPE_INFO = {
       step: 1,
       state_field: 'level'
     }
+  },
+  [CONTROL_TYPES.TEXT_LABEL]: {
+    label: 'Text Label',
+    description: 'Static text display for section headers, date/time, or dashboard titles. No connection needed.',
+    icon: mdiFormatText,
+    category: 'decorative',
+    canWrite: false,
+    canRead: false,
+    defaultUIConfig: {
+      display_content: 'title',
+      align: 'center',
+      size: 'md'
+    }
   }
 };
 
@@ -150,5 +165,6 @@ export const CONTROL_CATEGORIES = {
   switch: { label: 'Switches', description: 'On/off controls' },
   numeric: { label: 'Numeric', description: 'Sliders and dimmers' },
   action: { label: 'Actions', description: 'Buttons and triggers' },
-  input: { label: 'Input', description: 'Text and command entry' }
+  input: { label: 'Input', description: 'Text and command entry' },
+  decorative: { label: 'Decorative', description: 'Labels, headers, and layout elements' }
 };

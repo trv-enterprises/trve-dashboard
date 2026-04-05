@@ -150,7 +150,16 @@ function FrigateCameraViewer({ config }) {
 
   const cleanupLiveStream = useCallback(() => {
     if (playerRef.current) {
-      playerRef.current.destroy();
+      try {
+        // Stop playback and close WebSocket without removing the canvas from DOM
+        // (React owns the canvas element — destroy() would cause removeChild errors)
+        playerRef.current.stop();
+        if (playerRef.current.source) {
+          playerRef.current.source.destroy();
+        }
+      } catch (e) {
+        // Ignore cleanup errors (WebGL context may already be lost)
+      }
       playerRef.current = null;
     }
   }, []);

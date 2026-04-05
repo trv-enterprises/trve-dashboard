@@ -310,7 +310,7 @@
     touch-action: none; // Prevent scroll while dragging
 
     &.dimmer-on {
-      box-shadow: 0 0 24px rgba(244, 196, 48, 0.25);
+      box-shadow: 0 0 24px rgba(212, 96, 0, 0.25);
     }
 
     &.dimmer-dragging {
@@ -342,7 +342,7 @@
     bottom: 0;
     left: 0;
     right: 0;
-    background: linear-gradient(to top, #e8a317, #f4c430);
+    background: linear-gradient(to top, #d46000, #d46000);
     border-radius: 24px;
     transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -406,7 +406,7 @@
     transition: color 0.3s ease;
 
     &.dimmer-state-on {
-      color: #f4c430;
+      color: #d46000;
     }
   }
 }
@@ -424,6 +424,55 @@
   .cds--slider__thumb {
     background-color: var(--cds-interactive);
     border-color: var(--cds-interactive);
+  }
+}
+
+// ============================================================
+// Text Label — decorative text display (no connection)
+// ============================================================
+
+.control-text-label {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: spacing.$spacing-02;
+
+  // Alignment
+  &--left { align-items: flex-start; text-align: left; }
+  &--center { align-items: center; text-align: center; }
+  &--right { align-items: flex-end; text-align: right; }
+
+  // Sizes
+  &--sm .text-label-text { font-size: 0.875rem; }
+  &--md .text-label-text { font-size: 1.25rem; }
+  &--lg .text-label-text { font-size: 1.75rem; }
+  &--xl .text-label-text { font-size: 2.25rem; }
+
+  .text-label-text {
+    color: var(--cds-text-primary);
+    font-weight: 600;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+    word-break: break-word;
+  }
+
+  .text-label-datetime {
+    display: flex;
+    gap: spacing.$spacing-04;
+    color: var(--cds-text-secondary);
+    font-size: 0.875rem;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .text-label-date {
+    white-space: nowrap;
+  }
+
+  .text-label-time {
+    white-space: nowrap;
   }
 }
 
@@ -534,7 +583,7 @@
     bottom: 0;
     left: 0;
     right: 0;
-    background: linear-gradient(to top, #e8a317, #f4c430);
+    background: linear-gradient(to top, #d46000, #d46000);
     border-radius: 0 0 7px 7px; // slightly less than container to avoid bleed
     transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -558,6 +607,16 @@
   position: relative;
   width: 100%;
   height: 100%;
+}
+
+// Text label renderer overrides — no padding, no title, transparent background
+.control-renderer--text-label {
+  padding: 0;
+  background-color: transparent;
+
+  .control-body {
+    padding: 0;
+  }
 }
 
 // Tile renderer overrides — no padding, no title

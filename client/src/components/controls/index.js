@@ -17,6 +17,7 @@ export { default as ControlPlug } from './ControlPlug';
 export { default as ControlDimmer } from './ControlDimmer';
 export { default as TilePlug } from './TilePlug';
 export { default as TileDimmer } from './TileDimmer';
+export { default as ControlTextLabel } from './ControlTextLabel';
 export { default as ControlRenderer } from './ControlRenderer';
 
 // Shared hooks and utilities

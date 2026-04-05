@@ -19,6 +19,7 @@ import {
 } from '@carbon/react';
 import { Renew } from '@carbon/icons-react';
 import { CONTROL_TYPES, CONTROL_TYPE_INFO } from './controls';
+import { DISPLAY_CONTENT_FORMATS } from './controls/ControlTextLabel';
 import apiClient from '../api/client';
 import './ControlEditor.scss';
 
@@ -31,6 +32,7 @@ import './ControlEditor.scss';
 function ControlEditor({
   controlConfig,
   connectionId,
+  displayTitle,
   onControlConfigChange,
   onConnectionIdChange
 }) {
@@ -48,6 +50,10 @@ function ControlEditor({
 
   // Detect MQTT connection
   const isMQTT = selectedConnection?.type === 'mqtt';
+
+  // Check if this control type needs a connection (decorative types don't)
+  const typeInfo = CONTROL_TYPE_INFO[controlType];
+  const needsConnection = typeInfo?.canWrite || typeInfo?.canRead;
 
   // Fetch writable connections on mount
   useEffect(() => {
@@ -254,8 +260,8 @@ function ControlEditor({
         </div>
       </div>
 
-      {/* Connection Selection */}
-      <div className="connection-section">
+      {/* Connection & Command — hidden for decorative controls */}
+      {needsConnection && <><div className="connection-section">
         <h4>Connection</h4>
         <Grid narrow>
           <Column lg={8} md={4} sm={4}>
@@ -416,7 +422,7 @@ function ControlEditor({
             </Column>
           </Grid>
         )}
-      </div>
+      </div></>}
 
       {/* UI Configuration - varies by control type */}
       <div className="ui-config-section">
@@ -600,6 +606,138 @@ function ControlEditor({
               </Column>
             </>
           )}
+
+          {/* Tile Plug UI Config */}
+          {controlType === CONTROL_TYPES.TILE_PLUG && (
+            <>
+              <Column lg={4} md={4} sm={4}>
+                <TextInput
+                  id="ui-label"
+                  labelText="Label"
+                  value={uiConfig.label || ''}
+                  onChange={(e) => updateUIConfig('label', e.target.value)}
+                  placeholder="Plug"
+                />
+              </Column>
+              <Column lg={4} md={4} sm={4}>
+                <TextInput
+                  id="ui-on-label"
+                  labelText="On Label"
+                  value={uiConfig.onLabel || ''}
+                  onChange={(e) => updateUIConfig('onLabel', e.target.value)}
+                  placeholder="On"
+                />
+              </Column>
+              <Column lg={4} md={4} sm={4}>
+                <TextInput
+                  id="ui-off-label"
+                  labelText="Off Label"
+                  value={uiConfig.offLabel || ''}
+                  onChange={(e) => updateUIConfig('offLabel', e.target.value)}
+                  placeholder="Off"
+                />
+              </Column>
+            </>
+          )}
+
+          {/* Tile Dimmer UI Config */}
+          {controlType === CONTROL_TYPES.TILE_DIMMER && (
+            <>
+              <Column lg={4} md={4} sm={4}>
+                <TextInput
+                  id="ui-label"
+                  labelText="Label"
+                  value={uiConfig.label || ''}
+                  onChange={(e) => updateUIConfig('label', e.target.value)}
+                  placeholder="Light"
+                />
+              </Column>
+              <Column lg={3} md={2} sm={4}>
+                <NumberInput
+                  id="ui-min"
+                  label="Min"
+                  value={uiConfig.min ?? 0}
+                  onChange={(e, { value }) => updateUIConfig('min', value)}
+                  min={0}
+                  max={999}
+                  step={1}
+                />
+              </Column>
+              <Column lg={3} md={2} sm={4}>
+                <NumberInput
+                  id="ui-max"
+                  label="Max"
+                  value={uiConfig.max ?? 100}
+                  onChange={(e, { value }) => updateUIConfig('max', value)}
+                  min={1}
+                  max={1000}
+                  step={1}
+                />
+              </Column>
+              <Column lg={2} md={2} sm={4}>
+                <NumberInput
+                  id="ui-step"
+                  label="Step"
+                  value={uiConfig.step ?? 1}
+                  onChange={(e, { value }) => updateUIConfig('step', value)}
+                  min={1}
+                  max={100}
+                  step={1}
+                />
+              </Column>
+            </>
+          )}
+
+          {/* Text Label UI Config */}
+          {controlType === CONTROL_TYPES.TEXT_LABEL && (() => {
+            const now = new Date();
+            const titlePreview = displayTitle || '(empty)';
+            const contentItems = Object.entries(DISPLAY_CONTENT_FORMATS).map(([id, def]) => ({
+              id,
+              text: def.isDateTime ? def.format(now) : titlePreview
+            }));
+            return (
+              <>
+                <Column lg={4} md={4} sm={4}>
+                  <Select
+                    id="ui-display-content"
+                    labelText="Display Content"
+                    value={uiConfig.display_content || 'title'}
+                    onChange={(e) => updateUIConfig('display_content', e.target.value)}
+                  >
+                    {contentItems.map(item => (
+                      <SelectItem key={item.id} value={item.id} text={item.text} />
+                    ))}
+                  </Select>
+                </Column>
+                <Column lg={4} md={2} sm={4}>
+                  <Select
+                    id="ui-size"
+                    labelText="Text Size"
+                    value={uiConfig.size || 'md'}
+                    onChange={(e) => updateUIConfig('size', e.target.value)}
+                  >
+                    <SelectItem value="sm" text="Small" />
+                    <SelectItem value="md" text="Medium" />
+                    <SelectItem value="lg" text="Large" />
+                    <SelectItem value="xl" text="Extra Large" />
+                  </Select>
+                </Column>
+                <Column lg={4} md={2} sm={4}>
+                  <Select
+                    id="ui-align"
+                    labelText="Alignment"
+                    value={uiConfig.align || 'center'}
+                    onChange={(e) => updateUIConfig('align', e.target.value)}
+                  >
+                    <SelectItem value="left" text="Left" />
+                    <SelectItem value="center" text="Center" />
+                    <SelectItem value="right" text="Right" />
+                  </Select>
+                </Column>
+              </>
+            );
+          })()}
 
           {/* Text Input UI Config */}
           {controlType === CONTROL_TYPES.TEXT_INPUT && (

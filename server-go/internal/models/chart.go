@@ -24,6 +24,7 @@ const (
 // Display type constants
 const (
 	DisplayTypeFrigateCamera = "frigate_camera" // Frigate NVR camera viewer
+	DisplayTypeWeather       = "weather"        // Weather display with MQTT feed
 )
 
 // Control type constants
@@ -34,8 +35,9 @@ const (
 	ControlTypeTextInput = "text_input"  // Text input field
 	ControlTypePlug      = "plug"        // Smart plug toggle
 	ControlTypeDimmer    = "dimmer"      // Light dimmer
-	ControlTypeTilePlug  = "tile_plug"   // Compact tile plug
+	ControlTypeTilePlug   = "tile_plug"   // Compact tile plug
 	ControlTypeTileDimmer = "tile_dimmer" // Compact tile dimmer
+	ControlTypeTextLabel  = "text_label"  // Static text/label display
 )
 
 // ControlConfig defines configuration for control components
@@ -65,14 +67,18 @@ type CommandConfig struct {
 // DisplayConfig defines configuration for display components
 // @Description Configuration for non-chart visual components (cameras, iframes, etc.)
 type DisplayConfig struct {
-	DisplayType string `json:"display_type" bson:"display_type"` // "frigate_camera" (future: "datatable", "iframe", etc.)
+	DisplayType string `json:"display_type" bson:"display_type"` // "frigate_camera", "weather"
 
 	// Frigate-specific fields (only used when display_type = "frigate_camera")
 	FrigateConnectionID string `json:"frigate_connection_id,omitempty" bson:"frigate_connection_id,omitempty"` // API connection to Frigate NVR
 	DefaultCamera       string `json:"default_camera,omitempty" bson:"default_camera,omitempty"`               // Pre-selected camera name
-	MqttConnectionID    string `json:"mqtt_connection_id,omitempty" bson:"mqtt_connection_id,omitempty"`       // MQTT connection for alert subscription
+	MqttConnectionID    string `json:"mqtt_connection_id,omitempty" bson:"mqtt_connection_id,omitempty"`       // MQTT connection for alert/weather subscription
 	AlertTopic          string `json:"alert_topic,omitempty" bson:"alert_topic,omitempty"`                     // MQTT topic for alerts (default: "frigate/reviews")
 	SnapshotInterval    int    `json:"snapshot_interval,omitempty" bson:"snapshot_interval,omitempty"`          // Polling interval in ms (default 10000)
+
+	// Weather-specific fields (only used when display_type = "weather")
+	WeatherTopicPrefix string `json:"weather_topic_prefix,omitempty" bson:"weather_topic_prefix,omitempty"` // MQTT topic prefix (default: "weather")
+	WeatherLocation    string `json:"weather_location,omitempty" bson:"weather_location,omitempty"`         // Display label (e.g., "Spring, TX")
 }
 
 // Chart represents a standalone chart or control configuration

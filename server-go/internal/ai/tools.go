@@ -41,7 +41,7 @@ Control types and their UI config:
 					"control_type": map[string]interface{}{
 						"type":        "string",
 						"description": "Type of control",
-						"enum":        []string{"button", "toggle", "slider", "text_input", "plug", "dimmer", "tile_plug", "tile_dimmer"},
+						"enum":        []string{"button", "toggle", "slider", "text_input", "plug", "dimmer", "tile_plug", "tile_dimmer", "text_label"},
 					},
 					"connection_id": map[string]interface{}{"type": "string", "description": "ID of the connection to send commands through (e.g., MQTT, WebSocket)"},
 					"target": map[string]interface{}{"type": "string", "description": "Device or endpoint identifier for command targeting"},

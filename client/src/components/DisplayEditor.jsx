@@ -14,7 +14,8 @@ import apiClient from '../api/client';
 
 // Available display types
 const DISPLAY_TYPES = [
-  { id: 'frigate_camera', label: 'Frigate Camera' }
+  { id: 'frigate_camera', label: 'Frigate Camera' },
+  { id: 'weather', label: 'Weather' }
 ];
 
 /**
@@ -91,6 +92,42 @@ function DisplayEditor({ displayConfig, onDisplayConfigChange }) {
           ))}
         </Select>
       </div>
+
+      {/* Weather fields */}
+      {displayType === 'weather' && (
+        <div className="display-editor__section">
+          <Dropdown
+            id="weather-mqtt-connection"
+            titleText="MQTT Connection"
+            label="Select MQTT connection with weather topics"
+            items={mqttConnections}
+            itemToString={(item) => item?.name || ''}
+            selectedItem={mqttConnections.find(c => c.id === config.mqtt_connection_id) || null}
+            onChange={({ selectedItem }) => {
+              updateConfig({ mqtt_connection_id: selectedItem?.id || '' });
+            }}
+          />
+
+          <TextInput
+            id="weather-location"
+            labelText="Location"
+            value={config.weather_location || ''}
+            onChange={(e) => updateConfig({ weather_location: e.target.value })}
+            placeholder="e.g., Spring, TX"
+            helperText="Location label displayed at the top of the widget"
+            size="md"
+          />
+
+          <TextInput
+            id="weather-topic-prefix"
+            labelText="Topic Prefix"
+            value={config.weather_topic_prefix || 'weather'}
+            onChange={(e) => updateConfig({ weather_topic_prefix: e.target.value })}
+            helperText="MQTT topic prefix (subscribes to prefix/#). Default: weather"
+            size="md"
+          />
+        </div>
+      )}
 
       {/* Frigate Camera fields */}
       {displayType === 'frigate_camera' && (

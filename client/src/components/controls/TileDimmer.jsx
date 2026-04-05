@@ -46,19 +46,23 @@ function TileDimmer({ control, readOnly = false, onSuccess, onError }) {
       return;
     }
     if (!tileRef.current) return;
-    const rect = tileRef.current.getBoundingClientRect();
+    // Use the tile button's rect (the inner div), not the wrapper
+    const tileButton = tileRef.current.querySelector('.tile-dimmer');
+    const btnRect = tileButton ? tileButton.getBoundingClientRect() : rect;
+    const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const popupHeight = 260;
-    const openAbove = rect.top > popupHeight;
-    const centerX = rect.left + rect.width / 2;
+    const btnCenterX = btnRect.left + btnRect.width / 2;
+    const openRight = btnCenterX < viewportWidth / 2;
+    const openAbove = btnRect.top > viewportHeight / 2;
 
     setPopupStyle({
       position: 'fixed',
-      left: centerX,
-      transform: 'translateX(-50%)',
+      ...(openRight
+        ? { right: viewportWidth - btnRect.right - 39 }
+        : { left: btnRect.left - 41 }),
       ...(openAbove
-        ? { bottom: viewportHeight - rect.top + 4 }
-        : { top: rect.bottom + 4 }),
+        ? { bottom: viewportHeight - btnRect.top + 2 }
+        : { top: btnRect.bottom + 2 }),
       zIndex: 9999,
     });
     setPopupOpen(true);
@@ -69,7 +73,8 @@ function TileDimmer({ control, readOnly = false, onSuccess, onError }) {
       <div
         className={`tile-dimmer ${isHigh ? 'tile-dimmer-high' : 'tile-dimmer-low'}`}
         style={{ fontSize }}
-        onClick={handleTileClick}
+        onClick={(e) => { e.stopPropagation(); handleTileClick(); }}
+        onDoubleClick={(e) => e.stopPropagation()}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleTileClick(); }}
@@ -86,7 +91,7 @@ function TileDimmer({ control, readOnly = false, onSuccess, onError }) {
 
       {popupOpen && createPortal(
         <>
-          <div className="tile-popup-backdrop" onClick={() => setPopupOpen(false)} />
+          <div className="tile-popup-backdrop" onClick={(e) => { e.stopPropagation(); setPopupOpen(false); }} onDoubleClick={(e) => e.stopPropagation()} />
           <div className="tile-popup" style={popupStyle}>
             <ControlDimmer
               control={control}

@@ -229,6 +229,16 @@
           box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
         }
 
+        &.text-label-panel {
+          border: none;
+          background-color: #262626;
+          box-shadow: none;
+
+          .component-wrapper {
+            padding: 0;
+          }
+        }
+
         .chart-header {
           display: flex;
           align-items: center;

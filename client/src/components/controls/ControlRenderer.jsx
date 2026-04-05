@@ -40,8 +40,8 @@ function ControlRenderer({ control, onSuccess, onError }) {
   const isTile = controlType.startsWith('tile_');
 
   return (
-    <div className={`control-renderer ${isTile ? 'control-renderer--tile' : ''}`}>
-      {title && !isTile && <div className="control-title">{title}</div>}
+    <div className={`control-renderer ${isTile ? 'control-renderer--tile' : ''} ${controlType === 'text_label' ? 'control-renderer--text-label' : ''}`}>
+      {title && !isTile && controlType !== 'text_label' && <div className="control-title">{title}</div>}
       <div className="control-body">
         <Component
           control={control}

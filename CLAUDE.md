@@ -227,9 +227,10 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
 │                    React 18 + Vite + Carbon Design System                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  Design Mode          │  View Mode            │  Manage Mode                │
-│  - Layouts            │  - Dashboard Viewer   │  - Settings (Future)        │
-│  - Connections        │  - Real-time Data     │  - User Config (Future)     │
-│  - Charts/Components  │  - Auto-refresh       │                             │
+│  - Layouts            │  - Dashboard Viewer   │  - Settings                 │
+│  - Connections        │  - Real-time Data     │  - Users                    │
+│  - Charts/Components  │  - Auto-refresh       │  - Device Types             │
+│  - Dashboards         │  - Fullscreen         │                             │
 │  - Dashboards         │  - Fullscreen         │                             │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
@@ -287,8 +288,11 @@ End-user dashboard viewing:
 - Auto-refresh based on dashboard settings
 - Fullscreen viewing capability
 
-### Manage Mode (`/manage`) - Future
-System administration and user configuration.
+### Manage Mode (`/manage`)
+System administration and configuration:
+- **Settings** (`/manage/settings`) - Admin-configurable settings (layout dimensions, tile font size)
+- **Users** (`/manage/users`) - User management (create, edit users with name/GUID)
+- **Device Types** (`/manage/device-types`) - Define device types with command schemas for controls
 
 ## File Structure
 
@@ -378,9 +382,73 @@ dashboard/
 | GET | `/api/ai/sessions/:id/ws` | WebSocket connection |
 | POST | `/api/ai/sessions/:id/save` | Save session |
 | DELETE | `/api/ai/sessions/:id` | Cancel session |
+| **Settings (Admin)** |||
+| GET | `/api/settings` | List all admin settings |
+| GET | `/api/settings/:key` | Get setting by key |
+| PUT | `/api/settings/:key` | Update setting value |
+| **Config (App/User)** |||
+| GET | `/api/config/system` | Get system-wide app config |
+| PUT | `/api/config/system` | Update system config |
+| GET | `/api/config/user/:user_id` | Get user preferences |
+| PUT | `/api/config/user/:user_id` | Update user preferences (merges keys) |
 | **MCP** |||
 | GET | `/mcp/sse` | SSE connection for MCP |
 | POST | `/mcp/message` | Send MCP message |
+
+## Settings & Configuration
+
+The application has two configuration systems:
+
+### Admin Settings (`/manage/settings`)
+
+Global settings managed by administrators through the Settings page in Manage mode.
+
+- **Storage**: MongoDB `settings` collection, seeded from `server-go/config/user-configurable.yaml` on first run
+- **API**: `GET/PUT /api/settings/:key`
+- **Frontend**: `apiClient.getSettings()`, `apiClient.getSetting(key)`, `apiClient.updateSetting(key, value)`
+- **DB values take precedence** over YAML defaults after first sync
+
+**Current settings:**
+
+| Key | Category | Description |
+|-----|----------|-------------|
+| `default_layout_dimension` | layout | Default dimension preset for new dashboards |
+| `layout_dimensions` | layout | Array of available dashboard dimension presets |
+| `tile_font_size` | appearance | Font size for compact tile controls (xs/sm/md/lg) |
+
+**Adding a new admin setting:**
+1. Add entry to `server-go/config/user-configurable.yaml` with key, category, description, value
+2. Add a `case` to `SettingsPage.jsx` `handleEdit()` switch statement
+3. Create a custom editor modal component (follows `onClose`, `currentValue`, `onSave` pattern)
+4. Import and render the modal in SettingsPage
+
+### User Preferences (`/api/config/user/:user_id`)
+
+Per-user preferences stored as a key-value map. No predefined schema — any key can be set.
+
+- **Storage**: MongoDB `app_config` collection with `scope: "user"` and `user_id`
+- **API**: `GET/PUT /api/config/user/:user_id` — PUT merges individual keys (doesn't replace the whole map)
+- **Frontend**: `apiClient.getUserConfig(userId)`, `apiClient.updateUserConfig(userId, settings)`
+- **User ID**: Retrieved via `apiClient.getCurrentUserGuid()` (set by user selection dropdown in header)
+
+**Current user preferences:**
+
+| Key | Description | Used In |
+|-----|-------------|---------|
+| `dashboard_reduceToFit` | Whether dashboard view uses "fit to screen" mode (boolean) | `DashboardViewerPage.jsx` |
+
+**Pattern for adding a new user preference:**
+```javascript
+// Read on mount
+const userGuid = apiClient.getCurrentUserGuid();
+const config = await apiClient.getUserConfig(userGuid);
+const myPref = config?.settings?.my_preference ?? defaultValue;
+
+// Save on change
+await apiClient.updateUserConfig(userGuid, { my_preference: newValue });
+```
+
+For instant render, cache in `localStorage` and sync from server on mount (see `DashboardViewerPage.jsx` `reduceToFit` for the pattern).
 
 ## Development Setup
 

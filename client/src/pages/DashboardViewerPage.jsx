@@ -28,6 +28,7 @@ import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import ChartDataModal from '../components/ChartDataModal';
 import { ControlRenderer } from '../components/controls';
 import FrigateCameraViewer from '../components/frigate/FrigateCameraViewer';
+import WeatherDisplay from '../components/weather/WeatherDisplay';
 import apiClient from '../api/client';
 import './DashboardViewerPage.scss';
 
@@ -54,7 +55,11 @@ function DashboardViewerPage({ canDesign = false }) {
   const [error, setError] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
-  const [reduceToFit, setReduceToFit] = useState(true);
+  const [reduceToFit, setReduceToFit] = useState(() => {
+    // Initialize from localStorage for instant render, then sync from server
+    const stored = localStorage.getItem('dashboard_reduceToFit');
+    return stored !== null ? stored === 'true' : true;
+  });
   const [dataModalOpen, setDataModalOpen] = useState(false);
   const [selectedChart, setSelectedChart] = useState(null);
   const [configRefreshInterval, setConfigRefreshInterval] = useState(120); // Default 120s for dashboard/chart config refresh
@@ -64,6 +69,34 @@ function DashboardViewerPage({ canDesign = false }) {
   const [dashboardList, setDashboardList] = useState([]);
   const [switchIndicator, setSwitchIndicator] = useState(null); // { name, index, total }
   const switchTimerRef = useRef(null);
+
+  // Load user preference for reduceToFit from server
+  useEffect(() => {
+    const userGuid = apiClient.getCurrentUserGuid();
+    if (!userGuid) return;
+    apiClient.getUserConfig(userGuid)
+      .then(res => {
+        const pref = res?.settings?.dashboard_reduceToFit;
+        if (pref !== undefined) {
+          setReduceToFit(pref);
+          localStorage.setItem('dashboard_reduceToFit', String(pref));
+        }
+      })
+      .catch(() => {}); // silently use default
+  }, []);
+
+  // Save reduceToFit preference
+  const toggleReduceToFit = useCallback(() => {
+    setReduceToFit(prev => {
+      const next = !prev;
+      localStorage.setItem('dashboard_reduceToFit', String(next));
+      const userGuid = apiClient.getCurrentUserGuid();
+      if (userGuid) {
+        apiClient.updateUserConfig(userGuid, { dashboard_reduceToFit: next }).catch(() => {});
+      }
+      return next;
+    });
+  }, []);
 
   // Grid configuration - fixed 64x36px cells (16:9 aspect ratio)
   // Must match DashboardDetailPage.jsx
@@ -398,7 +431,7 @@ function DashboardViewerPage({ canDesign = false }) {
           <IconButton
             kind="ghost"
             label={reduceToFit ? 'Actual size' : 'Fit to screen'}
-            onClick={() => setReduceToFit(!reduceToFit)}
+            onClick={toggleReduceToFit}
             align="bottom"
           >
             {reduceToFit ? <CenterToFit size={20} /> : <FitToScreen size={20} />}
@@ -458,7 +491,7 @@ function DashboardViewerPage({ canDesign = false }) {
               return (
                 <div
                   key={panel.id}
-                  className={`panel-container ${hasChart ? 'has-component' : 'empty-panel'}`}
+                  className={`panel-container ${hasChart ? 'has-component' : 'empty-panel'} ${chart?.control_config?.control_type === 'text_label' ? 'text-label-panel' : ''}`}
                   style={{
                     gridColumn: `${panel.x + 1} / span ${panel.w}`,
                     gridRow: `${panel.y + 1} / span ${panel.h}`,
@@ -470,13 +503,19 @@ function DashboardViewerPage({ canDesign = false }) {
                     <>
                       {/* Render control components */}
                       {chart.component_type === 'control' ? (
-                        <div className="component-wrapper control-wrapper">
+                        <div className="component-wrapper control-wrapper" onDoubleClick={(e) => e.stopPropagation()}>
                           <ControlRenderer control={chart} />
                         </div>
                       ) : chart.component_type === 'display' ? (
-                        /* Render display components (Frigate camera, etc.) */
+                        /* Render display components (Frigate camera, Weather, etc.) */
                         <div className="component-wrapper display-wrapper">
-                          <FrigateCameraViewer config={chart.display_config} />
+                          {chart.display_config?.display_type === 'weather' ? (
+                            <WeatherDisplay config={chart.display_config} />
+                          ) : chart.display_config?.display_type === 'frigate_camera' ? (
+                            <FrigateCameraViewer config={chart.display_config} />
+                          ) : (
+                            <div className="display-empty">Unknown display type</div>
+                          )}
                         </div>
                       ) : (
                         <>

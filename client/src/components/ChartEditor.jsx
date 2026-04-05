@@ -400,7 +400,12 @@ const ChartEditor = forwardRef(function ChartEditor({
       setDescription(chart.description || '');
       setComponentType(chart.component_type || 'chart');
       setChartType(chart.chart_type || 'bar');
-      setControlConfig(chart.control_config || null);
+      const loadedControlConfig = chart.control_config || null;
+      // Ensure connection_id is in control_config for ControlEditor
+      if (loadedControlConfig && chart.connection_id && !loadedControlConfig.connection_id) {
+        loadedControlConfig.connection_id = chart.connection_id;
+      }
+      setControlConfig(loadedControlConfig);
       setDisplayConfig(chart.display_config || null);
       setSelectedDatasourceId(chart.connection_id || chart.datasource_id || '');
       setQueryRaw(chart.query_config?.raw || '');
@@ -1135,6 +1140,7 @@ const ChartEditor = forwardRef(function ChartEditor({
         <ControlEditor
           controlConfig={controlConfig}
           connectionId={controlConfig?.connection_id || selectedDatasourceId || ''}
+          displayTitle={title}
           onControlConfigChange={(newConfig) => setControlConfig(newConfig)}
           onConnectionIdChange={(connId) => setControlConfig(prev => ({ ...prev, connection_id: connId }))}
         />
