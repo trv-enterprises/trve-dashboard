@@ -34,6 +34,7 @@ type AISession struct {
 	PanelID      string      `json:"panel_id,omitempty" bson:"panel_id,omitempty"`         // Auto-attach to this panel on save
 	Created      time.Time   `json:"created" bson:"created"`
 	Updated      time.Time   `json:"updated" bson:"updated"`
+	ExpiresAt    time.Time   `json:"expires_at" bson:"expires_at"`
 }
 
 // AIMessage represents a single message in the AI conversation

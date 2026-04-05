@@ -48,12 +48,10 @@ clean: ## Clean build artifacts
 	rm -rf bin/ docs/ coverage.out coverage.html
 	@echo "✓ Cleaned"
 
-docker-up: ## Start MongoDB and Redis
-	cd .. && docker-compose up -d mongodb redis asynqmon
-	@echo "✓ MongoDB, Redis, and Asynq Monitor started"
+docker-up: ## Start MongoDB
+	cd .. && docker-compose up -d mongodb
+	@echo "✓ MongoDB started"
 	@echo "  - MongoDB: mongodb://localhost:27017"
-	@echo "  - Redis: localhost:6379"
-	@echo "  - Asynq Monitor: http://localhost:8080"
 
 docker-down: ## Stop all Docker services
 	cd .. && docker-compose down

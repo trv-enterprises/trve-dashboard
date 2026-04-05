@@ -16,7 +16,6 @@ import (
 type Config struct {
 	Server           ServerConfig                `mapstructure:"server"`
 	MongoDB          MongoDBConfig               `mapstructure:"mongodb"`
-	Redis            RedisConfig                 `mapstructure:"redis"`
 	Asynq            AsynqConfig                 `mapstructure:"asynq"`
 	WebSocket        WebSocketConfig             `mapstructure:"websocket"`
 	LLM              LLMConfig                   `mapstructure:"llm"`
@@ -71,15 +70,6 @@ type MongoDBConfig struct {
 	ConnectionTimeout time.Duration `mapstructure:"connection_timeout"`
 	MaxPoolSize       uint64        `mapstructure:"max_pool_size"`
 	MinPoolSize       uint64        `mapstructure:"min_pool_size"`
-}
-
-type RedisConfig struct {
-	Addr         string `mapstructure:"addr"`
-	Password     string `mapstructure:"password"`
-	DB           int    `mapstructure:"db"`
-	MaxRetries   int    `mapstructure:"max_retries"`
-	PoolSize     int    `mapstructure:"pool_size"`
-	MinIdleConns int    `mapstructure:"min_idle_conns"`
 }
 
 type AsynqConfig struct {
@@ -216,10 +206,6 @@ func (c *Config) Validate() error {
 
 	if c.MongoDB.Database == "" {
 		return fmt.Errorf("mongodb database name is required")
-	}
-
-	if c.Redis.Addr == "" {
-		return fmt.Errorf("redis address is required")
 	}
 
 	if c.Server.Mode != "debug" && c.Server.Mode != "release" {

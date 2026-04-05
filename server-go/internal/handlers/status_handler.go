@@ -22,16 +22,14 @@ import (
 // StatusHandler handles the WebSocket status endpoint
 type StatusHandler struct {
 	mongodb       *database.MongoDB
-	redis         *database.Redis
 	streamManager *streaming.Manager
 	startTime     time.Time
 }
 
 // NewStatusHandler creates a new status handler
-func NewStatusHandler(mongodb *database.MongoDB, redis *database.Redis, streamManager *streaming.Manager) *StatusHandler {
+func NewStatusHandler(mongodb *database.MongoDB, streamManager *streaming.Manager) *StatusHandler {
 	return &StatusHandler{
 		mongodb:       mongodb,
-		redis:         redis,
 		streamManager: streamManager,
 		startTime:     time.Now(),
 	}
@@ -204,7 +202,6 @@ func (h *StatusHandler) buildStatus() *StatusPayload {
 	// Check service health
 	services := make(map[string]ServiceStatus)
 	services["mongodb"] = h.checkMongoDB()
-	services["redis"] = h.checkRedis()
 
 	// Get connection stats from client registry
 	clientRegistry := registry.GetClientRegistry()
@@ -237,29 +234,6 @@ func (h *StatusHandler) checkMongoDB() ServiceStatus {
 
 	start := time.Now()
 	err := h.mongodb.Client.Ping(ctx, nil)
-	latency := time.Since(start)
-
-	if err != nil {
-		return ServiceStatus{
-			Status:    "unhealthy",
-			LatencyMs: latency.Milliseconds(),
-			Error:     err.Error(),
-		}
-	}
-
-	return ServiceStatus{
-		Status:    "healthy",
-		LatencyMs: latency.Milliseconds(),
-	}
-}
-
-// checkRedis pings Redis and returns status with latency
-func (h *StatusHandler) checkRedis() ServiceStatus {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	start := time.Now()
-	err := h.redis.Client.Ping(ctx).Err()
 	latency := time.Since(start)
 
 	if err != nil {

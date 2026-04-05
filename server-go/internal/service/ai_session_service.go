@@ -389,7 +389,7 @@ func (s *AISessionService) CancelSession(ctx context.Context, sessionID string) 
 	// Close all SSE connections
 	s.CloseSessionClients(sessionID)
 
-	// Delete session from Redis
+	// Delete session from database
 	if err := s.sessionRepo.Delete(ctx, sessionID); err != nil {
 		return fmt.Errorf("error deleting session: %w", err)
 	}

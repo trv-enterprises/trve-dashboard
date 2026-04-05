@@ -238,17 +238,18 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                      GO BACKEND (Port 3001)                                  │
-│                    Gin + MongoDB + Redis + Swagger                          │
+│                    Gin + MongoDB + Swagger                                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  /api/layouts    │  /api/connections  │  /api/components  │  /api/dashboards│
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
-                    ┌───────────────┼───────────────┐
-                    ▼               ▼               ▼
-              ┌──────────┐   ┌──────────┐   ┌───────────────┐
-              │ MongoDB  │   │  Redis   │   │  Connections  │
-              │   7.x    │   │   7.x    │   │ SQL/API/CSV/WS│
-              └──────────┘   └──────────┘   └───────────────┘
+                    ┌───────────────────────────────┐
+                    ▼                               ▼
+              ┌──────────────┐              ┌───────────────┐
+              │   MongoDB    │              │  Connections  │
+              │    7.x       │              │ SQL/API/CSV/  │
+              │              │              │ WS/MQTT       │
+              └──────────────┘              └───────────────┘
 ```
 
 ## Technology Stack
@@ -269,7 +270,6 @@ Use the most abstract (semantic) token available. This ensures theme compatibili
 | Go | 1.25.x | Primary Language |
 | Gin | 1.x | HTTP Framework |
 | MongoDB | 7.x | Primary Database |
-| Redis | 7.x | Caching |
 | Swaggo | 1.8.x | API Documentation |
 
 ## Application Modes
@@ -318,7 +318,7 @@ dashboard/
 │   ├── config/               # Configuration (Viper)
 │   ├── internal/
 │   │   ├── ai/               # AI agent, tools, system prompt
-│   │   ├── database/         # MongoDB, Redis connections
+│   │   ├── database/         # MongoDB connection
 │   │   ├── datasource/       # SQL, API, CSV, Socket adapters
 │   │   ├── handlers/         # HTTP handlers
 │   │   ├── mcp/              # MCP SSE endpoint
@@ -457,13 +457,12 @@ For instant render, cache in `localStorage` and sync from server on mount (see `
 - Node.js 18+
 - Docker & Docker Compose
 - MongoDB 7.x
-- Redis 7.x
 
 ### Quick Start
 
 ```bash
 # Start infrastructure
-docker compose up -d mongodb redis
+docker compose up -d mongodb
 
 # Start Go backend (Terminal 1)
 cd server-go

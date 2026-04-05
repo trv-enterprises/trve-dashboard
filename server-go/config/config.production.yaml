@@ -7,10 +7,6 @@ mongodb:
   uri: ${DASHBOARD_MONGODB_URI}  # From environment
   max_pool_size: 200
 
-redis:
-  addr: ${DASHBOARD_REDIS_ADDR}
-  password: ${DASHBOARD_REDIS_PASSWORD}
-
 llm:
   api_key: ${DASHBOARD_LLM_API_KEY}
 

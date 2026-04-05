@@ -72,13 +72,6 @@ func main() {
 		log.Fatalf("Failed to create MongoDB indexes: %v", err)
 	}
 
-	// Initialize Redis
-	redisClient, err := database.NewRedis(cfg.Redis)
-	if err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
-	}
-	defer redisClient.Close()
-
 	// Create Gin router
 	router := gin.Default()
 
@@ -108,7 +101,7 @@ func main() {
 	router.Use(cors.New(corsConfig))
 
 	// Health check endpoint
-	router.GET("/health", healthCheck(mongodb, redisClient))
+	router.GET("/health", healthCheck(mongodb))
 
 	// Version endpoint
 	router.GET("/version", func(c *gin.Context) {
@@ -119,7 +112,7 @@ func main() {
 	datasourceRepo := repository.NewDatasourceRepository(mongodb.Database)
 	chartRepo := repository.NewChartRepository(mongodb.Database)
 	dashboardRepo := repository.NewDashboardRepository(mongodb.Database)
-	aiSessionRepo := repository.NewAISessionRepository(redisClient.Client)
+	aiSessionRepo := repository.NewAISessionRepository(mongodb.Database)
 	configRepo := repository.NewConfigRepository(mongodb.Database)
 	userRepo := repository.NewUserRepository(mongodb.Database)
 	settingsRepo := repository.NewSettingsItemRepository(mongodb.Database)
@@ -129,6 +122,11 @@ func main() {
 	// Create chart indexes
 	if err := chartRepo.CreateIndexes(ctx); err != nil {
 		log.Printf("Warning: Failed to create chart indexes: %v", err)
+	}
+
+	// Create AI session indexes
+	if err := aiSessionRepo.CreateIndexes(ctx); err != nil {
+		log.Printf("Warning: Failed to create AI session indexes: %v", err)
 	}
 
 	// Create config indexes
@@ -236,7 +234,7 @@ func main() {
 	registryHandler := handlers.NewRegistryHandler()
 	deviceTypeHandler := handlers.NewDeviceTypeHandler(deviceTypeService)
 	deviceHandler := handlers.NewDeviceHandler(deviceService, deviceDiscoveryService)
-	statusHandler := handlers.NewStatusHandler(mongodb, redisClient, streamManager)
+	statusHandler := handlers.NewStatusHandler(mongodb, streamManager)
 
 	// Initialize auth middleware
 	authMiddleware := middleware.NewAuthMiddleware(userService)
@@ -258,7 +256,7 @@ func main() {
 	api.Use(authMiddleware.Authorize())    // Check route permissions
 	{
 		// Health check
-		api.GET("/health", healthCheck(mongodb, redisClient))
+		api.GET("/health", healthCheck(mongodb))
 
 		// Auth routes (for getting current user capabilities)
 		auth := api.Group("/auth")
@@ -513,7 +511,6 @@ func main() {
 		fmt.Printf("\n🚀 Dashboard Server starting on http://%s:%d\n", cfg.Server.Host, cfg.Server.Port)
 		fmt.Printf("📡 Mode: %s\n", cfg.Server.Mode)
 		fmt.Printf("📊 MongoDB: %s\n", cfg.MongoDB.Database)
-		fmt.Printf("⚡ Redis: %s\n", cfg.Redis.Addr)
 		fmt.Println("\nPress Ctrl+C to stop\n")
 
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -551,7 +548,7 @@ func main() {
 // @Success 200 {object} map[string]interface{}
 // @Failure 503 {object} map[string]interface{}
 // @Router /health [get]
-func healthCheck(mongodb *database.MongoDB, redis *database.Redis) gin.HandlerFunc {
+func healthCheck(mongodb *database.MongoDB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		status := gin.H{
 			"status":    "ok",
@@ -572,19 +569,6 @@ func healthCheck(mongodb *database.MongoDB, redis *database.Redis) gin.HandlerFu
 			}
 		} else {
 			status["services"].(gin.H)["mongodb"] = gin.H{
-				"status": "healthy",
-			}
-		}
-
-		// Check Redis
-		if err := redis.Client.Ping(ctx).Err(); err != nil {
-			status["status"] = "degraded"
-			status["services"].(gin.H)["redis"] = gin.H{
-				"status": "unhealthy",
-				"error":  err.Error(),
-			}
-		} else {
-			status["services"].(gin.H)["redis"] = gin.H{
 				"status": "healthy",
 			}
 		}

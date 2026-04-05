@@ -1,7 +1,7 @@
 # Dashboard Server (Go) - Development Status
 
 ## Project Overview
-Go-based backend server for the TRVE Dashboards project. Replacing Node.js server with Go + MongoDB + Redis + Asynq architecture.
+Go-based backend server for the TRVE Dashboards project. Replacing Node.js server with Go + MongoDB + Asynq architecture.
 
 ## Current Status (2025-11-20)
 
@@ -9,7 +9,6 @@ Go-based backend server for the TRVE Dashboards project. Replacing Node.js serve
 - **Go Version**: 1.23.12 (via Homebrew)
 - **Server**: Gin framework on port 3001
 - **Database**: MongoDB 7 (via Docker)
-- **Cache**: Redis 7-alpine (via Docker)
 - **Config**: Viper with YAML + ENV override
 - **Swagger**: v1.8.12 (CLI and library matched)
 - **Health Check**: `/health` endpoint working
@@ -19,7 +18,6 @@ Go-based backend server for the TRVE Dashboards project. Replacing Node.js serve
 - `cmd/server/main.go` - Server entry point
 - `config/config.yaml` - Base configuration
 - `internal/database/mongodb.go` - MongoDB connection
-- `internal/database/redis.go` - Redis connection
 - `docs/` - Generated Swagger documentation
 
 **MongoDB Indexes Fixed:**
@@ -28,7 +26,7 @@ Go-based backend server for the TRVE Dashboards project. Replacing Node.js serve
 
 **Docker Services:**
 ```bash
-docker compose up -d mongodb redis  # Start services
+docker compose up -d mongodb  # Start services
 make run                            # Run server
 ```
 
@@ -414,7 +412,6 @@ curl http://localhost:3001/health
 - Running: Yes (PID varies)
 - Port: 3001
 - MongoDB: Healthy
-- Redis: Healthy
 - Layouts in DB: 1 (test layout)
 
 ## Last Updated

@@ -49,13 +49,13 @@ TRVE Dashboards is a full-stack application for creating, managing, and viewing 
 │  └─────────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
-                    ┌───────────────┼───────────────┐
-                    ▼               ▼               ▼
-            ┌───────────┐   ┌───────────┐   ┌───────────────┐
-            │  MongoDB  │   │   Redis   │   │ Data Sources  │
-            │   (7.x)   │   │  (7.x)    │   │ SQL/API/CSV/  │
-            │           │   │           │   │ WebSocket     │
-            └───────────┘   └───────────┘   └───────────────┘
+                    ┌───────────────────────────────┐
+                    ▼                               ▼
+            ┌───────────────┐               ┌───────────────┐
+            │    MongoDB    │               │ Data Sources  │
+            │    (7.x)      │               │ SQL/API/CSV/  │
+            │               │               │ WS/MQTT       │
+            └───────────────┘               └───────────────┘
 ```
 
 ## Technology Stack
@@ -77,7 +77,6 @@ TRVE Dashboards is a full-stack application for creating, managing, and viewing 
 | Go | 1.23.x | Primary Language |
 | Gin | 1.x | HTTP Framework |
 | MongoDB Driver | 1.x | Database Operations |
-| Redis | 7.x | Caching & Job Queue |
 | Swaggo | 1.8.x | OpenAPI/Swagger Generation |
 | Viper | 1.x | Configuration Management |
 | go-anthropic | - | Claude API Client |
@@ -86,7 +85,6 @@ TRVE Dashboards is a full-stack application for creating, managing, and viewing 
 | Technology | Version | Purpose |
 |------------|---------|---------|
 | MongoDB | 7.x | Primary Database |
-| Redis | 7.x | Cache & Background Jobs |
 | Docker | - | Containerization |
 | Docker Compose | - | Local Development |
 
@@ -413,8 +411,7 @@ server-go/
 │   │   ├── mcp_tools.go           # MCP tool definitions
 │   │   └── stream.go              # SSE streaming
 │   ├── database/
-│   │   ├── mongodb.go             # MongoDB connection & indexes
-│   │   └── redis.go               # Redis connection
+│   │   └── mongodb.go             # MongoDB connection & indexes
 │   ├── datasource/
 │   │   ├── api.go                 # REST API adapter
 │   │   ├── csv.go                 # CSV file adapter
@@ -513,7 +510,8 @@ type DataSource interface {
                             ▼
                      ┌──────────────┐
                      │   MongoDB    │
-                     │  (Sessions)  │
+                     │ (Sessions,   │
+                     │  Charts)     │
                      └──────────────┘
 ```
 
@@ -563,17 +561,16 @@ Row height: 32px (based on Carbon $spacing-08)
 ## Development Setup
 
 ### Prerequisites
-- Go 1.23+ (via Homebrew on macOS)
+- Go 1.24+ (via Homebrew on macOS)
 - Node.js 18+
 - Docker & Docker Compose
 - MongoDB 7.x
-- Redis 7.x
 
 ### Quick Start
 
 ```bash
 # Start infrastructure
-docker compose up -d mongodb redis
+docker compose up -d mongodb
 
 # Start Go backend
 cd server-go
@@ -594,7 +591,6 @@ npm run dev
 export DASHBOARD_SERVER_PORT=3001
 export DASHBOARD_MONGODB_URI=mongodb://localhost:27017
 export DASHBOARD_MONGODB_DATABASE=dashboard
-export DASHBOARD_REDIS_ADDR=localhost:6379
 export ANTHROPIC_API_KEY=your-api-key
 
 # Frontend
@@ -642,6 +638,6 @@ $GOPATH/bin/swag init -g cmd/server/main.go -o docs --parseDependency --parseInt
 
 ---
 
-**Document Version**: 3.0
-**Last Updated**: 2025-12-06
-**Build**: 201
+**Document Version**: 4.0
+**Last Updated**: 2026-04-05
+**Build**: 662

@@ -78,6 +78,7 @@ func (m *MongoDB) Collections() Collections {
 		Datasources:  m.Collection("datasources"),
 		Dashboards:   m.Collection("dashboards"),
 		ChatSessions: m.Collection("chat_sessions"),
+		AISessions:   m.Collection("ai_sessions"),
 	}
 }
 
@@ -86,6 +87,7 @@ type Collections struct {
 	Datasources  *mongo.Collection
 	Dashboards   *mongo.Collection
 	ChatSessions *mongo.Collection
+	AISessions   *mongo.Collection
 }
 
 // CreateIndexes creates indexes for all collections
