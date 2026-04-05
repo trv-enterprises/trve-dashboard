@@ -29,6 +29,10 @@ logs/
 *.tmp
 *.temp
 
+# Drawio temp/backup files
+.*drawio.bkp
+.*drawio.dtmp
+
 # Go binaries
 server-go/bin/
 
