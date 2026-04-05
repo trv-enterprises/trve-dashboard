@@ -327,6 +327,191 @@
     }
   }
 
+  // ── Edit mode styles ──────────────────────────────────────────
+
+  &.edit-mode-active {
+    .viewer-toolbar {
+      border-bottom-color: #0f62fe;
+    }
+
+    .editing-indicator {
+      color: #78a9ff;
+      font-size: 1rem;
+      font-weight: 400;
+    }
+
+    .submode-active {
+      background-color: #393939;
+    }
+  }
+
+  // Layout dimension boundary lines (red dashed) — shown in edit mode
+  .dashboard-grid.edit-mode-grid {
+    // Right boundary
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: var(--grid-boundary-x, 100%);
+      width: 2px;
+      height: var(--grid-boundary-y, 100%);
+      background: linear-gradient(180deg, #da1e28 0%, #da1e28 50%, transparent 50%, transparent 100%);
+      background-size: 2px 8px;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    // Bottom boundary
+    &::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: var(--grid-boundary-y, 100%);
+      width: var(--grid-boundary-x, 100%);
+      height: 2px;
+      background: linear-gradient(90deg, #da1e28 0%, #da1e28 50%, transparent 50%, transparent 100%);
+      background-size: 8px 2px;
+      pointer-events: none;
+      z-index: 10;
+    }
+  }
+
+  .dashboard-grid .panel-container.edit-mode {
+    border-color: #0f62fe;
+    position: relative;
+    z-index: 1;
+
+    &.dragging {
+      opacity: 0.7;
+      z-index: 10;
+    }
+
+    &.resizing {
+      z-index: 10;
+    }
+
+    // Prevent component interaction during edit
+    .component-wrapper,
+    .control-wrapper,
+    .display-wrapper {
+      pointer-events: none;
+    }
+
+    .edit-drag-handle {
+      height: 28px;
+      min-height: 28px;
+      background-color: #262626;
+      border-bottom: 1px solid #393939;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 spacing.$spacing-03;
+      cursor: move;
+      z-index: 3;
+      flex-shrink: 0;
+      user-select: none;
+
+      .panel-title-label {
+        color: #f4f4f4;
+        font-size: 0.75rem;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: calc(100% - 40px);
+      }
+
+      .panel-size-label {
+        color: #6f6f6f;
+        font-size: 0.625rem;
+        font-family: 'IBM Plex Mono', monospace;
+        flex-shrink: 0;
+        margin-left: spacing.$spacing-02;
+      }
+    }
+
+    .edit-click-overlay {
+      position: absolute;
+      top: 28px; // Below drag handle
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2;
+      cursor: pointer;
+
+      &:hover {
+        background: rgba(15, 98, 254, 0.06);
+      }
+    }
+
+    .edit-resize-handle {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 16px;
+      height: 16px;
+      cursor: nwse-resize;
+      z-index: 4;
+      background: linear-gradient(135deg, transparent 50%, #0f62fe 50%);
+      border-radius: 0 0 4px 0;
+
+      &:hover {
+        background: linear-gradient(135deg, transparent 40%, #4589ff 40%);
+      }
+    }
+
+    .edit-panel-menu-anchor {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+    }
+
+    // Compact edit mode: no header, full-panel drag overlay
+    &.edit-compact {
+      .edit-drag-handle {
+        display: none;
+      }
+
+      .edit-click-overlay {
+        display: none;
+      }
+
+      .edit-compact-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 2;
+        cursor: move;
+
+        &:hover {
+          background: rgba(15, 98, 254, 0.06);
+        }
+      }
+
+      // Resize handle on top of the overlay
+      .edit-resize-handle {
+        z-index: 3;
+      }
+    }
+
+    // Empty panels in edit mode
+    &.empty-panel {
+      border-style: solid;
+      border-color: #0f62fe;
+      background-color: rgba(15, 98, 254, 0.03);
+    }
+
+    // Text label panels keep their minimal style
+    &.text-label-panel {
+      border: 1px solid #0f62fe;
+      background-color: #262626;
+    }
+  }
+
   .error-container {
     display: flex;
     flex-direction: column;
