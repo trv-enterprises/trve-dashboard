@@ -11,7 +11,9 @@ import {
   Tag,
   OverflowMenu,
   OverflowMenuItem,
-  Modal
+  Modal,
+  Select,
+  SelectItem
 } from '@carbon/react';
 import {
   ArrowLeft,
@@ -115,23 +117,37 @@ function DashboardViewerPage({ canDesign = false }) {
   const CELL_WIDTH = 64;
   const CELL_HEIGHT = 36;
 
-  // Layout dimension preset — defines the hard grid boundary
-  const [layoutDimension, setLayoutDimension] = useState(null); // { max_width, max_height }
+  // Layout dimension presets — defines the hard grid boundary
+  const [dimensions, setDimensions] = useState([]);
+  const [currentDimension, setCurrentDimension] = useState('');
 
-  // Fetch layout dimensions from system config when entering edit mode
+  // Fetch all dimension presets and resolve the dashboard's current one
   useEffect(() => {
     if (!isEditMode || !dashboard) return;
-    const dimensionName = dashboard.settings?.layout_dimension;
-    if (!dimensionName) return;
 
     apiClient.getSystemConfig()
       .then(config => {
         const dims = config.layout_dimensions || {};
-        const dim = dims[dimensionName];
-        if (dim) setLayoutDimension(dim);
+        const list = Object.entries(dims).map(([name, dim]) => ({
+          name, max_width: dim.max_width, max_height: dim.max_height
+        }));
+        list.sort((a, b) => a.max_width - b.max_width);
+        setDimensions(list);
+
+        const saved = dashboard.settings?.layout_dimension;
+        if (saved && dims[saved]) {
+          setCurrentDimension(saved);
+        } else if (list.length > 0) {
+          setCurrentDimension(list[0].name);
+        }
       })
       .catch(() => {});
   }, [isEditMode, dashboard]);
+
+  // Resolved current dimension object
+  const layoutDimension = useMemo(() => {
+    return dimensions.find(d => d.name === currentDimension) || null;
+  }, [dimensions, currentDimension]);
 
   // Grid bounds from layout dimension (matches DashboardDetailPage formula)
   const VIEWER_CHROME_V = 113; // 48px app header + 57px toolbar + 8px padding
@@ -435,10 +451,16 @@ function DashboardViewerPage({ canDesign = false }) {
     setMenuPanelId(null);
   };
 
+  const handleDimensionChange = (newDimension) => {
+    setCurrentDimension(newDimension);
+    setEditHasChanges(true);
+  };
+
   const saveEditMode = async () => {
     setEditSaving(true);
     try {
-      await apiClient.updateDashboard(id, { ...dashboard, panels: editablePanels });
+      const updatedSettings = { ...dashboard.settings, layout_dimension: currentDimension };
+      await apiClient.updateDashboard(id, { ...dashboard, panels: editablePanels, settings: updatedSettings });
       setIsEditMode(false);
       setEditHasChanges(false);
       setMenuPanelId(null);
@@ -731,6 +753,26 @@ function DashboardViewerPage({ canDesign = false }) {
           <div className="dashboard-info">
             <h1>{dashboard?.name}{isEditMode && <span className="editing-indicator"> — Editing</span>}</h1>
           </div>
+          {isEditMode && dimensions.length > 0 && (
+            <div className="dimension-selector">
+              <Select
+                id="viewer-dimension-select"
+                labelText=""
+                hideLabel
+                size="sm"
+                value={currentDimension}
+                onChange={(e) => handleDimensionChange(e.target.value)}
+              >
+                {dimensions.map((dim) => (
+                  <SelectItem
+                    key={dim.name}
+                    value={dim.name}
+                    text={`${dim.name} (${dim.max_width}×${dim.max_height})`}
+                  />
+                ))}
+              </Select>
+            </div>
+          )}
         </div>
 
         <div className="toolbar-center">

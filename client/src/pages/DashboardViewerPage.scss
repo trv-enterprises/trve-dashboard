@@ -343,6 +343,22 @@
     .submode-active {
       background-color: #393939;
     }
+
+    .dimension-selector {
+      margin-left: spacing.$spacing-03;
+
+      .cds--select {
+        min-width: 180px;
+      }
+
+      // Compact inline style
+      .cds--select-input--sm {
+        background-color: #393939;
+        border-bottom-color: #525252;
+        color: #f4f4f4;
+        height: 2rem;
+      }
+    }
   }
 
   // Layout dimension boundary lines (red dashed) — shown in edit mode
