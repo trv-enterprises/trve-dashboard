@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tviviano/dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
 )
 
 // BucketConfig defines the configuration for time-bucketed aggregation

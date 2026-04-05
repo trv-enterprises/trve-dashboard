@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tviviano/dashboard/internal/models"
-	"github.com/tviviano/dashboard/internal/registry"
-	"github.com/tviviano/dashboard/internal/service"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/registry"
+	"github.com/trv-enterprises/trve-dashboard/internal/service"
 )
 
 // CommandHandler handles command execution for bidirectional datasources and controls

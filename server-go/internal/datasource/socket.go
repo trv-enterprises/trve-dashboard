@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/tviviano/dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
 )
 
 // SocketDataSource implements the DataSource interface for socket/WebSocket streams

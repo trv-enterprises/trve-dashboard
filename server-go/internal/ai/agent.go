@@ -13,7 +13,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/google/uuid"
-	"github.com/tviviano/dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
 )
 
 // Agent handles AI conversations with tool execution

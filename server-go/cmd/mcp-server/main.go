@@ -13,12 +13,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/tviviano/dashboard/config"
-	"github.com/tviviano/dashboard/internal/database"
-	"github.com/tviviano/dashboard/internal/datasource"
-	"github.com/tviviano/dashboard/internal/models"
-	"github.com/tviviano/dashboard/internal/repository"
-	"github.com/tviviano/dashboard/internal/service"
+	"github.com/trv-enterprises/trve-dashboard/config"
+	"github.com/trv-enterprises/trve-dashboard/internal/database"
+	"github.com/trv-enterprises/trve-dashboard/internal/datasource"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/repository"
+	"github.com/trv-enterprises/trve-dashboard/internal/service"
 )
 
 // MCP Protocol Types

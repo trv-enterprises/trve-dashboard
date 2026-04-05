@@ -8,7 +8,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/tviviano/dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
 )
 
 // AggregatorRegistry manages shared bucket aggregators

@@ -15,8 +15,8 @@ import (
 
 	"github.com/eclipse/paho.golang/autopaho"
 	"github.com/eclipse/paho.golang/paho"
-	"github.com/tviviano/dashboard/internal/models"
-	"github.com/tviviano/dashboard/internal/registry"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/registry"
 )
 
 func init() {

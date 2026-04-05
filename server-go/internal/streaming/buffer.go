@@ -7,7 +7,7 @@ package streaming
 import (
 	"sync"
 
-	"github.com/tviviano/dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
 )
 
 // RingBuffer is a thread-safe circular buffer for storing records

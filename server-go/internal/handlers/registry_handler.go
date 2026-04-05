@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tviviano/dashboard/internal/registry"
+	"github.com/trv-enterprises/trve-dashboard/internal/registry"
 )
 
 // RegistryHandler handles registry-related endpoints

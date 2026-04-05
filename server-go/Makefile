@@ -5,9 +5,9 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 BUILD_NUM ?= $(shell cat ../client/build.json 2>/dev/null | grep buildNumber | awk '{print $$2}' | tr -d ',' || echo "0")
 GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 LDFLAGS = -ldflags "-s -w \
-	-X github.com/tviviano/dashboard/internal/version.Version=$(VERSION) \
-	-X github.com/tviviano/dashboard/internal/version.BuildNum=$(BUILD_NUM) \
-	-X github.com/tviviano/dashboard/internal/version.GitCommit=$(GIT_COMMIT)"
+	-X github.com/trv-enterprises/trve-dashboard/internal/version.Version=$(VERSION) \
+	-X github.com/trv-enterprises/trve-dashboard/internal/version.BuildNum=$(BUILD_NUM) \
+	-X github.com/trv-enterprises/trve-dashboard/internal/version.GitCommit=$(GIT_COMMIT)"
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'

@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tviviano/dashboard/internal/models"
-	"github.com/tviviano/dashboard/internal/repository"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/repository"
 )
 
 // Manager orchestrates multiple streaming connections

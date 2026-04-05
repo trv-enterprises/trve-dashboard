@@ -12,8 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/tviviano/dashboard/internal/models"
-	clientreg "github.com/tviviano/dashboard/internal/registry"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
+	clientreg "github.com/trv-enterprises/trve-dashboard/internal/registry"
 )
 
 // InboundHandler manages incoming WebSocket connections from external data sources (e.g., ts-store push)

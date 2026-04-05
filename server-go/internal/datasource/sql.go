@@ -9,8 +9,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/tviviano/dashboard/internal/models"
-	"github.com/tviviano/dashboard/internal/registry"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/registry"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"

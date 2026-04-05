@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/tviviano/dashboard/internal/ai"
-	"github.com/tviviano/dashboard/internal/registry"
+	"github.com/trv-enterprises/trve-dashboard/internal/ai"
+	"github.com/trv-enterprises/trve-dashboard/internal/registry"
 )
 
 var upgrader = websocket.Upgrader{

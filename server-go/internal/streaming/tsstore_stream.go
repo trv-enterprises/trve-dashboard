@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tviviano/dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
 )
 
 // TSStoreStream represents a streaming connection from a TSStore datasource

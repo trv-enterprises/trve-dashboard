@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/tviviano/dashboard/internal/hub"
-	"github.com/tviviano/dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/hub"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
 )
 
 // ToolExecutor handles executing AI tools and updating charts

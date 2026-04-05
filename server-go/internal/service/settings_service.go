@@ -10,9 +10,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/tviviano/dashboard/config"
-	"github.com/tviviano/dashboard/internal/models"
-	"github.com/tviviano/dashboard/internal/repository"
+	"github.com/trv-enterprises/trve-dashboard/config"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/repository"
 )
 
 // SettingsService handles business logic for settings management

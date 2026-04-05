@@ -13,10 +13,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/tviviano/dashboard/internal/database"
-	"github.com/tviviano/dashboard/internal/registry"
-	"github.com/tviviano/dashboard/internal/streaming"
-	"github.com/tviviano/dashboard/internal/version"
+	"github.com/trv-enterprises/trve-dashboard/internal/database"
+	"github.com/trv-enterprises/trve-dashboard/internal/registry"
+	"github.com/trv-enterprises/trve-dashboard/internal/streaming"
+	"github.com/trv-enterprises/trve-dashboard/internal/version"
 )
 
 // StatusHandler handles the WebSocket status endpoint

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/tviviano/dashboard/internal/models"
-	"github.com/tviviano/dashboard/internal/streaming"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/streaming"
 )
 
 // StreamHandler handles SSE streaming for socket datasources

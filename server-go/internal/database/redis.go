@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/tviviano/dashboard/config"
+	"github.com/trv-enterprises/trve-dashboard/config"
 )
 
 // Redis holds the Redis client

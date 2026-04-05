@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tviviano/dashboard/config"
+	"github.com/trv-enterprises/trve-dashboard/config"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

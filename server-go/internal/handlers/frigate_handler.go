@@ -16,7 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/tviviano/dashboard/internal/service"
+	"github.com/trv-enterprises/trve-dashboard/internal/service"
 )
 
 // FrigateHandler handles proxied requests to Frigate NVR instances.

@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/tviviano/dashboard/internal/models"
-	"github.com/tviviano/dashboard/internal/registry"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/registry"
 )
 
 // DataSourceFactory manages datasource instances

@@ -18,23 +18,23 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/tviviano/dashboard/config"
-	"github.com/tviviano/dashboard/internal/ai"
-	"github.com/tviviano/dashboard/internal/database"
-	"github.com/tviviano/dashboard/internal/handlers"
-	"github.com/tviviano/dashboard/internal/hub"
-	"github.com/tviviano/dashboard/internal/mcp"
-	"github.com/tviviano/dashboard/internal/middleware"
-	"github.com/tviviano/dashboard/internal/repository"
-	"github.com/tviviano/dashboard/internal/service"
-	"github.com/tviviano/dashboard/internal/streaming"
-	"github.com/tviviano/dashboard/internal/version"
+	"github.com/trv-enterprises/trve-dashboard/config"
+	"github.com/trv-enterprises/trve-dashboard/internal/ai"
+	"github.com/trv-enterprises/trve-dashboard/internal/database"
+	"github.com/trv-enterprises/trve-dashboard/internal/handlers"
+	"github.com/trv-enterprises/trve-dashboard/internal/hub"
+	"github.com/trv-enterprises/trve-dashboard/internal/mcp"
+	"github.com/trv-enterprises/trve-dashboard/internal/middleware"
+	"github.com/trv-enterprises/trve-dashboard/internal/repository"
+	"github.com/trv-enterprises/trve-dashboard/internal/service"
+	"github.com/trv-enterprises/trve-dashboard/internal/streaming"
+	"github.com/trv-enterprises/trve-dashboard/internal/version"
 
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
-	_ "github.com/tviviano/dashboard/docs"       // Swagger docs
-	_ "github.com/tviviano/dashboard/internal/datasource" // Register adapters via init()
+	_ "github.com/trv-enterprises/trve-dashboard/docs"       // Swagger docs
+	_ "github.com/trv-enterprises/trve-dashboard/internal/datasource" // Register adapters via init()
 )
 
 // @title TRVE Dashboards API
