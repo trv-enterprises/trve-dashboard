@@ -106,6 +106,19 @@
         align-items: center;
         gap: spacing.$spacing-02;
       }
+
+      .dimension-selector {
+        .cds--select {
+          min-width: 180px;
+        }
+
+        .cds--select-input--sm {
+          background-color: #393939;
+          border-bottom-color: #525252;
+          color: #f4f4f4;
+          height: 2rem;
+        }
+      }
     }
 
     .toolbar-right {
@@ -344,19 +357,20 @@
       background-color: #393939;
     }
 
-    .dimension-selector {
-      margin-left: spacing.$spacing-03;
+    .dashboard-name-input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid #525252;
+      color: #f4f4f4;
+      font-size: 2rem;
+      font-weight: 600;
+      outline: none;
+      padding: 0 spacing.$spacing-02;
+      min-width: 200px;
+      max-width: 400px;
 
-      .cds--select {
-        min-width: 180px;
-      }
-
-      // Compact inline style
-      .cds--select-input--sm {
-        background-color: #393939;
-        border-bottom-color: #525252;
-        color: #f4f4f4;
-        height: 2rem;
+      &:focus {
+        border-bottom-color: #0f62fe;
       }
     }
   }

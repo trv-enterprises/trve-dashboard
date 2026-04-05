@@ -89,6 +89,7 @@ function DashboardViewerPage({ canDesign = false }) {
   const [editHasChanges, setEditHasChanges] = useState(false);
   const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+  const [editableName, setEditableName] = useState('');
 
   // Drag/resize state
   const [draggingPanel, setDraggingPanel] = useState(null);
@@ -428,6 +429,7 @@ function DashboardViewerPage({ canDesign = false }) {
     const panelsCopy = (dashboard?.panels || []).map(p => ({ ...p }));
     setEditablePanels(panelsCopy);
     setOriginalPanels(panelsCopy.map(p => ({ ...p })));
+    setEditableName(dashboard?.name || '');
     setEditHasChanges(false);
     setIsEditMode(true);
     setMenuPanelId(null);
@@ -460,7 +462,7 @@ function DashboardViewerPage({ canDesign = false }) {
     setEditSaving(true);
     try {
       const updatedSettings = { ...dashboard.settings, layout_dimension: currentDimension };
-      await apiClient.updateDashboard(id, { ...dashboard, panels: editablePanels, settings: updatedSettings });
+      await apiClient.updateDashboard(id, { ...dashboard, name: editableName, panels: editablePanels, settings: updatedSettings });
       setIsEditMode(false);
       setEditHasChanges(false);
       setMenuPanelId(null);
@@ -751,8 +753,29 @@ function DashboardViewerPage({ canDesign = false }) {
             </IconButton>
           )}
           <div className="dashboard-info">
-            <h1>{dashboard?.name}{isEditMode && <span className="editing-indicator"> — Editing</span>}</h1>
+            {isEditMode ? (
+              <input
+                className="dashboard-name-input"
+                type="text"
+                value={editableName}
+                onChange={(e) => {
+                  setEditableName(e.target.value);
+                  setEditHasChanges(true);
+                }}
+              />
+            ) : (
+              <h1>{dashboard?.name}</h1>
+            )}
           </div>
+        </div>
+
+        <div className="toolbar-center">
+          {!isEditMode && dashboard?.settings?.refresh_interval > 0 && (
+            <Tag type="green" size="sm">
+              <Time size={12} />
+              Data refresh: {dashboard.settings.refresh_interval}s
+            </Tag>
+          )}
           {isEditMode && dimensions.length > 0 && (
             <div className="dimension-selector">
               <Select
@@ -772,15 +795,6 @@ function DashboardViewerPage({ canDesign = false }) {
                 ))}
               </Select>
             </div>
-          )}
-        </div>
-
-        <div className="toolbar-center">
-          {!isEditMode && dashboard?.settings?.refresh_interval > 0 && (
-            <Tag type="green" size="sm">
-              <Time size={12} />
-              Data refresh: {dashboard.settings.refresh_interval}s
-            </Tag>
           )}
           {isEditMode && editHasChanges && (
             <Tag type="blue" size="sm">Unsaved changes</Tag>
