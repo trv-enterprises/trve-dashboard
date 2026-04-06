@@ -118,7 +118,7 @@ class APIClient {
 
   // Chart endpoints
   async getCharts(filters = {}) {
-    const params = new URLSearchParams(filters);
+    const params = new URLSearchParams({ page_size: 1000, ...filters });
     return this.request(`/api/charts?${params}`);
   }
 

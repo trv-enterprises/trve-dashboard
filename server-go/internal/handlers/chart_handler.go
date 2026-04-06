@@ -202,6 +202,8 @@ func (h *ChartHandler) GetChartDraft(c *gin.Context) {
 // @Produce json
 // @Param name query string false "Filter by name (partial match)"
 // @Param chart_type query string false "Filter by chart type"
+// @Param component_type query string false "Filter by component type (chart, control, display)"
+// @Param status query string false "Filter by status (draft, final)"
 // @Param datasource_id query string false "Filter by data source ID"
 // @Param tag query string false "Filter by tag"
 // @Param page query int false "Page number" default(1)

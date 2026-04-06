@@ -456,6 +456,13 @@ func main() {
 	fmt.Println("✓ TSStore inbound WebSocket at ws://localhost:3001/api/streams/inbound/:datasourceId")
 	fmt.Println("✓ Status WebSocket at ws://localhost:3001/api/ws/status?interval=5s")
 
+	// Serve documentation site at /docs
+	docsPath := filepath.Join(".", "../udoc/build")
+	if _, err := os.Stat(docsPath); !os.IsNotExist(err) {
+		router.Static("/docs", docsPath)
+		fmt.Printf("✓ Documentation site enabled at http://localhost:%d/docs\n", cfg.Server.Port)
+	}
+
 	// Static file serving for SPA (production mode)
 	if cfg.StaticFiles.Enabled {
 		staticPath := cfg.StaticFiles.Path

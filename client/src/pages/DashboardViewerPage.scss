@@ -106,6 +106,69 @@
         align-items: center;
         gap: spacing.$spacing-02;
       }
+
+      .dimension-selector {
+        .cds--select {
+          min-width: 180px;
+        }
+
+        .cds--select-input--sm {
+          background-color: #393939;
+          border-bottom-color: #525252;
+          color: #f4f4f4;
+          height: 2rem;
+        }
+      }
+
+      .zoom-controls {
+        display: flex;
+        align-items: center;
+        gap: spacing.$spacing-01;
+
+        .cds--btn--icon-only {
+          min-height: 28px;
+          width: 28px;
+          height: 28px;
+          padding: 0;
+
+          svg {
+            fill: #c6c6c6;
+          }
+
+          &:hover:not(:disabled) {
+            background-color: #393939;
+
+            svg {
+              fill: #f4f4f4;
+            }
+          }
+
+          &:disabled {
+            opacity: 0.5;
+          }
+        }
+
+        .zoom-reset {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 48px;
+          height: 28px;
+          padding: 0 spacing.$spacing-02;
+          background: transparent;
+          border: none;
+          border-radius: 4px;
+          color: #c6c6c6;
+          font-family: 'IBM Plex Mono', monospace;
+          font-size: 0.75rem;
+          cursor: pointer;
+
+          &:hover {
+            background-color: #393939;
+            color: #f4f4f4;
+          }
+        }
+      }
     }
 
     .toolbar-right {
@@ -188,24 +251,8 @@
     overflow: auto; // THIS is the only scrolling element
     background-color: var(--cds-background);
 
-    &.reduce-to-fit {
-      position: relative;
-      overflow: hidden;
-      padding: spacing.$spacing-02; // Minimal padding in reduce-to-fit mode
-
-      .dashboard-grid {
-        position: absolute;
-        inset: spacing.$spacing-02; // Fill container with padding offset
-        min-width: 0; // Allow grid to shrink below content size
-        width: auto;
-        height: auto;
-        gap: spacing.$spacing-02; // Match outer padding in reduce-to-fit mode
-
-        .panel-container {
-          min-height: 0; // Allow panels to shrink
-          min-width: 0;
-        }
-      }
+    &.fit-to-screen {
+      overflow: hidden; // No scrollbars — everything fits via scale transform
     }
 
     .dashboard-grid {
@@ -325,6 +372,283 @@
         }
       }
     }
+  }
+
+  // ── Edit mode styles ──────────────────────────────────────────
+
+  &.edit-mode-active {
+    .viewer-toolbar {
+      border-bottom-color: #0f62fe;
+    }
+
+    .editing-indicator {
+      color: #78a9ff;
+      font-size: 1rem;
+      font-weight: 400;
+    }
+
+    .submode-active {
+      background-color: #393939;
+    }
+
+    .dashboard-name-input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid #525252;
+      color: #f4f4f4;
+      font-size: 2rem;
+      font-weight: 600;
+      outline: none;
+      padding: 0 spacing.$spacing-02;
+      min-width: 200px;
+      max-width: 400px;
+
+      &:focus {
+        border-bottom-color: #0f62fe;
+      }
+    }
+  }
+
+  // Edit mode: crosshair cursor on empty grid space for drawing new panels
+  .dashboard-grid.edit-active {
+    cursor: crosshair;
+  }
+
+  // Drawing preview while dragging to create a new panel
+  .drawing-panel-preview {
+    border: 2px dashed #0f62fe;
+    border-radius: 4px;
+    background: rgba(15, 98, 254, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 5;
+
+    span {
+      color: #78a9ff;
+      font-size: 0.75rem;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+  }
+
+  // Layout dimension boundary lines (red dashed) — shown in edit mode
+  .dashboard-grid.edit-mode-grid {
+    // Right boundary
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: var(--grid-boundary-x, 100%);
+      width: 2px;
+      height: var(--grid-boundary-y, 100%);
+      background: linear-gradient(180deg, #da1e28 0%, #da1e28 50%, transparent 50%, transparent 100%);
+      background-size: 2px 8px;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    // Bottom boundary
+    &::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: var(--grid-boundary-y, 100%);
+      width: var(--grid-boundary-x, 100%);
+      height: 2px;
+      background: linear-gradient(90deg, #da1e28 0%, #da1e28 50%, transparent 50%, transparent 100%);
+      background-size: 8px 2px;
+      pointer-events: none;
+      z-index: 10;
+    }
+  }
+
+  .dashboard-grid .panel-container.edit-mode {
+    border-color: #0f62fe;
+    position: relative;
+    z-index: 1;
+
+    &.dragging {
+      opacity: 0.7;
+      z-index: 10;
+    }
+
+    &.resizing {
+      z-index: 10;
+    }
+
+    // Prevent component interaction during edit
+    .component-wrapper,
+    .control-wrapper,
+    .display-wrapper {
+      pointer-events: none;
+    }
+
+    .edit-drag-handle {
+      height: 28px;
+      min-height: 28px;
+      background-color: #262626;
+      border-bottom: 1px solid #393939;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 spacing.$spacing-03;
+      cursor: move;
+      z-index: 3;
+      flex-shrink: 0;
+      user-select: none;
+
+      .panel-title-label {
+        color: #f4f4f4;
+        font-size: 0.75rem;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: calc(100% - 40px);
+      }
+
+      .panel-header-right {
+        display: flex;
+        align-items: center;
+        gap: spacing.$spacing-01;
+        flex-shrink: 0;
+        margin-left: spacing.$spacing-02;
+
+        .panel-size-label {
+          color: #6f6f6f;
+          font-size: 0.625rem;
+          font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .panel-header-edit-menu {
+          display: flex;
+          align-items: center;
+
+          .panel-edit-menu--minimal .panel-edit-menu-chevron-btn {
+            opacity: 1; // Always visible in header
+            min-height: 20px;
+            max-height: 20px;
+            min-width: 20px;
+            width: 20px;
+            height: 20px;
+            background: transparent;
+
+            svg {
+              fill: #6f6f6f;
+            }
+
+            &:hover {
+              background: rgba(57, 57, 57, 0.8);
+
+              svg {
+                fill: #0f62fe;
+              }
+            }
+          }
+        }
+
+        .panel-delete-btn {
+          min-height: 20px;
+          max-height: 20px;
+          min-width: 20px;
+          padding: 0;
+
+          svg {
+            fill: #6f6f6f;
+          }
+
+          &:hover svg {
+            fill: #da1e28;
+          }
+        }
+      }
+    }
+
+    .edit-resize-handle {
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 16px;
+      height: 16px;
+      cursor: nwse-resize;
+      z-index: 4;
+      background: linear-gradient(135deg, transparent 50%, #0f62fe 50%);
+      border-radius: 0 0 4px 0;
+
+      &:hover {
+        background: linear-gradient(135deg, transparent 40%, #4589ff 40%);
+      }
+    }
+
+    .edit-panel-menu-anchor {
+      position: absolute;
+      top: calc(50% + 14px); // Offset for 28px drag handle header
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      pointer-events: auto;
+
+      .cds--btn {
+        background-color: rgba(57, 57, 57, 0.5);
+
+        &:hover {
+          background-color: rgba(57, 57, 57, 0.8);
+        }
+      }
+    }
+
+    // Compact edit mode: no header, full-panel drag overlay
+    &.edit-compact {
+      .edit-drag-handle {
+        display: none;
+      }
+
+      .edit-panel-menu-anchor {
+        top: 50%; // No header offset in compact mode
+      }
+
+
+      .edit-compact-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 2;
+        cursor: move;
+
+        &:hover {
+          background: rgba(15, 98, 254, 0.06);
+        }
+      }
+
+      // Resize handle on top of the overlay
+      .edit-resize-handle {
+        z-index: 3;
+      }
+    }
+
+    // Empty panels in edit mode
+    &.empty-panel {
+      border-style: solid;
+      border-color: #0f62fe;
+      background-color: rgba(15, 98, 254, 0.03);
+    }
+
+    // Text label panels keep their minimal style
+    &.text-label-panel {
+      border: 1px solid #0f62fe;
+      background-color: #262626;
+    }
+  }
+
+  // Dashboard settings modal form
+  .dashboard-settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-05;
+    padding-top: spacing.$spacing-03;
   }
 
   .error-container {

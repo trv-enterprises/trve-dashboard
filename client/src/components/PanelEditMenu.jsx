@@ -34,6 +34,8 @@ function PanelEditMenu({
   buttonLabel = 'Edit',
   buttonKind = 'secondary',
   buttonSize = 'sm',
+  minimal = false,
+  minimalIcon = null, // Custom icon for minimal mode (defaults to ChevronDown)
   hasExisting = false,
   onEdit,
   onEditWithAI,
@@ -183,16 +185,26 @@ function PanelEditMenu({
   ) : null;
 
   return (
-    <div className="panel-edit-menu" ref={menuRef}>
+    <div className={`panel-edit-menu ${minimal ? 'panel-edit-menu--minimal' : ''}`} ref={menuRef}>
       <div ref={buttonRef}>
-        <Button
-          kind={buttonKind}
-          size={buttonSize}
-          onClick={() => setIsOpen(!isOpen)}
-          renderIcon={() => <ChevronDown size={16} className={`panel-edit-menu-chevron ${isOpen ? 'open' : ''}`} />}
-        >
-          {buttonLabel}
-        </Button>
+        {minimal ? (
+          <button
+            className={`panel-edit-menu-chevron-btn ${isOpen ? 'open' : ''}`}
+            onClick={() => setIsOpen(!isOpen)}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {minimalIcon || <ChevronDown size={16} />}
+          </button>
+        ) : (
+          <Button
+            kind={buttonKind}
+            size={buttonSize}
+            onClick={() => setIsOpen(!isOpen)}
+            renderIcon={() => <ChevronDown size={16} className={`panel-edit-menu-chevron ${isOpen ? 'open' : ''}`} />}
+          >
+            {buttonLabel}
+          </Button>
+        )}
       </div>
 
       {/* Render dropdown via portal to escape transformed parents */}

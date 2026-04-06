@@ -3,7 +3,7 @@
 // See LICENSE file for details.
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Header,
   HeaderContainer,
@@ -37,7 +37,7 @@ import ChartsListPage from './pages/ChartsListPage';
 import ChartDetailPage from './pages/ChartDetailPage';
 import AIBuilderPage from './pages/AIBuilderPage';
 import DashboardsListPage from './pages/DashboardsListPage';
-import DashboardDetailPage from './pages/DashboardDetailPage';
+// DashboardDetailPage replaced by DashboardViewerPage edit mode
 import DashboardViewerPage from './pages/DashboardViewerPage';
 import DashboardTileViewPage from './pages/DashboardTileViewPage';
 import ModeToggle from './components/mode/ModeToggle';
@@ -53,6 +53,12 @@ import NotificationPanel from './components/NotificationPanel';
 import { MODES } from './config/layoutConfig';
 import buildInfo from '../build.json';
 import './App.scss';
+
+// Redirect /design/dashboards/:id to /view/dashboards/:id with auto-edit
+function DashboardEditRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/view/dashboards/${id}`} state={{ autoEdit: true }} replace />;
+}
 
 function AppContent({ onDisconnect }) {
   const [isSideNavExpanded, setIsSideNavExpanded] = useState(true);
@@ -231,7 +237,11 @@ function AppContent({ onDisconnect }) {
               />
             </div>
             <HeaderGlobalBar>
-              <HeaderGlobalAction aria-label={`Help - Build ${buildInfo.buildNumber}`} tooltipAlignment="end">
+              <HeaderGlobalAction
+                aria-label={`Help - Build ${buildInfo.buildNumber}`}
+                tooltipAlignment="end"
+                onClick={() => window.open('/docs', '_blank')}
+              >
                 <Help size={20} />
               </HeaderGlobalAction>
               <HeaderGlobalAction aria-label="App Switcher">
@@ -346,7 +356,7 @@ function AppContent({ onDisconnect }) {
           <Route path="/design/charts/ai/:chartId" element={<AIBuilderPage />} />
           <Route path="/design/charts/:id" element={<ChartDetailPage />} />
           <Route path="/design/dashboards" element={<DashboardsListPage />} />
-          <Route path="/design/dashboards/:id" element={<DashboardDetailPage />} />
+          <Route path="/design/dashboards/:id" element={<DashboardEditRedirect />} />
 
           {/* View Mode Routes */}
           <Route path="/view/dashboards" element={<DashboardTileViewPage />} />

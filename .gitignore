@@ -33,6 +33,11 @@ logs/
 .*drawio.bkp
 .*drawio.dtmp
 
+# Docusaurus
+udoc/build/
+udoc/.docusaurus/
+udoc/node_modules/
+
 # Go binaries
 server-go/bin/
 
