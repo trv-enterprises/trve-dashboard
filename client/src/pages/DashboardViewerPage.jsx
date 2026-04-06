@@ -524,7 +524,7 @@ function DashboardViewerPage({ canDesign = false }) {
           const clonedGrid = clonedDoc.querySelector('.dashboard-grid');
           if (clonedGrid) {
             // Remove all edit mode classes and elements
-            clonedGrid.classList.remove('edit-mode-grid', 'edit-active');
+            clonedGrid.classList.remove('edit-active');
             clonedGrid.querySelectorAll('.edit-hover-header, .edit-drag-overlay, .edit-resize-handle, .edit-panel-menu-anchor').forEach(el => el.remove());
             clonedGrid.querySelectorAll('.panel-container.edit-mode').forEach(el => {
               el.classList.remove('edit-mode', 'dragging', 'resizing');
@@ -974,6 +974,7 @@ function DashboardViewerPage({ canDesign = false }) {
             <IconButton
               kind="ghost"
               label="Back to dashboards"
+              align="bottom"
               onClick={handleBack}
             >
               <ArrowLeft size={20} />
@@ -1029,6 +1030,7 @@ function DashboardViewerPage({ canDesign = false }) {
                 kind="ghost"
                 size="sm"
                 label="Zoom out"
+                align="bottom"
                 onClick={zoomOut}
                 disabled={zoom <= 10}
               >
@@ -1046,6 +1048,7 @@ function DashboardViewerPage({ canDesign = false }) {
                 kind="ghost"
                 size="sm"
                 label="Zoom in"
+                align="bottom"
                 onClick={zoomIn}
                 disabled={zoom >= 100}
               >
@@ -1073,6 +1076,7 @@ function DashboardViewerPage({ canDesign = false }) {
                 kind="ghost"
                 size="sm"
                 label="Dashboard settings"
+                align="bottom"
                 onClick={() => setSettingsModalOpen(true)}
               >
                 <Settings size={20} />
@@ -1095,6 +1099,7 @@ function DashboardViewerPage({ canDesign = false }) {
               <IconButton
                 kind="ghost"
                 label="Refresh"
+                align="bottom"
                 onClick={handleManualRefresh}
                 disabled={loading}
               >
@@ -1159,7 +1164,7 @@ function DashboardViewerPage({ canDesign = false }) {
         >
           <div
             ref={gridRef}
-            className={`dashboard-grid ${isEditMode && gridCols && !reduceToFit ? 'edit-mode-grid' : ''} ${isEditMode ? 'edit-active' : ''}`}
+            className={`dashboard-grid ${isEditMode ? 'edit-active' : ''}`}
             onMouseDown={handleGridMouseDown}
             style={{
               gridTemplateColumns: `repeat(${maxGridCol}, ${CELL_WIDTH}px)`,
@@ -1169,11 +1174,6 @@ function DashboardViewerPage({ canDesign = false }) {
               ...(reduceToFit && !isEditMode ? {
                 transform: `scale(${fitScaleX}, ${fitScaleY})`,
                 transformOrigin: 'top left'
-              } : {}),
-              // Edit mode: layout dimension boundary lines
-              ...(isEditMode && gridCols ? {
-                '--grid-boundary-x': `${gridCols * CELL_WIDTH + (gridCols - 1) * VIEWER_GAP}px`,
-                '--grid-boundary-y': `${gridRows * CELL_HEIGHT + (gridRows - 1) * VIEWER_GAP}px`
               } : {}),
               // Edit mode: manual zoom
               ...(isEditMode && zoom !== 100 ? {
@@ -1323,6 +1323,26 @@ function DashboardViewerPage({ canDesign = false }) {
               >
                 <span>{drawingPanel.w}×{drawingPanel.h}</span>
               </div>
+            )}
+
+            {/* Dimension boundary lines — rendered as real elements to paint above grid items */}
+            {isEditMode && gridCols && (
+              <>
+                <div
+                  className="grid-boundary-right"
+                  style={{
+                    left: gridCols * CELL_WIDTH + (gridCols - 1) * VIEWER_GAP,
+                    height: gridRows * CELL_HEIGHT + (gridRows - 1) * VIEWER_GAP
+                  }}
+                />
+                <div
+                  className="grid-boundary-bottom"
+                  style={{
+                    top: gridRows * CELL_HEIGHT + (gridRows - 1) * VIEWER_GAP,
+                    width: gridCols * CELL_WIDTH + (gridCols - 1) * VIEWER_GAP
+                  }}
+                />
+              </>
             )}
           </div>
         </div>

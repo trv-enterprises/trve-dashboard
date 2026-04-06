@@ -73,7 +73,7 @@
     height: 56px;
     min-height: 56px;
     max-height: 56px;
-    overflow: hidden;
+    overflow: visible;
 
     .toolbar-left {
       display: flex;
@@ -428,35 +428,24 @@
     }
   }
 
-  // Layout dimension boundary lines (red dashed) — shown in edit mode
-  .dashboard-grid.edit-mode-grid {
-    // Right boundary
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: var(--grid-boundary-x, 100%);
-      width: 2px;
-      height: var(--grid-boundary-y, 100%);
-      background: linear-gradient(180deg, #da1e28 0%, #da1e28 50%, transparent 50%, transparent 100%);
-      background-size: 2px 8px;
-      pointer-events: none;
-      z-index: 10;
-    }
+  // Layout dimension boundary lines (red dashed) — real elements to paint above grid items
+  .grid-boundary-right,
+  .grid-boundary-bottom {
+    position: absolute;
+    pointer-events: none;
+    z-index: 20;
+  }
 
-    // Bottom boundary
-    &::after {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: var(--grid-boundary-y, 100%);
-      width: var(--grid-boundary-x, 100%);
-      height: 2px;
-      background: linear-gradient(90deg, #da1e28 0%, #da1e28 50%, transparent 50%, transparent 100%);
-      background-size: 8px 2px;
-      pointer-events: none;
-      z-index: 10;
-    }
+  .grid-boundary-right {
+    top: 0;
+    width: 2px;
+    background: repeating-linear-gradient(180deg, #da1e28 0px, #da1e28 4px, transparent 4px, transparent 8px);
+  }
+
+  .grid-boundary-bottom {
+    left: 0;
+    height: 2px;
+    background: repeating-linear-gradient(90deg, #da1e28 0px, #da1e28 4px, transparent 4px, transparent 8px);
   }
 
   .dashboard-grid .panel-container.edit-mode {
@@ -533,6 +522,7 @@
             width: 20px;
             height: 20px;
             background: transparent;
+            cursor: pointer;
 
             svg {
               fill: #78a9ff; // Blue 40 — visible resting state
@@ -552,6 +542,7 @@
           max-width: 20px;
           width: 20px;
           padding: 0;
+          cursor: pointer;
 
           svg { fill: #ff8389; } // Red 40 — visible resting state
           &:hover svg { fill: #da1e28; }
@@ -563,6 +554,7 @@
     &:hover .edit-hover-header {
       opacity: 1;
       pointer-events: auto;
+      cursor: move;
     }
 
     // Full-panel drag overlay
