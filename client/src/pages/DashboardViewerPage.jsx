@@ -100,6 +100,22 @@ function DashboardViewerPage({ canDesign = false }) {
   const zoomOut = () => setZoom(z => Math.max(z - 10, 10));
   const zoomReset = () => setZoom(100);
 
+  // Fit-to-screen scale calculation
+  const containerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+  // Track container size with ResizeObserver
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(entries => {
+      const { width, height } = entries[0].contentRect;
+      setContainerSize({ width, height });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [dashboard]); // Re-observe when dashboard loads
+
   // Drag/resize/draw state
   const [draggingPanel, setDraggingPanel] = useState(null);
   const [resizingPanel, setResizingPanel] = useState(null);
@@ -227,6 +243,18 @@ function DashboardViewerPage({ canDesign = false }) {
   const maxGridRow = isEditMode && gridRows
     ? Math.max(gridRows, panelExtentRow)
     : (panelExtentRow || 30);
+
+  // Calculate fit-to-screen scale factor
+  const GAP = 8; // spacing.$spacing-03
+  const fitScale = useMemo(() => {
+    if (!reduceToFit || !containerSize.width || !containerSize.height) return 1;
+    const gridNativeW = maxGridCol * CELL_WIDTH + (maxGridCol - 1) * GAP;
+    const gridNativeH = maxGridRow * CELL_HEIGHT + (maxGridRow - 1) * GAP;
+    const padding = 8; // small inset so grid doesn't touch container edges
+    const scaleX = (containerSize.width - padding * 2) / gridNativeW;
+    const scaleY = (containerSize.height - padding * 2) / gridNativeH;
+    return Math.min(scaleX, scaleY, 1); // Never scale up beyond 100%
+  }, [reduceToFit, containerSize, maxGridCol, maxGridRow, CELL_WIDTH, CELL_HEIGHT]);
 
   // Fetch dashboard data and referenced charts
   const fetchDashboard = useCallback(async () => {
@@ -522,20 +550,14 @@ function DashboardViewerPage({ canDesign = false }) {
   const getGridPosition = useCallback((e) => {
     if (!gridRef.current) return null;
     const rect = gridRef.current.getBoundingClientRect();
-    const scale = zoom / 100;
-
-    if (reduceToFit) {
-      const cellW = rect.width / maxGridCol;
-      const cellH = rect.height / maxGridRow;
-      const x = Math.floor((e.clientX - rect.left) / cellW);
-      const y = Math.floor((e.clientY - rect.top) / cellH);
-      return { x: Math.max(0, Math.min(x, maxGridCol - 1)), y: Math.max(0, y) };
-    }
-
-    const x = Math.floor((e.clientX - rect.left) / (CELL_WIDTH * scale));
-    const y = Math.floor((e.clientY - rect.top) / (CELL_HEIGHT * scale));
+    // The grid may be scaled via transform — getBoundingClientRect accounts for this,
+    // so we calculate the effective cell size from the rendered dimensions
+    const cellW = rect.width / maxGridCol;
+    const cellH = rect.height / maxGridRow;
+    const x = Math.floor((e.clientX - rect.left) / cellW);
+    const y = Math.floor((e.clientY - rect.top) / cellH);
     return { x: Math.max(0, Math.min(x, maxGridCol - 1)), y: Math.max(0, y) };
-  }, [reduceToFit, maxGridCol, maxGridRow, CELL_WIDTH, CELL_HEIGHT, zoom]);
+  }, [maxGridCol, maxGridRow]);
 
   const startDragging = (e, panel) => {
     e.stopPropagation();
@@ -558,16 +580,9 @@ function DashboardViewerPage({ canDesign = false }) {
     // mouse movement doesn't immediately snap to the next grid cell.
     if (gridRef.current) {
       const rect = gridRef.current.getBoundingClientRect();
-      const scale = zoom / 100;
-      let cellW, cellH;
-      if (reduceToFit) {
-        cellW = rect.width / maxGridCol;
-        cellH = rect.height / maxGridRow;
-      } else {
-        cellW = CELL_WIDTH * scale;
-        cellH = CELL_HEIGHT * scale;
-      }
-      // Where the panel's bottom-right edge is in pixels
+      // getBoundingClientRect reflects the CSS transform, so rendered cell size is:
+      const cellW = rect.width / maxGridCol;
+      const cellH = rect.height / maxGridRow;
       const edgePixelX = rect.left + (panel.x + panel.w) * cellW;
       const edgePixelY = rect.top + (panel.y + panel.h) * cellH;
       // How far inside the current cell the mouse started
@@ -641,15 +656,8 @@ function DashboardViewerPage({ canDesign = false }) {
           const rect = gridRef.current.getBoundingClientRect();
           const adjustedX = e.clientX - (resizingPanel.offsetX || 0);
           const adjustedY = e.clientY - (resizingPanel.offsetY || 0);
-          const scale = zoom / 100;
-          let cellW, cellH;
-          if (reduceToFit) {
-            cellW = rect.width / maxGridCol;
-            cellH = rect.height / maxGridRow;
-          } else {
-            cellW = CELL_WIDTH * scale;
-            cellH = CELL_HEIGHT * scale;
-          }
+          const cellW = rect.width / maxGridCol;
+          const cellH = rect.height / maxGridRow;
           const gridX = Math.floor((adjustedX - rect.left) / cellW);
           const gridY = Math.floor((adjustedY - rect.top) / cellH);
           const newW = Math.max(minSize.w, Math.min(gridX - panel.x + 1, boundCols - panel.x));
@@ -1015,24 +1023,30 @@ function DashboardViewerPage({ canDesign = false }) {
 
       {/* Dashboard grid */}
       {panels && panels.length > 0 ? (
-        <div className={`dashboard-grid-container ${reduceToFit ? 'reduce-to-fit' : ''}`}>
+        <div
+          ref={containerRef}
+          className={`dashboard-grid-container ${reduceToFit ? 'fit-to-screen' : ''}`}
+        >
           <div
             ref={gridRef}
             className={`dashboard-grid ${isEditMode && gridCols && !reduceToFit ? 'edit-mode-grid' : ''} ${isEditMode ? 'edit-active' : ''}`}
             onMouseDown={handleGridMouseDown}
             style={{
-              gridTemplateColumns: reduceToFit
-                ? `repeat(${maxGridCol}, 1fr)`
-                : `repeat(${maxGridCol}, ${CELL_WIDTH}px)`,
-              gridTemplateRows: reduceToFit
-                ? `repeat(${maxGridRow}, 1fr)`
-                : `repeat(${maxGridRow}, ${CELL_HEIGHT}px)`,
+              gridTemplateColumns: `repeat(${maxGridCol}, ${CELL_WIDTH}px)`,
+              gridTemplateRows: `repeat(${maxGridRow}, ${CELL_HEIGHT}px)`,
               '--title-scale': (dashboard?.settings?.title_scale || 100) / 100,
-              ...(isEditMode && gridCols && !reduceToFit ? {
+              // Fit-to-screen: scale the grid to fit the viewport
+              ...(reduceToFit && !isEditMode ? {
+                transform: `scale(${fitScale})`,
+                transformOrigin: 'top left'
+              } : {}),
+              // Edit mode: layout dimension boundary lines
+              ...(isEditMode && gridCols ? {
                 '--grid-boundary-x': `${gridCols * CELL_WIDTH + (gridCols - 1) * VIEWER_GAP}px`,
                 '--grid-boundary-y': `${gridRows * CELL_HEIGHT + (gridRows - 1) * VIEWER_GAP}px`
               } : {}),
-              ...(isEditMode && !reduceToFit && zoom !== 100 ? {
+              // Edit mode: manual zoom
+              ...(isEditMode && zoom !== 100 ? {
                 transform: `scale(${zoom / 100})`,
                 transformOrigin: 'top left'
               } : {})

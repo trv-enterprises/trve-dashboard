@@ -251,24 +251,8 @@
     overflow: auto; // THIS is the only scrolling element
     background-color: var(--cds-background);
 
-    &.reduce-to-fit {
-      position: relative;
-      overflow: hidden;
-      padding: spacing.$spacing-02; // Minimal padding in reduce-to-fit mode
-
-      .dashboard-grid {
-        position: absolute;
-        inset: spacing.$spacing-02; // Fill container with padding offset
-        min-width: 0; // Allow grid to shrink below content size
-        width: auto;
-        height: auto;
-        gap: spacing.$spacing-02; // Match outer padding in reduce-to-fit mode
-
-        .panel-container {
-          min-height: 0; // Allow panels to shrink
-          min-width: 0;
-        }
-      }
+    &.fit-to-screen {
+      overflow: hidden; // No scrollbars — everything fits via scale transform
     }
 
     .dashboard-grid {
