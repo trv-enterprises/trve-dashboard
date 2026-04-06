@@ -30,7 +30,9 @@ import {
   Close,
   Move,
   Draggable,
-  TrashCan
+  TrashCan,
+  ZoomIn,
+  ZoomOut
 } from '@carbon/icons-react';
 import html2canvas from 'html2canvas';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
@@ -92,6 +94,12 @@ function DashboardViewerPage({ canDesign = false }) {
   const [editSaving, setEditSaving] = useState(false);
   const [editableName, setEditableName] = useState('');
 
+  // Zoom state (edit mode only)
+  const [zoom, setZoom] = useState(100);
+  const zoomIn = () => setZoom(z => Math.min(z + 10, 100));
+  const zoomOut = () => setZoom(z => Math.max(z - 10, 10));
+  const zoomReset = () => setZoom(100);
+
   // Drag/resize/draw state
   const [draggingPanel, setDraggingPanel] = useState(null);
   const [resizingPanel, setResizingPanel] = useState(null);
@@ -99,8 +107,6 @@ function DashboardViewerPage({ canDesign = false }) {
   const gridRef = useRef(null);
   const didDragRef = useRef(false); // Distinguishes click from drag in compact mode
 
-  // Panel edit menu state (which panel's menu is open)
-  const [menuPanelId, setMenuPanelId] = useState(null);
 
   // Chart editor modal state
   const [chartEditorOpen, setChartEditorOpen] = useState(false);
@@ -433,8 +439,8 @@ function DashboardViewerPage({ canDesign = false }) {
     setOriginalPanels(panelsCopy.map(p => ({ ...p })));
     setEditableName(dashboard?.name || '');
     setEditHasChanges(false);
+    setZoom(100);
     setIsEditMode(true);
-    setMenuPanelId(null);
   };
 
   const exitEditMode = () => {
@@ -442,7 +448,7 @@ function DashboardViewerPage({ canDesign = false }) {
       setShowDiscardModal(true);
     } else {
       setIsEditMode(false);
-      setMenuPanelId(null);
+  
     }
   };
 
@@ -452,7 +458,7 @@ function DashboardViewerPage({ canDesign = false }) {
     setEditablePanels([]);
     setOriginalPanels([]);
     setEditHasChanges(false);
-    setMenuPanelId(null);
+
   };
 
   const handleDimensionChange = (newDimension) => {
@@ -467,7 +473,7 @@ function DashboardViewerPage({ canDesign = false }) {
       await apiClient.updateDashboard(id, { ...dashboard, name: editableName, panels: editablePanels, settings: updatedSettings });
       setIsEditMode(false);
       setEditHasChanges(false);
-      setMenuPanelId(null);
+  
       fetchDashboard();
     } catch (err) {
       console.error('Failed to save dashboard:', err);
@@ -516,6 +522,7 @@ function DashboardViewerPage({ canDesign = false }) {
   const getGridPosition = useCallback((e) => {
     if (!gridRef.current) return null;
     const rect = gridRef.current.getBoundingClientRect();
+    const scale = zoom / 100;
 
     if (reduceToFit) {
       const cellW = rect.width / maxGridCol;
@@ -525,10 +532,10 @@ function DashboardViewerPage({ canDesign = false }) {
       return { x: Math.max(0, Math.min(x, maxGridCol - 1)), y: Math.max(0, y) };
     }
 
-    const x = Math.floor((e.clientX - rect.left) / CELL_WIDTH);
-    const y = Math.floor((e.clientY - rect.top) / CELL_HEIGHT);
+    const x = Math.floor((e.clientX - rect.left) / (CELL_WIDTH * scale));
+    const y = Math.floor((e.clientY - rect.top) / (CELL_HEIGHT * scale));
     return { x: Math.max(0, Math.min(x, maxGridCol - 1)), y: Math.max(0, y) };
-  }, [reduceToFit, maxGridCol, maxGridRow, CELL_WIDTH, CELL_HEIGHT]);
+  }, [reduceToFit, maxGridCol, maxGridRow, CELL_WIDTH, CELL_HEIGHT, zoom]);
 
   const startDragging = (e, panel) => {
     e.stopPropagation();
@@ -547,7 +554,29 @@ function DashboardViewerPage({ canDesign = false }) {
   const startResizing = (e, panel) => {
     e.stopPropagation();
     e.preventDefault();
-    setResizingPanel({ id: panel.id });
+    // Capture offset from the panel's bottom-right corner so the first
+    // mouse movement doesn't immediately snap to the next grid cell.
+    if (gridRef.current) {
+      const rect = gridRef.current.getBoundingClientRect();
+      const scale = zoom / 100;
+      let cellW, cellH;
+      if (reduceToFit) {
+        cellW = rect.width / maxGridCol;
+        cellH = rect.height / maxGridRow;
+      } else {
+        cellW = CELL_WIDTH * scale;
+        cellH = CELL_HEIGHT * scale;
+      }
+      // Where the panel's bottom-right edge is in pixels
+      const edgePixelX = rect.left + (panel.x + panel.w) * cellW;
+      const edgePixelY = rect.top + (panel.y + panel.h) * cellH;
+      // How far inside the current cell the mouse started
+      const offsetX = e.clientX - edgePixelX;
+      const offsetY = e.clientY - edgePixelY;
+      setResizingPanel({ id: panel.id, offsetX, offsetY });
+    } else {
+      setResizingPanel({ id: panel.id, offsetX: 0, offsetY: 0 });
+    }
   };
 
   // Start drawing a new panel by clicking empty grid space
@@ -606,10 +635,25 @@ function DashboardViewerPage({ canDesign = false }) {
 
       if (resizingPanel) {
         const panel = editablePanels.find(p => p.id === resizingPanel.id);
-        if (panel) {
+        if (panel && gridRef.current) {
           const minSize = getMinSizeForPanel(resizingPanel.id);
-          const newW = Math.max(minSize.w, Math.min(pos.x - panel.x + 1, boundCols - panel.x));
-          const newH = Math.max(minSize.h, Math.min(pos.y - panel.y + 1, boundRows - panel.y));
+          // Use raw pixel position adjusted by initial offset for smooth resizing
+          const rect = gridRef.current.getBoundingClientRect();
+          const adjustedX = e.clientX - (resizingPanel.offsetX || 0);
+          const adjustedY = e.clientY - (resizingPanel.offsetY || 0);
+          const scale = zoom / 100;
+          let cellW, cellH;
+          if (reduceToFit) {
+            cellW = rect.width / maxGridCol;
+            cellH = rect.height / maxGridRow;
+          } else {
+            cellW = CELL_WIDTH * scale;
+            cellH = CELL_HEIGHT * scale;
+          }
+          const gridX = Math.floor((adjustedX - rect.left) / cellW);
+          const gridY = Math.floor((adjustedY - rect.top) / cellH);
+          const newW = Math.max(minSize.w, Math.min(gridX - panel.x + 1, boundCols - panel.x));
+          const newH = Math.max(minSize.h, Math.min(gridY - panel.y + 1, boundRows - panel.y));
           if (newW !== panel.w || newH !== panel.h) {
             updateEditablePanel(resizingPanel.id, { w: newW, h: newH });
           }
@@ -639,30 +683,6 @@ function DashboardViewerPage({ canDesign = false }) {
     };
   }, [isEditMode, draggingPanel, resizingPanel, drawingPanel, editablePanels, maxGridCol, maxGridRow, gridCols, gridRows, getGridPosition]);
 
-  // ── Panel click → open edit menu ─────────────────────────────────
-
-  const handlePanelClick = (e, panel) => {
-    e.stopPropagation();
-    setMenuPanelId(prev => prev === panel.id ? null : panel.id);
-  };
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    if (!menuPanelId) return;
-    const handleClick = (e) => {
-      if (e.target.closest('.panel-edit-menu-dropdown')) return;
-      if (e.target.closest('.edit-click-overlay')) return;
-      setMenuPanelId(null);
-    };
-    const timer = setTimeout(() => {
-      document.addEventListener('mousedown', handleClick);
-    }, 0);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('mousedown', handleClick);
-    };
-  }, [menuPanelId]);
-
   // ── Chart editor / component picker / AI preflight ───────────────
 
   const openChartEditor = (panelId, chart = undefined) => {
@@ -674,7 +694,7 @@ function DashboardViewerPage({ canDesign = false }) {
       setEditingChart(chart);
     }
     setChartEditorOpen(true);
-    setMenuPanelId(null);
+
   };
 
   const closeChartEditor = () => {
@@ -706,14 +726,14 @@ function DashboardViewerPage({ canDesign = false }) {
         state: { from: `/view/dashboards/${id}`, dashboardId: id, panelId }
       });
     }
-    setMenuPanelId(null);
+
   };
 
   const openComponentPicker = (panelId, category) => {
     setComponentPickerPanelId(panelId);
     setComponentPickerCategory(category);
     setComponentPickerOpen(true);
-    setMenuPanelId(null);
+
   };
 
   const closeComponentPicker = () => {
@@ -743,7 +763,7 @@ function DashboardViewerPage({ canDesign = false }) {
     updateEditablePanel(panelId, { chart_id: null });
     setAiPreflightPanelId(panelId);
     setAiPreflightOpen(true);
-    setMenuPanelId(null);
+
   };
 
   const handleAIPreflightContinue = async (context) => {
@@ -853,6 +873,36 @@ function DashboardViewerPage({ canDesign = false }) {
                   />
                 ))}
               </Select>
+            </div>
+          )}
+          {isEditMode && (
+            <div className="zoom-controls">
+              <IconButton
+                kind="ghost"
+                size="sm"
+                label="Zoom out"
+                onClick={zoomOut}
+                disabled={zoom <= 10}
+              >
+                <ZoomOut size={16} />
+              </IconButton>
+              <button
+                type="button"
+                className="zoom-reset"
+                onClick={zoomReset}
+                title="Reset to 100%"
+              >
+                {zoom}%
+              </button>
+              <IconButton
+                kind="ghost"
+                size="sm"
+                label="Zoom in"
+                onClick={zoomIn}
+                disabled={zoom >= 100}
+              >
+                <ZoomIn size={16} />
+              </IconButton>
             </div>
           )}
           {isEditMode && editHasChanges && (
@@ -981,13 +1031,16 @@ function DashboardViewerPage({ canDesign = false }) {
               ...(isEditMode && gridCols && !reduceToFit ? {
                 '--grid-boundary-x': `${gridCols * CELL_WIDTH + (gridCols - 1) * VIEWER_GAP}px`,
                 '--grid-boundary-y': `${gridRows * CELL_HEIGHT + (gridRows - 1) * VIEWER_GAP}px`
+              } : {}),
+              ...(isEditMode && !reduceToFit && zoom !== 100 ? {
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: 'top left'
               } : {})
             }}
           >
             {panels.map((panel) => {
               const chart = panel.chart_id ? chartsMap[panel.chart_id] : null;
               const hasChart = !!chart?.component_code || chart?.component_type === 'control' || chart?.component_type === 'display';
-              const isMenuOpen = isEditMode && menuPanelId === panel.id;
 
               const isCompact = isEditMode && editSubMode === 'compact';
               const isStandard = isEditMode && editSubMode === 'standard';
@@ -1074,30 +1127,17 @@ function DashboardViewerPage({ canDesign = false }) {
                     </div>
                   )}
 
-                  {/* Standard mode: click overlay below header → opens PanelEditMenu */}
-                  {isStandard && (
-                    <div
-                      className="edit-click-overlay"
-                      onClick={(e) => handlePanelClick(e, panel)}
-                    />
-                  )}
-
-                  {/* Compact mode: full-panel overlay for drag + click */}
+                  {/* Compact mode: full-panel drag overlay */}
                   {isCompact && (
                     <div
                       className="edit-compact-overlay"
                       onMouseDown={(e) => startDragging(e, panel)}
-                      onMouseUp={(e) => {
-                        if (!didDragRef.current) {
-                          handlePanelClick(e, panel);
-                        }
-                      }}
                     />
                   )}
 
-                  {/* Edit mode: PanelEditMenu (shown when this panel's menu is open) */}
-                  {isMenuOpen && (
-                    <div className="edit-panel-menu-anchor">
+                  {/* Standard edit mode: PanelEditMenu with full button */}
+                  {isStandard && (
+                    <div className="edit-panel-menu-anchor" style={{ pointerEvents: (draggingPanel || resizingPanel) ? 'none' : 'auto' }}>
                       <PanelEditMenu
                         buttonLabel={hasChart ? 'Edit' : 'Add'}
                         hasExisting={hasChart}
@@ -1107,6 +1147,19 @@ function DashboardViewerPage({ canDesign = false }) {
                           if (hasChart) updateEditablePanel(panel.id, { chart_id: null });
                           openChartEditor(panel.id, null);
                         }}
+                        onNewWithAI={() => openAIPreflightModal(panel.id)}
+                        onSelectExisting={() => openComponentPicker(panel.id, 'all')}
+                      />
+                    </div>
+                  )}
+
+                  {/* Compact edit mode: only show Add button for empty panels */}
+                  {isCompact && !hasChart && (
+                    <div className="edit-panel-menu-anchor" style={{ pointerEvents: (draggingPanel || resizingPanel) ? 'none' : 'auto' }}>
+                      <PanelEditMenu
+                        buttonLabel="Add"
+                        hasExisting={false}
+                        onNew={() => openChartEditor(panel.id, null)}
                         onNewWithAI={() => openAIPreflightModal(panel.id)}
                         onSelectExisting={() => openComponentPicker(panel.id, 'all')}
                       />

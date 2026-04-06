@@ -18,6 +18,48 @@
   }
 }
 
+// Minimal mode: small chevron button, visible on hover
+.panel-edit-menu--minimal {
+  .panel-edit-menu-chevron-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(57, 57, 57, 0.8);
+    color: #c6c6c6;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+    pointer-events: auto;
+
+    svg {
+      fill: #c6c6c6;
+      transition: transform 0.2s ease;
+    }
+
+    &.open svg {
+      transform: rotate(180deg);
+    }
+
+    &:hover {
+      background: rgba(57, 57, 57, 1);
+    }
+
+    // Always visible when dropdown is open
+    &.open {
+      opacity: 1;
+    }
+  }
+}
+
+// Show the chevron when hovering the panel container
+.panel-container:hover .panel-edit-menu--minimal .panel-edit-menu-chevron-btn {
+  opacity: 1;
+}
+
 .panel-edit-menu-dropdown {
   position: fixed;
   display: flex;
