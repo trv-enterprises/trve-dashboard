@@ -1,3 +1,7 @@
+---
+sidebar_position: 13
+---
+
 # Display Types
 
 Displays are specialized visual components for specific integrations that don't use the standard chart rendering engine.
@@ -37,5 +41,3 @@ Displays current weather information for a configured location.
 6 columns x 8 rows
 
 ---
-
-[Back to Guide](README.md) | Previous: [Control Types](control-types.md) | Next: [AI Component Builder](ai-builder.md)

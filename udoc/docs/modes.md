@@ -1,3 +1,7 @@
+---
+sidebar_position: 3
+---
+
 # Application Modes
 
 TRVE Dashboards operates in three modes, accessible via the mode toggle in the application header.
@@ -39,5 +43,3 @@ Three sections in the sidebar:
 Click the mode toggle buttons in the header bar. Your current mode is highlighted. The selected mode persists across browser sessions.
 
 ---
-
-[Back to Guide](README.md) | Previous: [Getting Started](getting-started.md) | Next: [Viewing Dashboards](viewing-dashboards.md)

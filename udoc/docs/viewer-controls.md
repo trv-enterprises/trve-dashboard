@@ -1,3 +1,7 @@
+---
+sidebar_position: 5
+---
+
 # Dashboard Navigation & Controls
 
 ## Keyboard Navigation
@@ -52,5 +56,3 @@ Capture the current dashboard view as a thumbnail image for the tile grid:
 The thumbnail captures the live state of all components including charts, controls, and displays.
 
 ---
-
-[Back to Guide](README.md) | Previous: [Viewing Dashboards](viewing-dashboards.md) | Next: [Dashboard Editor](dashboard-editor.md)

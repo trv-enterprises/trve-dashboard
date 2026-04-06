@@ -14,6 +14,12 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0',  // Listen on all interfaces for Tailscale access
-    port: 5173
+    port: 5173,
+    proxy: {
+      '/docs': {
+        target: 'http://localhost:3001',
+        changeOrigin: true
+      }
+    }
   }
 })

@@ -1,3 +1,7 @@
+---
+sidebar_position: 18
+---
+
 # System Settings
 
 Configure system-wide settings from Manage Mode > Settings. Requires the Manage capability.
@@ -38,5 +42,3 @@ Manages the list of available screen dimension presets:
 Settings are seeded from `server-go/config/config.yaml` on first server start. After initial seeding, editable settings live in MongoDB and take precedence over the YAML file.
 
 ---
-
-[Back to Guide](README.md) | Previous: [User Management](user-management.md) | Next: [Device Types](device-types.md)

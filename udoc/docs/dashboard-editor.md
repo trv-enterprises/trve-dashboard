@@ -1,3 +1,7 @@
+---
+sidebar_position: 6
+---
+
 # Live Dashboard Editor
 
 The dashboard editor works directly within the viewer, allowing you to rearrange and resize panels while components continue to render live data.
@@ -78,5 +82,3 @@ Click **Save** to persist:
 Click **Cancel** to discard. If you have unsaved changes, a confirmation dialog asks whether to discard or keep editing.
 
 ---
-
-[Back to Guide](README.md) | Previous: [Viewer Controls](viewer-controls.md) | Next: [Panel Management](panel-management.md)

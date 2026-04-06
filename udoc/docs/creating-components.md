@@ -1,3 +1,7 @@
+---
+sidebar_position: 10
+---
+
 # Creating Components
 
 There are three ways to create components:
@@ -53,5 +57,3 @@ From the component list or a dashboard panel:
 Changes to a component update it everywhere it's used.
 
 ---
-
-[Back to Guide](README.md) | Previous: [Components Overview](components-overview.md) | Next: [Chart Types](chart-types.md)

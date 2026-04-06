@@ -1,3 +1,7 @@
+---
+sidebar_position: 2
+---
+
 # Logging In & User Selection
 
 ## Browser Mode
@@ -33,5 +37,3 @@ Each user has a set of capabilities that control access:
 The mode toggle in the header only shows modes you have access to.
 
 ---
-
-[Back to Guide](README.md) | Next: [Application Modes](modes.md)

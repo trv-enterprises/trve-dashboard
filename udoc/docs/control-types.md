@@ -1,3 +1,7 @@
+---
+sidebar_position: 12
+---
+
 # Control Types
 
 Controls are interactive UI elements that send commands to devices via bidirectional connections (MQTT, WebSocket). Most controls can both read device state and send commands.
@@ -43,5 +47,3 @@ Tile Plug and Tile Dimmer are compact versions designed for dense dashboards:
 Text Labels are non-interactive components for adding section headers, spacers, or annotations to dashboards. They require no connection and have a minimum size of 1x1 grid cell.
 
 ---
-
-[Back to Guide](README.md) | Previous: [Chart Types](chart-types.md) | Next: [Display Types](display-types.md)

@@ -1,3 +1,8 @@
+---
+sidebar_position: 1
+slug: /
+---
+
 # TRVE Dashboards User Guide
 
 Welcome to TRVE Dashboards, a full-stack application for creating, managing, and viewing dynamic data visualization dashboards with real-time data from multiple sources.

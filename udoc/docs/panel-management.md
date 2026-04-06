@@ -1,3 +1,7 @@
+---
+sidebar_position: 7
+---
+
 # Panel Management
 
 Panels are the building blocks of a dashboard layout. Each panel occupies a rectangular area on the grid and contains one component.
@@ -63,5 +67,3 @@ Click the edit icon (pencil for existing components, `+` for empty panels) in th
 After assigning a component, the panel automatically expands to meet the component's minimum size if needed.
 
 ---
-
-[Back to Guide](README.md) | Previous: [Dashboard Editor](dashboard-editor.md) | Next: [Dashboard Settings](dashboard-settings.md)

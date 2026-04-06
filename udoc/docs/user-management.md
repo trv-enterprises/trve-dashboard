@@ -1,3 +1,7 @@
+---
+sidebar_position: 17
+---
+
 # User Management
 
 Manage user accounts from Manage Mode > Users. Requires the Manage capability.
@@ -42,5 +46,3 @@ The system seeds three built-in pseudo users on first run:
 These can be modified but not deleted.
 
 ---
-
-[Back to Guide](README.md) | Previous: [Connection Types](connection-types.md) | Next: [System Settings](system-settings.md)

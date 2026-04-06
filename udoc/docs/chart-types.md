@@ -1,3 +1,7 @@
+---
+sidebar_position: 11
+---
+
 # Chart Types
 
 Charts are data visualization components that query a connection and render results using ECharts.
@@ -54,5 +58,3 @@ Map query result fields to chart axes and series:
 When placed in a dashboard with auto-refresh enabled, charts automatically re-query their data source at the configured interval. Streaming connections (WebSocket, MQTT) update in real-time without polling.
 
 ---
-
-[Back to Guide](README.md) | Previous: [Creating Components](creating-components.md) | Next: [Control Types](control-types.md)

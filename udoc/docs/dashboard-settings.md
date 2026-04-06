@@ -1,3 +1,7 @@
+---
+sidebar_position: 8
+---
+
 # Dashboard Settings
 
 Click the gear icon in the edit mode toolbar to open the Dashboard Settings modal.
@@ -27,5 +31,3 @@ Settings are saved alongside panel layout and dashboard name when you click Save
 The Title Scale slider adjusts the font size of panel titles in real-time while the settings modal is open, so you can see the effect before saving. This applies to the `--title-scale` CSS variable used by data table headers and other titled components.
 
 ---
-
-[Back to Guide](README.md) | Previous: [Panel Management](panel-management.md) | Next: [Components Overview](components-overview.md)

@@ -1,3 +1,7 @@
+---
+sidebar_position: 14
+---
+
 # AI Component Builder
 
 The AI builder lets you create and modify components through natural language conversation with an AI assistant.
@@ -74,5 +78,3 @@ When launched from a dashboard panel, the saved component is automatically assig
 AI builder sessions are temporary (24-hour expiry). Each session maintains conversation history so you can return to a previous session if the browser tab stays open.
 
 ---
-
-[Back to Guide](README.md) | Previous: [Display Types](display-types.md) | Next: [Connections Overview](connections-overview.md)

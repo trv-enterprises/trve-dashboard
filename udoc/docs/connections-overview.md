@@ -1,3 +1,7 @@
+---
+sidebar_position: 15
+---
+
 # Connections Overview
 
 Connections define how the dashboard fetches data and communicates with external systems. Manage connections from Design Mode > Connections.
@@ -32,5 +36,3 @@ The connection editor includes a test feature:
 The chart count column shows how many components reference each connection. Deleting a connection that's in use by components will cause those components to fail to load data.
 
 ---
-
-[Back to Guide](README.md) | Previous: [AI Builder](ai-builder.md) | Next: [Connection Types](connection-types.md)

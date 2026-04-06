@@ -1,3 +1,7 @@
+---
+sidebar_position: 19
+---
+
 # Device Types
 
 Device types define the capabilities and command schemas for devices controlled through the dashboard. Manage from Manage Mode > Device Types.
@@ -37,5 +41,3 @@ Custom device types can be edited and deleted.
 Some connections support automatic device discovery. From a connection's page, you can discover devices on the network and import them with their device type automatically assigned.
 
 ---
-
-[Back to Guide](README.md) | Previous: [System Settings](system-settings.md) | Next: [Keyboard Shortcuts](keyboard-shortcuts.md)

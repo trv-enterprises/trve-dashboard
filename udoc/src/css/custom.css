@@ -1,0 +1,58 @@
+/* Carbon g100 dark theme adaptation for Docusaurus */
+
+:root {
+  --ifm-color-primary: #0f62fe;
+  --ifm-color-primary-dark: #0050e6;
+  --ifm-color-primary-darker: #0043cc;
+  --ifm-color-primary-darkest: #002d9c;
+  --ifm-color-primary-light: #4589ff;
+  --ifm-color-primary-lighter: #78a9ff;
+  --ifm-color-primary-lightest: #a6c8ff;
+}
+
+[data-theme='dark'] {
+  --ifm-background-color: #161616;
+  --ifm-background-surface-color: #262626;
+  --ifm-color-primary: #0f62fe;
+  --ifm-color-primary-dark: #0050e6;
+  --ifm-color-primary-darker: #0043cc;
+  --ifm-color-primary-darkest: #002d9c;
+  --ifm-color-primary-light: #4589ff;
+  --ifm-color-primary-lighter: #78a9ff;
+  --ifm-color-primary-lightest: #a6c8ff;
+  --ifm-navbar-background-color: #262626;
+  --ifm-footer-background-color: #161616;
+  --ifm-toc-border-color: #393939;
+  --ifm-color-emphasis-300: #393939;
+  --ifm-table-stripe-background: rgba(255, 255, 255, 0.03);
+  --ifm-code-background: #262626;
+}
+
+/* Navbar styling */
+.navbar {
+  border-bottom: 1px solid #393939;
+}
+
+/* Sidebar styling */
+.theme-doc-sidebar-container {
+  border-right: 1px solid #393939 !important;
+}
+
+/* Table styling */
+table {
+  border: 1px solid #393939;
+}
+
+table th {
+  background-color: #262626;
+}
+
+table td,
+table th {
+  border-color: #393939;
+}
+
+/* Code blocks */
+pre {
+  border: 1px solid #393939;
+}

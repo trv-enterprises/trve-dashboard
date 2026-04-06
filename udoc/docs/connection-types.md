@@ -1,3 +1,7 @@
+---
+sidebar_position: 16
+---
+
 # Connection Types
 
 ## SQL Database
@@ -115,5 +119,3 @@ Connect to an EdgeLake distributed database network.
 **Usage**: Edge computing and IoT data aggregation dashboards.
 
 ---
-
-[Back to Guide](README.md) | Previous: [Connections Overview](connections-overview.md) | Next: [User Management](user-management.md)

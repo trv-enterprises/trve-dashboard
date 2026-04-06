@@ -237,7 +237,11 @@ function AppContent({ onDisconnect }) {
               />
             </div>
             <HeaderGlobalBar>
-              <HeaderGlobalAction aria-label={`Help - Build ${buildInfo.buildNumber}`} tooltipAlignment="end">
+              <HeaderGlobalAction
+                aria-label={`Help - Build ${buildInfo.buildNumber}`}
+                tooltipAlignment="end"
+                onClick={() => window.open('/docs', '_blank')}
+              >
                 <Help size={20} />
               </HeaderGlobalAction>
               <HeaderGlobalAction aria-label="App Switcher">

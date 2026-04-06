@@ -1,3 +1,7 @@
+---
+sidebar_position: 20
+---
+
 # Keyboard Shortcuts
 
 ## Dashboard Viewer
@@ -26,5 +30,3 @@ Dashboard switching is disabled while in edit mode.
 | **Enter** | Submit / confirm in most modals |
 
 ---
-
-[Back to Guide](README.md) | Previous: [Device Types](device-types.md) | Next: [Grid & Layout System](grid-layout.md)

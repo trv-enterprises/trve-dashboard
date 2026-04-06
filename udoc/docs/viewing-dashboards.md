@@ -1,3 +1,7 @@
+---
+sidebar_position: 4
+---
+
 # Viewing Dashboards
 
 ## Dashboard Selection
@@ -48,5 +52,3 @@ The toolbar at the top of the viewer provides:
 - **Double-click** a chart panel to open a data modal showing the raw data table
 
 ---
-
-[Back to Guide](README.md) | Previous: [Application Modes](modes.md) | Next: [Dashboard Controls](viewer-controls.md)

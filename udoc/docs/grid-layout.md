@@ -1,3 +1,7 @@
+---
+sidebar_position: 21
+---
+
 # Grid & Layout System
 
 ## Grid Fundamentals
@@ -59,5 +63,3 @@ gridRow: (y + 1) / span h
 ```
 
 ---
-
-[Back to Guide](README.md) | Previous: [Keyboard Shortcuts](keyboard-shortcuts.md)

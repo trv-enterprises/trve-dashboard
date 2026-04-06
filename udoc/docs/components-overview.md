@@ -1,3 +1,7 @@
+---
+sidebar_position: 9
+---
+
 # Components Overview
 
 Components are the visual elements placed inside dashboard panels. There are three categories:
@@ -49,5 +53,3 @@ Access the full component library from Design Mode > Components.
 | **Draft** | Work in progress, typically from AI builder sessions |
 
 ---
-
-[Back to Guide](README.md) | Previous: [Dashboard Settings](dashboard-settings.md) | Next: [Creating Components](creating-components.md)
