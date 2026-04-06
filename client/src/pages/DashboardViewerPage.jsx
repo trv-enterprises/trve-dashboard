@@ -68,6 +68,7 @@ function DashboardViewerPage({ canDesign = false }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const isNewDashboard = id === 'new';
 
   const [dashboard, setDashboard] = useState(null);
   const [chartsMap, setChartsMap] = useState({}); // Chart data keyed by chart_id
@@ -242,11 +243,11 @@ function DashboardViewerPage({ canDesign = false }) {
   // In view mode, grid fits tightly around panels
   const maxGridCol = isEditMode && gridCols
     ? Math.max(gridCols, panelExtentCol)
-    : (panelExtentCol || 30);
+    : (isEditMode ? Math.max(panelExtentCol, 20) : (panelExtentCol || 30));
 
   const maxGridRow = isEditMode && gridRows
     ? Math.max(gridRows, panelExtentRow)
-    : (panelExtentRow || 30);
+    : (isEditMode ? Math.max(panelExtentRow, 12) : (panelExtentRow || 30));
 
   // Track container size for fit-to-screen scale calculation
   const hasPanels = panels && panels.length > 0;
@@ -385,17 +386,29 @@ function DashboardViewerPage({ canDesign = false }) {
 
   // Initial load
   useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+    if (isNewDashboard) {
+      // New dashboard — skip fetch, initialize empty client-side state
+      const emptyDashboard = {
+        name: 'Untitled Dashboard',
+        description: '',
+        panels: [],
+        settings: { theme: 'dark', refresh_interval: 0, title_scale: 100, is_public: false, allow_export: true }
+      };
+      setDashboard(emptyDashboard);
+      setLoading(false);
+    } else {
+      fetchDashboard();
+    }
+  }, [fetchDashboard, isNewDashboard]);
 
-  // Auto-enter edit mode when navigated from design mode
+  // Auto-enter edit mode when navigated from design mode (or new dashboard)
   const autoEditTriggered = useRef(false);
   useEffect(() => {
-    if (dashboard && !autoEditTriggered.current && location.state?.autoEdit && canDesign) {
+    if (dashboard && !autoEditTriggered.current && (location.state?.autoEdit || isNewDashboard) && canDesign) {
       autoEditTriggered.current = true;
       enterEditMode();
     }
-  }, [dashboard, location.state]);
+  }, [dashboard, location.state, isNewDashboard]);
 
   // Check if this dashboard is the user's default
   useEffect(() => {
@@ -573,21 +586,31 @@ function DashboardViewerPage({ canDesign = false }) {
   };
 
   const exitEditMode = () => {
+    if (isNewDashboard) {
+      if (editHasChanges) {
+        setShowDiscardModal(true);
+      } else {
+        navigate('/design/dashboards', { replace: true });
+      }
+      return;
+    }
     if (editHasChanges) {
       setShowDiscardModal(true);
     } else {
       setIsEditMode(false);
-  
     }
   };
 
   const confirmDiscard = () => {
     setShowDiscardModal(false);
+    if (isNewDashboard) {
+      navigate('/design/dashboards', { replace: true });
+      return;
+    }
     setIsEditMode(false);
     setEditablePanels([]);
     setOriginalPanels([]);
     setEditHasChanges(false);
-
   };
 
   const handleDimensionChange = (newDimension) => {
@@ -607,17 +630,22 @@ function DashboardViewerPage({ canDesign = false }) {
         is_public: editableIsPublic,
         allow_export: editableAllowExport
       };
-      await apiClient.updateDashboard(id, {
-        ...dashboard,
+      const payload = {
         name: editableName,
         description: editableDescription,
         panels: editablePanels,
         settings: updatedSettings
-      });
-      setIsEditMode(false);
-      setEditHasChanges(false);
-  
-      fetchDashboard();
+      };
+
+      if (isNewDashboard) {
+        const created = await apiClient.createDashboard(payload);
+        navigate(`/view/dashboards/${created.id}`, { replace: true });
+      } else {
+        await apiClient.updateDashboard(id, { ...dashboard, ...payload });
+        setIsEditMode(false);
+        setEditHasChanges(false);
+        fetchDashboard();
+      }
     } catch (err) {
       console.error('Failed to save dashboard:', err);
     } finally {
@@ -1136,7 +1164,7 @@ function DashboardViewerPage({ canDesign = false }) {
       </div>
 
       {/* Dashboard grid */}
-      {panels && panels.length > 0 ? (
+      {(panels && panels.length > 0) || isEditMode ? (
         <div
           ref={containerRef}
           className={`dashboard-grid-container ${reduceToFit ? 'fit-to-screen' : ''}`}

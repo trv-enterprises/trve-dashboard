@@ -57,6 +57,9 @@ import './App.scss';
 // Redirect /design/dashboards/:id to /view/dashboards/:id with auto-edit
 function DashboardEditRedirect() {
   const { id } = useParams();
+  if (id === 'new') {
+    return <Navigate to="/view/dashboards/new" state={{ autoEdit: true, isNew: true }} replace />;
+  }
   return <Navigate to={`/view/dashboards/${id}`} state={{ autoEdit: true }} replace />;
 }
 

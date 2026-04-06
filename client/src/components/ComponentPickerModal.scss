@@ -60,11 +60,8 @@
 
 .picker-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: spacing.$spacing-04;
-  max-height: 420px;
-  overflow-y: auto;
-  padding-right: spacing.$spacing-02;
 }
 
 .picker-tile {
