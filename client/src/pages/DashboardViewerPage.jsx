@@ -32,8 +32,6 @@ import {
   Edit,
   Save,
   Close,
-  Move,
-  Draggable,
   TrashCan,
   Add,
   ZoomIn,
@@ -91,10 +89,7 @@ function DashboardViewerPage({ canDesign = false }) {
   const switchTimerRef = useRef(null);
 
   // ── Edit mode state ──────────────────────────────────────────────
-  // editSubMode: 'standard' = drag handle header + click overlay (default)
-  //              'compact'  = no header, full panel is drag target, components at full size
   const [isEditMode, setIsEditMode] = useState(false);
-  const [editSubMode, setEditSubMode] = useState('standard');
   const [editablePanels, setEditablePanels] = useState([]);
   const [originalPanels, setOriginalPanels] = useState([]);
   const [editHasChanges, setEditHasChanges] = useState(false);
@@ -530,9 +525,9 @@ function DashboardViewerPage({ canDesign = false }) {
           if (clonedGrid) {
             // Remove all edit mode classes and elements
             clonedGrid.classList.remove('edit-mode-grid', 'edit-active');
-            clonedGrid.querySelectorAll('.edit-drag-handle, .edit-resize-handle, .edit-click-overlay, .edit-compact-overlay, .edit-panel-menu-anchor').forEach(el => el.remove());
+            clonedGrid.querySelectorAll('.edit-hover-header, .edit-drag-overlay, .edit-resize-handle, .edit-panel-menu-anchor').forEach(el => el.remove());
             clonedGrid.querySelectorAll('.panel-container.edit-mode').forEach(el => {
-              el.classList.remove('edit-mode', 'edit-compact', 'dragging', 'resizing');
+              el.classList.remove('edit-mode', 'dragging', 'resizing');
             });
           }
           // Remove ALL CSS gradient backgrounds that crash html2canvas
@@ -1077,15 +1072,6 @@ function DashboardViewerPage({ canDesign = false }) {
               <IconButton
                 kind="ghost"
                 size="sm"
-                label={editSubMode === 'standard' ? 'Compact mode' : 'Standard mode'}
-                onClick={() => setEditSubMode(prev => prev === 'standard' ? 'compact' : 'standard')}
-                className={editSubMode === 'compact' ? 'submode-active' : ''}
-              >
-                {editSubMode === 'standard' ? <Move size={20} /> : <Draggable size={20} />}
-              </IconButton>
-              <IconButton
-                kind="ghost"
-                size="sm"
                 label="Dashboard settings"
                 onClick={() => setSettingsModalOpen(true)}
               >
@@ -1200,13 +1186,10 @@ function DashboardViewerPage({ canDesign = false }) {
               const chart = panel.chart_id ? chartsMap[panel.chart_id] : null;
               const hasChart = !!chart?.component_code || chart?.component_type === 'control' || chart?.component_type === 'display';
 
-              const isCompact = isEditMode && editSubMode === 'compact';
-              const isStandard = isEditMode && editSubMode === 'standard';
-
               return (
                 <div
                   key={panel.id}
-                  className={`panel-container ${hasChart ? 'has-component' : 'empty-panel'} ${chart?.control_config?.control_type === 'text_label' ? 'text-label-panel' : ''} ${isEditMode ? 'edit-mode' : ''} ${isCompact ? 'edit-compact' : ''} ${draggingPanel?.id === panel.id ? 'dragging' : ''} ${resizingPanel?.id === panel.id ? 'resizing' : ''}`}
+                  className={`panel-container ${hasChart ? 'has-component' : 'empty-panel'} ${chart?.control_config?.control_type === 'text_label' ? 'text-label-panel' : ''} ${isEditMode ? 'edit-mode' : ''} ${draggingPanel?.id === panel.id ? 'dragging' : ''} ${resizingPanel?.id === panel.id ? 'resizing' : ''}`}
                   style={{
                     gridColumn: `${panel.x + 1} / span ${panel.w}`,
                     gridRow: `${panel.y + 1} / span ${panel.h}`,
@@ -1214,12 +1197,9 @@ function DashboardViewerPage({ canDesign = false }) {
                   }}
                   onDoubleClick={() => handlePanelDoubleClick(chart)}
                 >
-                  {/* Standard edit mode: drag handle with title, size, and delete */}
-                  {isStandard && (
-                    <div
-                      className="edit-drag-handle"
-                      onMouseDown={(e) => startDragging(e, panel)}
-                    >
+                  {/* Edit mode: hover header overlay with title, actions, and delete */}
+                  {isEditMode && (
+                    <div className="edit-hover-header">
                       <span className="panel-title-label">
                         {chart?.title || chart?.name || 'Empty'}
                       </span>
@@ -1300,17 +1280,16 @@ function DashboardViewerPage({ canDesign = false }) {
                     </div>
                   )}
 
-                  {/* Compact mode: full-panel drag overlay */}
-                  {isCompact && (
+                  {/* Edit mode: full-panel drag overlay */}
+                  {isEditMode && (
                     <div
-                      className="edit-compact-overlay"
+                      className="edit-drag-overlay"
                       onMouseDown={(e) => startDragging(e, panel)}
                     />
                   )}
 
-
-                  {/* Compact edit mode: only show Add button for empty panels */}
-                  {isCompact && !hasChart && (
+                  {/* Edit mode: Add button for empty panels */}
+                  {isEditMode && !hasChart && (
                     <div className="edit-panel-menu-anchor" style={{ pointerEvents: (draggingPanel || resizingPanel) ? 'none' : 'auto' }}>
                       <PanelEditMenu
                         buttonLabel="Add"
