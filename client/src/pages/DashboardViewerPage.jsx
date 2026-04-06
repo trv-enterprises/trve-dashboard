@@ -29,7 +29,8 @@ import {
   Save,
   Close,
   Move,
-  Draggable
+  Draggable,
+  TrashCan
 } from '@carbon/icons-react';
 import html2canvas from 'html2canvas';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
@@ -91,9 +92,10 @@ function DashboardViewerPage({ canDesign = false }) {
   const [editSaving, setEditSaving] = useState(false);
   const [editableName, setEditableName] = useState('');
 
-  // Drag/resize state
+  // Drag/resize/draw state
   const [draggingPanel, setDraggingPanel] = useState(null);
   const [resizingPanel, setResizingPanel] = useState(null);
+  const [drawingPanel, setDrawingPanel] = useState(null);
   const gridRef = useRef(null);
   const didDragRef = useRef(false); // Distinguishes click from drag in compact mode
 
@@ -482,6 +484,23 @@ function DashboardViewerPage({ canDesign = false }) {
     setEditHasChanges(true);
   };
 
+  // Add a new empty panel
+  const addPanel = (panelData) => {
+    const newPanel = {
+      id: `panel-${Date.now()}`,
+      chart_id: null,
+      ...panelData
+    };
+    setEditablePanels(prev => [...prev, newPanel]);
+    setEditHasChanges(true);
+  };
+
+  // Delete a panel
+  const deletePanel = (panelId) => {
+    setEditablePanels(prev => prev.filter(p => p.id !== panelId));
+    setEditHasChanges(true);
+  };
+
   // Get minimum panel size based on assigned component
   const getMinSizeForPanel = (panelId) => {
     const panel = editablePanels.find(p => p.id === panelId);
@@ -531,16 +550,47 @@ function DashboardViewerPage({ canDesign = false }) {
     setResizingPanel({ id: panel.id });
   };
 
+  // Start drawing a new panel by clicking empty grid space
+  const handleGridMouseDown = (e) => {
+    if (!isEditMode) return;
+    // Only trigger on clicks directly on the grid (not on panels)
+    if (e.target !== gridRef.current) return;
+    const pos = getGridPosition(e);
+    if (pos) {
+      setDrawingPanel({
+        startX: pos.x,
+        startY: pos.y,
+        x: pos.x,
+        y: pos.y,
+        w: 1,
+        h: 1
+      });
+    }
+  };
+
   useEffect(() => {
-    if (!isEditMode || (!draggingPanel && !resizingPanel)) return;
+    if (!isEditMode || (!draggingPanel && !resizingPanel && !drawingPanel)) return;
+
+    const boundCols = gridCols || maxGridCol;
+    const boundRows = gridRows || maxGridRow;
 
     const handleMouseMove = (e) => {
       const pos = getGridPosition(e);
       if (!pos) return;
 
-      // Use layout dimension boundary for hard limits (fall back to grid extent)
-      const boundCols = gridCols || maxGridCol;
-      const boundRows = gridRows || maxGridRow;
+      if (drawingPanel) {
+        const x = Math.min(drawingPanel.startX, pos.x);
+        const y = Math.min(drawingPanel.startY, pos.y);
+        const w = Math.abs(pos.x - drawingPanel.startX) + 1;
+        const h = Math.abs(pos.y - drawingPanel.startY) + 1;
+        setDrawingPanel(prev => ({
+          ...prev,
+          x,
+          y,
+          w: Math.min(w, boundCols - x),
+          h: Math.min(h, boundRows - y)
+        }));
+      }
 
       if (draggingPanel) {
         const panel = editablePanels.find(p => p.id === draggingPanel.id);
@@ -568,6 +618,15 @@ function DashboardViewerPage({ canDesign = false }) {
     };
 
     const handleMouseUp = () => {
+      if (drawingPanel && drawingPanel.w >= 2 && drawingPanel.h >= 2) {
+        addPanel({
+          x: drawingPanel.x,
+          y: drawingPanel.y,
+          w: drawingPanel.w,
+          h: drawingPanel.h
+        });
+      }
+      setDrawingPanel(null);
       setDraggingPanel(null);
       setResizingPanel(null);
     };
@@ -578,7 +637,7 @@ function DashboardViewerPage({ canDesign = false }) {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isEditMode, draggingPanel, resizingPanel, editablePanels, maxGridCol, maxGridRow, gridCols, gridRows, getGridPosition]);
+  }, [isEditMode, draggingPanel, resizingPanel, drawingPanel, editablePanels, maxGridCol, maxGridRow, gridCols, gridRows, getGridPosition]);
 
   // ── Panel click → open edit menu ─────────────────────────────────
 
@@ -909,7 +968,8 @@ function DashboardViewerPage({ canDesign = false }) {
         <div className={`dashboard-grid-container ${reduceToFit ? 'reduce-to-fit' : ''}`}>
           <div
             ref={gridRef}
-            className={`dashboard-grid ${isEditMode && gridCols && !reduceToFit ? 'edit-mode-grid' : ''}`}
+            className={`dashboard-grid ${isEditMode && gridCols && !reduceToFit ? 'edit-mode-grid' : ''} ${isEditMode ? 'edit-active' : ''}`}
+            onMouseDown={handleGridMouseDown}
             style={{
               gridTemplateColumns: reduceToFit
                 ? `repeat(${maxGridCol}, 1fr)`
@@ -943,7 +1003,7 @@ function DashboardViewerPage({ canDesign = false }) {
                   }}
                   onDoubleClick={() => handlePanelDoubleClick(chart)}
                 >
-                  {/* Standard edit mode: drag handle with read-only title */}
+                  {/* Standard edit mode: drag handle with title, size, and delete */}
                   {isStandard && (
                     <div
                       className="edit-drag-handle"
@@ -952,7 +1012,22 @@ function DashboardViewerPage({ canDesign = false }) {
                       <span className="panel-title-label">
                         {chart?.title || chart?.name || 'Empty'}
                       </span>
-                      <span className="panel-size-label">{panel.w}×{panel.h}</span>
+                      <div className="panel-header-right">
+                        <span className="panel-size-label">{panel.w}×{panel.h}</span>
+                        <IconButton
+                          kind="ghost"
+                          size="sm"
+                          label="Delete panel"
+                          className="panel-delete-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deletePanel(panel.id);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
+                          <TrashCan size={14} />
+                        </IconButton>
+                      </div>
                     </div>
                   )}
 
@@ -1048,6 +1123,19 @@ function DashboardViewerPage({ canDesign = false }) {
                 </div>
               );
             })}
+
+            {/* Drawing preview — shown while dragging to create a new panel */}
+            {drawingPanel && (
+              <div
+                className="drawing-panel-preview"
+                style={{
+                  gridColumn: `${drawingPanel.x + 1} / span ${drawingPanel.w}`,
+                  gridRow: `${drawingPanel.y + 1} / span ${drawingPanel.h}`
+                }}
+              >
+                <span>{drawingPanel.w}×{drawingPanel.h}</span>
+              </div>
+            )}
           </div>
         </div>
       ) : (

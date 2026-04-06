@@ -375,6 +375,29 @@
     }
   }
 
+  // Edit mode: crosshair cursor on empty grid space for drawing new panels
+  .dashboard-grid.edit-active {
+    cursor: crosshair;
+  }
+
+  // Drawing preview while dragging to create a new panel
+  .drawing-panel-preview {
+    border: 2px dashed #0f62fe;
+    border-radius: 4px;
+    background: rgba(15, 98, 254, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 5;
+
+    span {
+      color: #78a9ff;
+      font-size: 0.75rem;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+  }
+
   // Layout dimension boundary lines (red dashed) — shown in edit mode
   .dashboard-grid.edit-mode-grid {
     // Right boundary
@@ -451,12 +474,33 @@
         max-width: calc(100% - 40px);
       }
 
-      .panel-size-label {
-        color: #6f6f6f;
-        font-size: 0.625rem;
-        font-family: 'IBM Plex Mono', monospace;
+      .panel-header-right {
+        display: flex;
+        align-items: center;
+        gap: spacing.$spacing-01;
         flex-shrink: 0;
         margin-left: spacing.$spacing-02;
+
+        .panel-size-label {
+          color: #6f6f6f;
+          font-size: 0.625rem;
+          font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .panel-delete-btn {
+          min-height: 20px;
+          max-height: 20px;
+          min-width: 20px;
+          padding: 0;
+
+          svg {
+            fill: #6f6f6f;
+          }
+
+          &:hover svg {
+            fill: #da1e28;
+          }
+        }
       }
     }
 
