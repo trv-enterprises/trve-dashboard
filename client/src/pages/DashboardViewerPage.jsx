@@ -453,17 +453,22 @@ function DashboardViewerPage({ canDesign = false }) {
   const [savingThumbnail, setSavingThumbnail] = useState(false);
   const saveThumbnail = async () => {
     const grid = gridRef.current;
-    if (!grid) return;
+    const container = containerRef.current;
+    if (!grid || !container) return;
 
     setSavingThumbnail(true);
     try {
-      // Temporarily remove any transform (fit-to-screen or zoom) for a clean capture
-      const originalTransform = grid.style.transform;
-      const originalTransformOrigin = grid.style.transformOrigin;
+      // Save original styles
+      const origGridTransform = grid.style.transform;
+      const origGridOrigin = grid.style.transformOrigin;
+      const origContainerOverflow = container.style.overflow;
+
+      // Remove transform and allow overflow so html2canvas can see the full grid
       grid.style.transform = 'none';
       grid.style.transformOrigin = '';
+      container.style.overflow = 'visible';
 
-      // Wait for the style change to paint
+      // Wait for paint
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
       // Calculate the native grid size from panel extent
@@ -472,28 +477,48 @@ function DashboardViewerPage({ canDesign = false }) {
 
       const canvas = await html2canvas(grid, {
         backgroundColor: '#161616',
-        scale: 0.25, // Scale down for thumbnail
+        scale: 0.25,
         useCORS: true,
         allowTaint: true,
         width: gridNativeW,
         height: gridNativeH,
         scrollX: 0,
-        scrollY: 0
+        scrollY: 0,
+        windowScrollX: 0,
+        windowScrollY: 0,
+        onclone: (clonedDoc) => {
+          // Remove edit mode elements that cause html2canvas gradient errors
+          const clonedGrid = clonedDoc.querySelector('.dashboard-grid');
+          if (clonedGrid) {
+            // Remove the edit-mode-grid class to prevent boundary line pseudo-elements
+            clonedGrid.classList.remove('edit-mode-grid', 'edit-active');
+            // Remove edit handles, overlays, and menu anchors
+            clonedGrid.querySelectorAll('.edit-drag-handle, .edit-resize-handle, .edit-click-overlay, .edit-compact-overlay, .edit-panel-menu-anchor').forEach(el => el.remove());
+            // Remove edit-mode class from panels
+            clonedGrid.querySelectorAll('.panel-container.edit-mode').forEach(el => {
+              el.classList.remove('edit-mode', 'edit-compact', 'dragging', 'resizing');
+            });
+          }
+        }
       });
 
-      // Restore transform
-      grid.style.transform = originalTransform;
-      grid.style.transformOrigin = originalTransformOrigin;
+      // Restore styles
+      grid.style.transform = origGridTransform;
+      grid.style.transformOrigin = origGridOrigin;
+      container.style.overflow = origContainerOverflow;
 
       const thumbnailDataUrl = canvas.toDataURL('image/png');
       await apiClient.updateDashboard(id, { ...dashboard, thumbnail: thumbnailDataUrl });
       fetchDashboard();
     } catch (err) {
       console.error('Failed to save thumbnail:', err);
-      // Restore transform on error
-      if (gridRef.current) {
-        gridRef.current.style.transform = '';
-        gridRef.current.style.transformOrigin = '';
+      // Restore styles on error
+      if (grid) {
+        grid.style.transform = '';
+        grid.style.transformOrigin = '';
+      }
+      if (container) {
+        container.style.overflow = '';
       }
     } finally {
       setSavingThumbnail(false);
