@@ -255,11 +255,17 @@ function DashboardViewerPage({ canDesign = false }) {
   const GAP = 8; // spacing.$spacing-03
   const fitScale = useMemo(() => {
     if (!reduceToFit || !containerSize.width || !containerSize.height) return 1;
+    // Grid native size: cells + gaps between cells
     const gridNativeW = maxGridCol * CELL_WIDTH + (maxGridCol - 1) * GAP;
     const gridNativeH = maxGridRow * CELL_HEIGHT + (maxGridRow - 1) * GAP;
-    const padding = 8;
-    const scaleX = (containerSize.width - padding * 2) / gridNativeW;
-    const scaleY = (containerSize.height - padding * 2) / gridNativeH;
+    // Container clientWidth/clientHeight already excludes border/scrollbar but includes padding.
+    // Subtract the container's own padding (8px each side) to get usable space.
+    const containerPadding = 16; // spacing.$spacing-03 * 2 sides
+    const availW = containerSize.width - containerPadding;
+    const availH = containerSize.height - containerPadding;
+    if (gridNativeW <= availW && gridNativeH <= availH) return 1; // Already fits
+    const scaleX = availW / gridNativeW;
+    const scaleY = availH / gridNativeH;
     return Math.min(scaleX, scaleY, 1);
   }, [reduceToFit, containerSize, maxGridCol, maxGridRow, CELL_WIDTH, CELL_HEIGHT]);
 
