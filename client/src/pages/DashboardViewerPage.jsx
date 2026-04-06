@@ -487,18 +487,23 @@ function DashboardViewerPage({ canDesign = false }) {
         windowScrollX: 0,
         windowScrollY: 0,
         onclone: (clonedDoc) => {
-          // Remove edit mode elements that cause html2canvas gradient errors
           const clonedGrid = clonedDoc.querySelector('.dashboard-grid');
           if (clonedGrid) {
-            // Remove the edit-mode-grid class to prevent boundary line pseudo-elements
+            // Remove all edit mode classes and elements
             clonedGrid.classList.remove('edit-mode-grid', 'edit-active');
-            // Remove edit handles, overlays, and menu anchors
             clonedGrid.querySelectorAll('.edit-drag-handle, .edit-resize-handle, .edit-click-overlay, .edit-compact-overlay, .edit-panel-menu-anchor').forEach(el => el.remove());
-            // Remove edit-mode class from panels
             clonedGrid.querySelectorAll('.panel-container.edit-mode').forEach(el => {
               el.classList.remove('edit-mode', 'edit-compact', 'dragging', 'resizing');
             });
           }
+          // Remove ALL CSS gradient backgrounds that crash html2canvas
+          // html2canvas can't parse certain gradient stop values
+          clonedDoc.querySelectorAll('*').forEach(el => {
+            const bg = getComputedStyle(el).backgroundImage;
+            if (bg && bg.includes('gradient')) {
+              el.style.backgroundImage = 'none';
+            }
+          });
         }
       });
 
