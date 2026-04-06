@@ -104,17 +104,27 @@ function DashboardViewerPage({ canDesign = false }) {
   const containerRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
-  // Track container size with ResizeObserver
+  // Track container size with ResizeObserver for fit-to-screen scaling
+  const panelsExist = panels && panels.length > 0;
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(entries => {
-      const { width, height } = entries[0].contentRect;
-      setContainerSize({ width, height });
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [dashboard]); // Re-observe when dashboard loads
+    if (!panelsExist) return;
+    let observer;
+    const timer = setTimeout(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      observer = new ResizeObserver(entries => {
+        if (entries[0]) {
+          const { width, height } = entries[0].contentRect;
+          setContainerSize({ width, height });
+        }
+      });
+      observer.observe(el);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      if (observer) observer.disconnect();
+    };
+  }, [panelsExist, isFullscreen]);
 
   // Drag/resize/draw state
   const [draggingPanel, setDraggingPanel] = useState(null);

@@ -484,17 +484,6 @@
       pointer-events: none;
     }
 
-    // Standard mode: hide component content, show dark background
-    &:not(.edit-compact) {
-      .component-wrapper,
-      .control-wrapper,
-      .display-wrapper,
-      .chart-header,
-      .empty-panel-placeholder {
-        visibility: hidden;
-      }
-    }
-
     .edit-drag-handle {
       height: 28px;
       min-height: 28px;
@@ -572,6 +561,14 @@
       transform: translate(-50%, -50%);
       z-index: 5;
       pointer-events: auto;
+
+      .cds--btn {
+        background-color: rgba(57, 57, 57, 0.5);
+
+        &:hover {
+          background-color: rgba(57, 57, 57, 0.8);
+        }
+      }
     }
 
     // Compact edit mode: no header, full-panel drag overlay
