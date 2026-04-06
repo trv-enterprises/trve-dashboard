@@ -104,28 +104,6 @@ function DashboardViewerPage({ canDesign = false }) {
   const containerRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
 
-  // Track container size with ResizeObserver for fit-to-screen scaling
-  const panelsExist = panels && panels.length > 0;
-  useEffect(() => {
-    if (!panelsExist) return;
-    let observer;
-    const timer = setTimeout(() => {
-      const el = containerRef.current;
-      if (!el) return;
-      observer = new ResizeObserver(entries => {
-        if (entries[0]) {
-          const { width, height } = entries[0].contentRect;
-          setContainerSize({ width, height });
-        }
-      });
-      observer.observe(el);
-    }, 0);
-    return () => {
-      clearTimeout(timer);
-      if (observer) observer.disconnect();
-    };
-  }, [panelsExist, isFullscreen]);
-
   // Drag/resize/draw state
   const [draggingPanel, setDraggingPanel] = useState(null);
   const [resizingPanel, setResizingPanel] = useState(null);
@@ -253,6 +231,28 @@ function DashboardViewerPage({ canDesign = false }) {
   const maxGridRow = isEditMode && gridRows
     ? Math.max(gridRows, panelExtentRow)
     : (panelExtentRow || 30);
+
+  // Track container size with ResizeObserver for fit-to-screen scaling
+  const hasPanels = panels && panels.length > 0;
+  useEffect(() => {
+    if (!hasPanels) return;
+    let observer;
+    const timer = setTimeout(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      observer = new ResizeObserver(entries => {
+        if (entries[0]) {
+          const { width, height } = entries[0].contentRect;
+          setContainerSize({ width, height });
+        }
+      });
+      observer.observe(el);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      if (observer) observer.disconnect();
+    };
+  }, [hasPanels, isFullscreen]);
 
   // Calculate fit-to-screen scale factor
   const GAP = 8; // spacing.$spacing-03
