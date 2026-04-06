@@ -18,7 +18,7 @@ import {
 } from '@carbon/react';
 import {
   Help,
-  Switcher,
+
   Notification,
   UserAvatar,
   ChartMultitype,
@@ -247,9 +247,7 @@ function AppContent({ onDisconnect }) {
               >
                 <Help size={20} />
               </HeaderGlobalAction>
-              <HeaderGlobalAction aria-label="App Switcher">
-                <Switcher size={20} />
-              </HeaderGlobalAction>
+
               <HeaderGlobalAction
                 aria-label="Notifications"
                 onClick={() => setNotificationPanelOpen(!notificationPanelOpen)}

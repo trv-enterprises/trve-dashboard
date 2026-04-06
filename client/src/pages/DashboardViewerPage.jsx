@@ -167,6 +167,8 @@ function DashboardViewerPage({ canDesign = false }) {
         const saved = dashboard.settings?.layout_dimension;
         if (saved && dims[saved]) {
           setCurrentDimension(saved);
+        } else if (config.default_dimension && dims[config.default_dimension]) {
+          setCurrentDimension(config.default_dimension);
         } else if (list.length > 0) {
           setCurrentDimension(list[0].name);
         }

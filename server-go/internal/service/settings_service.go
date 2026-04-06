@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"time"
 
 	"github.com/trv-enterprises/trve-dashboard/config"
@@ -119,6 +120,11 @@ func (s *SettingsService) UpdateSetting(ctx context.Context, key string, value i
 		return nil, fmt.Errorf("setting not found: %s", key)
 	}
 
+	// Sort layout_dimensions by name before saving
+	if key == "layout_dimensions" {
+		value = sortDimensionsByName(value)
+	}
+
 	// Update the value
 	if err := s.repo.UpdateSettingValue(ctx, key, value); err != nil {
 		return nil, fmt.Errorf("failed to update setting: %w", err)
@@ -126,6 +132,25 @@ func (s *SettingsService) UpdateSetting(ctx context.Context, key string, value i
 
 	// Return updated setting
 	return s.GetSetting(ctx, key)
+}
+
+// sortDimensionsByName sorts a layout_dimensions array by the "name" field
+func sortDimensionsByName(value interface{}) interface{} {
+	dimList, ok := value.([]interface{})
+	if !ok {
+		return value
+	}
+	sort.Slice(dimList, func(i, j int) bool {
+		iMap, iOk := dimList[i].(map[string]interface{})
+		jMap, jOk := dimList[j].(map[string]interface{})
+		if !iOk || !jOk {
+			return false
+		}
+		iName, _ := iMap["name"].(string)
+		jName, _ := jMap["name"].(string)
+		return iName < jName
+	})
+	return dimList
 }
 
 // CreateIndexes creates necessary indexes for the settings collection

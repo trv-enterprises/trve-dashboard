@@ -159,7 +159,7 @@ func main() {
 	chartService := service.NewChartService(chartRepo)
 	dashboardService := service.NewDashboardService(dashboardRepo, mongodb.Database)
 	aiSessionService := service.NewAISessionService(aiSessionRepo, chartRepo, dashboardRepo)
-	configService := service.NewConfigService(configRepo, cfg)
+	configService := service.NewConfigService(configRepo, settingsRepo, cfg)
 	userService := service.NewUserService(userRepo)
 	deviceTypeService := service.NewDeviceTypeService(deviceTypeRepo)
 	deviceService := service.NewDeviceService(deviceRepo, deviceTypeRepo, datasourceRepo)
