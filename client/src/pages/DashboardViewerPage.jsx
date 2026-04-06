@@ -237,37 +237,39 @@ function DashboardViewerPage({ canDesign = false }) {
   const hasPanels = panels && panels.length > 0;
   useEffect(() => {
     if (!hasPanels) return;
-    // Measure on next frame to ensure container ref is attached
     const measure = () => {
       const el = containerRef.current;
       if (el) {
         setContainerSize({ width: el.clientWidth, height: el.clientHeight });
       }
     };
-    // Initial measure
-    requestAnimationFrame(measure);
-    // Re-measure on window resize
+    // Double rAF ensures CSS class changes (overflow: hidden) have been painted
+    // before we measure the container dimensions
+    let raf1, raf2;
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(measure);
+    });
     window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      window.removeEventListener('resize', measure);
+    };
   }, [hasPanels, isFullscreen, reduceToFit]);
 
   // Calculate fit-to-screen scale factor
   const GAP = 8; // spacing.$spacing-03
-  const fitScale = useMemo(() => {
-    if (!reduceToFit || !containerSize.width || !containerSize.height) return 1;
-    // Grid native size: cells + gaps between cells
+  const fitScaleX = useMemo(() => {
+    if (!reduceToFit || !containerSize.width) return 1;
     const gridNativeW = maxGridCol * CELL_WIDTH + (maxGridCol - 1) * GAP;
+    return containerSize.width / gridNativeW;
+  }, [reduceToFit, containerSize.width, maxGridCol, CELL_WIDTH]);
+
+  const fitScaleY = useMemo(() => {
+    if (!reduceToFit || !containerSize.height) return 1;
     const gridNativeH = maxGridRow * CELL_HEIGHT + (maxGridRow - 1) * GAP;
-    // Container clientWidth/clientHeight already excludes border/scrollbar but includes padding.
-    // Subtract the container's own padding (8px each side) to get usable space.
-    const containerPadding = 16; // spacing.$spacing-03 * 2 sides
-    const availW = containerSize.width - containerPadding;
-    const availH = containerSize.height - containerPadding;
-    if (gridNativeW <= availW && gridNativeH <= availH) return 1; // Already fits
-    const scaleX = availW / gridNativeW;
-    const scaleY = availH / gridNativeH;
-    return Math.min(scaleX, scaleY, 1);
-  }, [reduceToFit, containerSize, maxGridCol, maxGridRow, CELL_WIDTH, CELL_HEIGHT]);
+    return containerSize.height / gridNativeH;
+  }, [reduceToFit, containerSize.height, maxGridRow, CELL_HEIGHT]);
 
   // Fetch dashboard data and referenced charts
   const fetchDashboard = useCallback(async () => {
@@ -447,26 +449,52 @@ function DashboardViewerPage({ canDesign = false }) {
     setSelectedChart(null);
   };
 
-  // Save thumbnail
+  // Save thumbnail — captures the live grid at native resolution
   const [savingThumbnail, setSavingThumbnail] = useState(false);
   const saveThumbnail = async () => {
-    const gridContainer = document.querySelector('.dashboard-grid-container');
-    if (!gridContainer) return;
+    const grid = gridRef.current;
+    if (!grid) return;
 
     setSavingThumbnail(true);
     try {
-      const canvas = await html2canvas(gridContainer, {
+      // Temporarily remove any transform (fit-to-screen or zoom) for a clean capture
+      const originalTransform = grid.style.transform;
+      const originalTransformOrigin = grid.style.transformOrigin;
+      grid.style.transform = 'none';
+      grid.style.transformOrigin = '';
+
+      // Wait for the style change to paint
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+      // Calculate the native grid size from panel extent
+      const gridNativeW = maxGridCol * CELL_WIDTH + (maxGridCol - 1) * GAP;
+      const gridNativeH = maxGridRow * CELL_HEIGHT + (maxGridRow - 1) * GAP;
+
+      const canvas = await html2canvas(grid, {
         backgroundColor: '#161616',
-        scale: 0.5,
-        logging: true,
+        scale: 0.25, // Scale down for thumbnail
         useCORS: true,
-        allowTaint: true
+        allowTaint: true,
+        width: gridNativeW,
+        height: gridNativeH,
+        scrollX: 0,
+        scrollY: 0
       });
+
+      // Restore transform
+      grid.style.transform = originalTransform;
+      grid.style.transformOrigin = originalTransformOrigin;
+
       const thumbnailDataUrl = canvas.toDataURL('image/png');
       await apiClient.updateDashboard(id, { ...dashboard, thumbnail: thumbnailDataUrl });
       fetchDashboard();
     } catch (err) {
       console.error('Failed to save thumbnail:', err);
+      // Restore transform on error
+      if (gridRef.current) {
+        gridRef.current.style.transform = '';
+        gridRef.current.style.transformOrigin = '';
+      }
     } finally {
       setSavingThumbnail(false);
     }
@@ -1050,7 +1078,7 @@ function DashboardViewerPage({ canDesign = false }) {
               '--title-scale': (dashboard?.settings?.title_scale || 100) / 100,
               // Fit-to-screen: scale the grid to fit the viewport
               ...(reduceToFit && !isEditMode ? {
-                transform: `scale(${fitScale})`,
+                transform: `scale(${fitScaleX}, ${fitScaleY})`,
                 transformOrigin: 'top left'
               } : {}),
               // Edit mode: layout dimension boundary lines
