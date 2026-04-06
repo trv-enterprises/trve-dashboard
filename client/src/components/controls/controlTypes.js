@@ -15,7 +15,8 @@ import {
   mdiFormTextbox,
   mdiPowerPlug,
   mdiLightbulbOn,
-  mdiFormatText
+  mdiFormatText,
+  mdiGarage
 } from '@mdi/js';
 
 // Control type constants - must match backend models.ControlType* constants
@@ -28,6 +29,7 @@ export const CONTROL_TYPES = {
   DIMMER: 'dimmer',
   TILE_PLUG: 'tile_plug',
   TILE_DIMMER: 'tile_dimmer',
+  TILE_GARAGE_DOOR: 'tile_garage_door',
   TEXT_LABEL: 'text_label'
 };
 
@@ -145,6 +147,18 @@ export const CONTROL_TYPE_INFO = {
       state_field: 'level'
     }
   },
+  [CONTROL_TYPES.TILE_GARAGE_DOOR]: {
+    label: 'Tile Garage Door',
+    description: 'Compact tile showing garage door open/closed state from a contact sensor.',
+    icon: mdiGarage,
+    category: 'indicator',
+    canWrite: false,
+    canRead: true,
+    defaultUIConfig: {
+      label: 'Garage',
+      state_field: 'contact'
+    }
+  },
   [CONTROL_TYPES.TEXT_LABEL]: {
     label: 'Text Label',
     description: 'Static text display for section headers, date/time, or dashboard titles. No connection needed.',
@@ -166,5 +180,6 @@ export const CONTROL_CATEGORIES = {
   numeric: { label: 'Numeric', description: 'Sliders and dimmers' },
   action: { label: 'Actions', description: 'Buttons and triggers' },
   input: { label: 'Input', description: 'Text and command entry' },
+  indicator: { label: 'Indicators', description: 'Read-only state displays' },
   decorative: { label: 'Decorative', description: 'Labels, headers, and layout elements' }
 };

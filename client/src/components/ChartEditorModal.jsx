@@ -35,8 +35,10 @@ function ChartEditorModal({ open, onClose, onSave, chart, panelId }) {
     setSaving(true);
     try {
       // Capture thumbnail now that "Saving..." is visible
+      // Skip thumbnail for controls — html2canvas hangs on SSE-connected components
       let thumbnail = null;
-      if (editorRef.current?.captureThumbnail) {
+      const isControl = chartPayload.component_type === 'control';
+      if (!isControl && editorRef.current?.captureThumbnail) {
         thumbnail = await editorRef.current.captureThumbnail();
       }
 

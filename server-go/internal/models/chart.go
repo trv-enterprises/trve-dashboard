@@ -35,9 +35,10 @@ const (
 	ControlTypeTextInput = "text_input"  // Text input field
 	ControlTypePlug      = "plug"        // Smart plug toggle
 	ControlTypeDimmer    = "dimmer"      // Light dimmer
-	ControlTypeTilePlug   = "tile_plug"   // Compact tile plug
-	ControlTypeTileDimmer = "tile_dimmer" // Compact tile dimmer
-	ControlTypeTextLabel  = "text_label"  // Static text/label display
+	ControlTypeTilePlug       = "tile_plug"        // Compact tile plug
+	ControlTypeTileDimmer     = "tile_dimmer"      // Compact tile dimmer
+	ControlTypeTileGarageDoor = "tile_garage_door"  // Compact garage door status tile
+	ControlTypeTextLabel      = "text_label"        // Static text/label display
 )
 
 // ControlConfig defines configuration for control components

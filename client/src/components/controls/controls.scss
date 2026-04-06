@@ -619,6 +619,58 @@
   }
 }
 
+// Tile Garage Door
+.tile-garage-door {
+  @extend %tile-base;
+
+  &.tile-garage-door--closed {
+    background-color: #393939;
+
+    .tile-icon, .tile-name, .tile-state {
+      color: #8d8d8d;
+    }
+  }
+
+  &.tile-garage-door--open {
+    background-color: #da1e28;
+
+    .tile-icon, .tile-name, .tile-state {
+      color: #ffffff;
+    }
+  }
+}
+
+// Garage door popup
+.tile-garage-door-popup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+
+  .popup-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--cds-text-primary);
+  }
+
+  .popup-state {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+}
+
+@keyframes gd-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+.tile-garage-door-pulse {
+  animation: gd-pulse 1.8s ease-in-out infinite;
+}
+
 // Tile renderer overrides — no padding, no title
 .control-renderer--tile {
   padding: 0;

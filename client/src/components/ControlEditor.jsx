@@ -55,15 +55,32 @@ function ControlEditor({
   const typeInfo = CONTROL_TYPE_INFO[controlType];
   const needsConnection = typeInfo?.canWrite || typeInfo?.canRead;
 
-  // Fetch writable connections on mount
+  // If we already have a connectionId, fetch that connection immediately for fast display
   useEffect(() => {
+    if (connectionId && !selectedConnection) {
+      apiClient.getConnection(connectionId)
+        .then(conn => setSelectedConnection(conn))
+        .catch(() => {});
+    }
+  }, [connectionId]);
+
+  // Fetch all writable connections for the dropdown
+  useEffect(() => {
+    if (!needsConnection) return;
     const fetchConnections = async () => {
       try {
         setLoadingConnections(true);
-        const response = await apiClient.getWritableConnections();
-        setConnections(response.connections || []);
+        // For read-only controls, fetch all readable connections; for writable, fetch writable
+        const response = typeInfo?.canWrite
+          ? await apiClient.getWritableConnections()
+          : await apiClient.getConnections();
+        const connList = response.connections || response.datasources || [];
+        const filtered = typeInfo?.canWrite
+          ? connList
+          : connList.filter(c => c.capabilities?.can_read || c.capabilities?.can_stream);
+        setConnections(filtered);
       } catch (err) {
-        console.error('Failed to fetch writable connections:', err);
+        console.error('Failed to fetch connections:', err);
       } finally {
         setLoadingConnections(false);
       }
@@ -74,15 +91,13 @@ function ControlEditor({
     apiClient.getDeviceTypes({ protocol: 'mqtt' })
       .then(result => setMqttDeviceTypes(result?.device_types || []))
       .catch(() => setMqttDeviceTypes([]));
-  }, []);
+  }, [needsConnection]);
 
-  // Update selected connection when connectionId changes
+  // Update selected connection when connections list loads (if not already set)
   useEffect(() => {
-    if (connectionId && connections.length > 0) {
+    if (connectionId && connections.length > 0 && !selectedConnection) {
       const conn = connections.find(c => c.id === connectionId);
-      setSelectedConnection(conn || null);
-    } else {
-      setSelectedConnection(null);
+      if (conn) setSelectedConnection(conn);
     }
   }, [connectionId, connections]);
 

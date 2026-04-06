@@ -42,12 +42,13 @@ func IsValidDeviceCategory(category string) bool {
 
 // Control UI type constants (fixed set - how controls appear in UI)
 const (
-	ControlUITypeToggle = "toggle" // On/off switch, sends boolean
-	ControlUITypeScalar = "scalar" // Slider/numeric input, sends number
-	ControlUITypeButton = "button" // Action trigger, sends null
-	ControlUITypeText   = "text"   // Text/command input, sends string
-	ControlUITypePlug   = "plug"   // Smart plug toggle, sends boolean
-	ControlUITypeDimmer = "dimmer" // Vertical slider with on/off, sends number (0=off)
+	ControlUITypeToggle         = "toggle"           // On/off switch, sends boolean
+	ControlUITypeScalar         = "scalar"           // Slider/numeric input, sends number
+	ControlUITypeButton         = "button"           // Action trigger, sends null
+	ControlUITypeText           = "text"             // Text/command input, sends string
+	ControlUITypePlug           = "plug"             // Smart plug toggle, sends boolean
+	ControlUITypeDimmer         = "dimmer"           // Vertical slider with on/off, sends number (0=off)
+	ControlUITypeTileGarageDoor = "tile_garage_door" // Read-only garage door contact sensor tile
 )
 
 // ValidControlUITypes returns the list of valid control UI types
@@ -59,6 +60,7 @@ func ValidControlUITypes() []string {
 		ControlUITypeText,
 		ControlUITypePlug,
 		ControlUITypeDimmer,
+		ControlUITypeTileGarageDoor,
 	}
 }
 
