@@ -643,6 +643,14 @@
     }
   }
 
+  // Dashboard settings modal form
+  .dashboard-settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-05;
+    padding-top: spacing.$spacing-03;
+  }
+
   .error-container {
     display: flex;
     flex-direction: column;

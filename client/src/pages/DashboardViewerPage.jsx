@@ -3,7 +3,7 @@
 // See LICENSE file for details.
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Button,
   Loading,
@@ -13,7 +13,11 @@ import {
   OverflowMenuItem,
   Modal,
   Select,
-  SelectItem
+  SelectItem,
+  TextInput,
+  NumberInput,
+  Slider,
+  Checkbox
 } from '@carbon/react';
 import {
   ArrowLeft,
@@ -33,7 +37,8 @@ import {
   TrashCan,
   Add,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Settings
 } from '@carbon/icons-react';
 import html2canvas from 'html2canvas';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
@@ -62,6 +67,7 @@ import './DashboardViewerPage.scss';
 function DashboardViewerPage({ canDesign = false }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [dashboard, setDashboard] = useState(null);
   const [chartsMap, setChartsMap] = useState({}); // Chart data keyed by chart_id
@@ -94,6 +100,15 @@ function DashboardViewerPage({ canDesign = false }) {
   const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editableName, setEditableName] = useState('');
+
+  // Dashboard settings (editable in settings modal)
+  const [editableDescription, setEditableDescription] = useState('');
+  const [editableTheme, setEditableTheme] = useState('dark');
+  const [editableRefreshInterval, setEditableRefreshInterval] = useState(0);
+  const [editableTitleScale, setEditableTitleScale] = useState(100);
+  const [editableIsPublic, setEditableIsPublic] = useState(false);
+  const [editableAllowExport, setEditableAllowExport] = useState(true);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   // Zoom state (edit mode only)
   const [zoom, setZoom] = useState(100);
@@ -373,6 +388,15 @@ function DashboardViewerPage({ canDesign = false }) {
     fetchDashboard();
   }, [fetchDashboard]);
 
+  // Auto-enter edit mode when navigated from design mode
+  const autoEditTriggered = useRef(false);
+  useEffect(() => {
+    if (dashboard && !autoEditTriggered.current && location.state?.autoEdit && canDesign) {
+      autoEditTriggered.current = true;
+      enterEditMode();
+    }
+  }, [dashboard, location.state]);
+
   // Check if this dashboard is the user's default
   useEffect(() => {
     const checkIfDefault = async () => {
@@ -537,6 +561,12 @@ function DashboardViewerPage({ canDesign = false }) {
     setEditablePanels(panelsCopy);
     setOriginalPanels(panelsCopy.map(p => ({ ...p })));
     setEditableName(dashboard?.name || '');
+    setEditableDescription(dashboard?.description || '');
+    setEditableTheme(dashboard?.settings?.theme || 'dark');
+    setEditableRefreshInterval(dashboard?.settings?.refresh_interval || 0);
+    setEditableTitleScale(dashboard?.settings?.title_scale || 100);
+    setEditableIsPublic(dashboard?.settings?.is_public || false);
+    setEditableAllowExport(dashboard?.settings?.allow_export ?? true);
     setEditHasChanges(false);
     setZoom(100);
     setIsEditMode(true);
@@ -568,8 +598,22 @@ function DashboardViewerPage({ canDesign = false }) {
   const saveEditMode = async () => {
     setEditSaving(true);
     try {
-      const updatedSettings = { ...dashboard.settings, layout_dimension: currentDimension };
-      await apiClient.updateDashboard(id, { ...dashboard, name: editableName, panels: editablePanels, settings: updatedSettings });
+      const updatedSettings = {
+        ...dashboard.settings,
+        layout_dimension: currentDimension,
+        theme: editableTheme,
+        refresh_interval: editableRefreshInterval,
+        title_scale: editableTitleScale,
+        is_public: editableIsPublic,
+        allow_export: editableAllowExport
+      };
+      await apiClient.updateDashboard(id, {
+        ...dashboard,
+        name: editableName,
+        description: editableDescription,
+        panels: editablePanels,
+        settings: updatedSettings
+      });
       setIsEditMode(false);
       setEditHasChanges(false);
   
@@ -1009,6 +1053,14 @@ function DashboardViewerPage({ canDesign = false }) {
               >
                 {editSubMode === 'standard' ? <Move size={20} /> : <Draggable size={20} />}
               </IconButton>
+              <IconButton
+                kind="ghost"
+                size="sm"
+                label="Dashboard settings"
+                onClick={() => setSettingsModalOpen(true)}
+              >
+                <Settings size={20} />
+              </IconButton>
               <Button
                 kind="primary"
                 size="sm"
@@ -1048,15 +1100,6 @@ function DashboardViewerPage({ canDesign = false }) {
               >
                 {reduceToFit ? <CenterToFit size={20} /> : <FitToScreen size={20} />}
               </IconButton>
-              {canDesign && (
-                <IconButton
-                  kind="ghost"
-                  label="Edit layout"
-                  onClick={enterEditMode}
-                >
-                  <Edit size={20} />
-                </IconButton>
-              )}
               <OverflowMenu
                 renderIcon={() => <OverflowMenuVertical size={20} />}
                 flipped
@@ -1065,8 +1108,8 @@ function DashboardViewerPage({ canDesign = false }) {
               >
                 {canDesign && (
                   <OverflowMenuItem
-                    itemText="Edit in Designer"
-                    onClick={() => navigate(`/design/dashboards/${id}`, { state: { from: `/view/dashboards/${id}` } })}
+                    itemText="Edit Dashboard"
+                    onClick={enterEditMode}
                   />
                 )}
                 {canDesign && (
@@ -1105,7 +1148,7 @@ function DashboardViewerPage({ canDesign = false }) {
             style={{
               gridTemplateColumns: `repeat(${maxGridCol}, ${CELL_WIDTH}px)`,
               gridTemplateRows: `repeat(${maxGridRow}, ${CELL_HEIGHT}px)`,
-              '--title-scale': (dashboard?.settings?.title_scale || 100) / 100,
+              '--title-scale': (isEditMode ? editableTitleScale : (dashboard?.settings?.title_scale || 100)) / 100,
               // Fit-to-screen: scale the grid to fit the viewport
               ...(reduceToFit && !isEditMode ? {
                 transform: `scale(${fitScaleX}, ${fitScaleY})`,
@@ -1316,6 +1359,71 @@ function DashboardViewerPage({ canDesign = false }) {
         }}
         onContinue={handleAIPreflightContinue}
       />
+
+      {/* Dashboard settings modal */}
+      <Modal
+        open={settingsModalOpen}
+        onRequestClose={() => setSettingsModalOpen(false)}
+        onRequestSubmit={() => {
+          setEditHasChanges(true);
+          setSettingsModalOpen(false);
+        }}
+        modalHeading="Dashboard Settings"
+        primaryButtonText="Apply"
+        secondaryButtonText="Cancel"
+        size="sm"
+      >
+        <div className="dashboard-settings-form">
+          <TextInput
+            id="settings-description"
+            labelText="Description"
+            value={editableDescription}
+            onChange={(e) => setEditableDescription(e.target.value)}
+            placeholder="Enter dashboard description"
+          />
+          <Select
+            id="settings-theme"
+            labelText="Theme"
+            value={editableTheme}
+            onChange={(e) => setEditableTheme(e.target.value)}
+          >
+            <SelectItem value="light" text="Light" />
+            <SelectItem value="dark" text="Dark" />
+            <SelectItem value="auto" text="Auto" />
+          </Select>
+          <NumberInput
+            id="settings-refresh"
+            label="Auto Refresh (seconds)"
+            value={editableRefreshInterval}
+            onChange={(e, { value }) => setEditableRefreshInterval(value)}
+            min={0}
+            max={3600}
+            step={5}
+            helperText="Set to 0 to disable auto refresh"
+          />
+          <Slider
+            id="settings-title-scale"
+            labelText="Title Scale (%)"
+            value={editableTitleScale}
+            onChange={({ value }) => setEditableTitleScale(value)}
+            min={50}
+            max={200}
+            step={10}
+          />
+          <Checkbox
+            id="settings-public"
+            labelText="Make dashboard public"
+            checked={editableIsPublic}
+            onChange={(_, { checked }) => setEditableIsPublic(checked)}
+          />
+          <Checkbox
+            id="settings-export"
+            labelText="Allow export"
+            checked={editableAllowExport}
+            onChange={(_, { checked }) => setEditableAllowExport(checked)}
+          />
+        </div>
+      </Modal>
 
       {/* Discard changes confirmation */}
       {showDiscardModal && (
