@@ -233,27 +233,23 @@ function DashboardViewerPage({ canDesign = false }) {
     ? Math.max(gridRows, panelExtentRow)
     : (panelExtentRow || 30);
 
-  // Track container size with ResizeObserver for fit-to-screen scaling
+  // Track container size for fit-to-screen scale calculation
   const hasPanels = panels && panels.length > 0;
   useEffect(() => {
     if (!hasPanels) return;
-    let observer;
-    const timer = setTimeout(() => {
+    // Measure on next frame to ensure container ref is attached
+    const measure = () => {
       const el = containerRef.current;
-      if (!el) return;
-      observer = new ResizeObserver(entries => {
-        if (entries[0]) {
-          const { width, height } = entries[0].contentRect;
-          setContainerSize({ width, height });
-        }
-      });
-      observer.observe(el);
-    }, 0);
-    return () => {
-      clearTimeout(timer);
-      if (observer) observer.disconnect();
+      if (el) {
+        setContainerSize({ width: el.clientWidth, height: el.clientHeight });
+      }
     };
-  }, [hasPanels, isFullscreen]);
+    // Initial measure
+    requestAnimationFrame(measure);
+    // Re-measure on window resize
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [hasPanels, isFullscreen, reduceToFit]);
 
   // Calculate fit-to-screen scale factor
   const GAP = 8; // spacing.$spacing-03
@@ -261,10 +257,10 @@ function DashboardViewerPage({ canDesign = false }) {
     if (!reduceToFit || !containerSize.width || !containerSize.height) return 1;
     const gridNativeW = maxGridCol * CELL_WIDTH + (maxGridCol - 1) * GAP;
     const gridNativeH = maxGridRow * CELL_HEIGHT + (maxGridRow - 1) * GAP;
-    const padding = 8; // small inset so grid doesn't touch container edges
+    const padding = 8;
     const scaleX = (containerSize.width - padding * 2) / gridNativeW;
     const scaleY = (containerSize.height - padding * 2) / gridNativeH;
-    return Math.min(scaleX, scaleY, 1); // Never scale up beyond 100%
+    return Math.min(scaleX, scaleY, 1);
   }, [reduceToFit, containerSize, maxGridCol, maxGridRow, CELL_WIDTH, CELL_HEIGHT]);
 
   // Fetch dashboard data and referenced charts
