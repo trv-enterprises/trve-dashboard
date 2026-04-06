@@ -35,6 +35,7 @@ function PanelEditMenu({
   buttonKind = 'secondary',
   buttonSize = 'sm',
   minimal = false,
+  minimalIcon = null, // Custom icon for minimal mode (defaults to ChevronDown)
   hasExisting = false,
   onEdit,
   onEditWithAI,
@@ -192,7 +193,7 @@ function PanelEditMenu({
             onClick={() => setIsOpen(!isOpen)}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <ChevronDown size={16} />
+            {minimalIcon || <ChevronDown size={16} />}
           </button>
         ) : (
           <Button

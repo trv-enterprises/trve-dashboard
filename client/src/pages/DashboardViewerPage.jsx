@@ -31,6 +31,7 @@ import {
   Move,
   Draggable,
   TrashCan,
+  Add,
   ZoomIn,
   ZoomOut
 } from '@carbon/icons-react';
@@ -1089,8 +1090,23 @@ function DashboardViewerPage({ canDesign = false }) {
                       <span className="panel-title-label">
                         {chart?.title || chart?.name || 'Empty'}
                       </span>
-                      <div className="panel-header-right">
+                      <div className="panel-header-right" style={{ pointerEvents: (draggingPanel || resizingPanel) ? 'none' : 'auto' }}>
                         <span className="panel-size-label">{panel.w}×{panel.h}</span>
+                        <div className="panel-header-edit-menu" onMouseDown={(e) => e.stopPropagation()}>
+                          <PanelEditMenu
+                            minimal
+                            minimalIcon={hasChart ? <Edit size={14} /> : <Add size={14} />}
+                            hasExisting={hasChart}
+                            onEdit={hasChart ? () => openChartEditor(panel.id) : undefined}
+                            onEditWithAI={hasChart ? () => openAIEditor(panel.id) : undefined}
+                            onNew={() => {
+                              if (hasChart) updateEditablePanel(panel.id, { chart_id: null });
+                              openChartEditor(panel.id, null);
+                            }}
+                            onNewWithAI={() => openAIPreflightModal(panel.id)}
+                            onSelectExisting={() => openComponentPicker(panel.id, 'all')}
+                          />
+                        </div>
                         <IconButton
                           kind="ghost"
                           size="sm"
@@ -1159,23 +1175,6 @@ function DashboardViewerPage({ canDesign = false }) {
                     />
                   )}
 
-                  {/* Standard edit mode: PanelEditMenu with full button */}
-                  {isStandard && (
-                    <div className="edit-panel-menu-anchor" style={{ pointerEvents: (draggingPanel || resizingPanel) ? 'none' : 'auto' }}>
-                      <PanelEditMenu
-                        buttonLabel={hasChart ? 'Edit' : 'Add'}
-                        hasExisting={hasChart}
-                        onEdit={hasChart ? () => openChartEditor(panel.id) : undefined}
-                        onEditWithAI={hasChart ? () => openAIEditor(panel.id) : undefined}
-                        onNew={() => {
-                          if (hasChart) updateEditablePanel(panel.id, { chart_id: null });
-                          openChartEditor(panel.id, null);
-                        }}
-                        onNewWithAI={() => openAIPreflightModal(panel.id)}
-                        onSelectExisting={() => openComponentPicker(panel.id, 'all')}
-                      />
-                    </div>
-                  )}
 
                   {/* Compact edit mode: only show Add button for empty panels */}
                   {isCompact && !hasChart && (

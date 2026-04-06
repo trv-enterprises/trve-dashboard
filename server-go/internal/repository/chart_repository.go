@@ -199,6 +199,12 @@ func (r *ChartRepository) FindAllLatest(ctx context.Context, params models.Chart
 	if params.Tag != "" {
 		matchFilter["tags"] = params.Tag
 	}
+	if params.ComponentType != "" {
+		matchFilter["component_type"] = params.ComponentType
+	}
+	if params.Status != "" {
+		matchFilter["status"] = params.Status
+	}
 
 	// Aggregation pipeline to get latest version of each chart
 	pipeline := mongo.Pipeline{

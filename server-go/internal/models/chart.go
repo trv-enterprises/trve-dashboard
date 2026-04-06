@@ -160,12 +160,14 @@ type ChartListResponse struct {
 // ChartQueryParams defines query parameters for listing charts
 // @Description Query parameters for filtering and pagination
 type ChartQueryParams struct {
-	Name         string `form:"name"`
-	ChartType    string `form:"chart_type"`
-	DatasourceID string `form:"connection_id"` // Accept connection_id query param
-	Tag          string `form:"tag"`
-	Page         int    `form:"page"`
-	PageSize     int    `form:"page_size"`
+	Name          string `form:"name"`
+	ChartType     string `form:"chart_type"`
+	ComponentType string `form:"component_type"` // "chart", "control", "display"
+	Status        string `form:"status"`         // "draft", "final"
+	DatasourceID  string `form:"connection_id"`  // Accept connection_id query param
+	Tag           string `form:"tag"`
+	Page          int    `form:"page"`
+	PageSize      int    `form:"page_size"`
 }
 
 // ChartSummary is a lightweight chart representation for card listings
