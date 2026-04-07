@@ -8,15 +8,25 @@ import (
 	"time"
 )
 
+// PanelTextConfig holds configuration for native text panels (no component needed)
+// @Description Configuration for native text panels — section headers, date/time, titles
+type PanelTextConfig struct {
+	Content        string      `json:"content,omitempty" bson:"content,omitempty"`                 // Static text (used when display_content="title")
+	DisplayContent string      `json:"display_content,omitempty" bson:"display_content,omitempty"` // "title", "date_short", "time_12", etc.
+	Size           interface{} `json:"size,omitempty" bson:"size,omitempty"`                       // Font size in pixels (int) or legacy name (string)
+	Align          string      `json:"align,omitempty" bson:"align,omitempty"`                     // "left", "center", "right"
+}
+
 // DashboardPanel represents a panel position in the dashboard grid
-// @Description Panel position and size in the grid with optional chart reference
+// @Description Panel position and size in the grid with optional chart reference or text config
 type DashboardPanel struct {
-	ID      string `json:"id" bson:"id"`
-	X       int    `json:"x" bson:"x"`
-	Y       int    `json:"y" bson:"y"`
-	W       int    `json:"w" bson:"w"`
-	H       int    `json:"h" bson:"h"`
-	ChartID string `json:"chart_id,omitempty" bson:"chart_id,omitempty"` // Reference to chart
+	ID         string           `json:"id" bson:"id"`
+	X          int              `json:"x" bson:"x"`
+	Y          int              `json:"y" bson:"y"`
+	W          int              `json:"w" bson:"w"`
+	H          int              `json:"h" bson:"h"`
+	ChartID    string           `json:"chart_id,omitempty" bson:"chart_id,omitempty"`       // Reference to chart component
+	TextConfig *PanelTextConfig `json:"text_config,omitempty" bson:"text_config,omitempty"` // Native text panel config
 }
 
 // ChartQueryConfig defines how to query data for a chart

@@ -5,7 +5,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@carbon/react';
-import { ChevronDown, Edit, Add, Catalog } from '@carbon/icons-react';
+import { ChevronDown, Edit, Add, Catalog, TextFont } from '@carbon/icons-react';
 import AiIcon from './icons/AiIcon';
 import './PanelEditMenu.scss';
 
@@ -41,7 +41,8 @@ function PanelEditMenu({
   onEditWithAI,
   onNew,
   onNewWithAI,
-  onSelectExisting
+  onSelectExisting,
+  onText
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState({});
@@ -180,6 +181,16 @@ function PanelEditMenu({
       >
         <Catalog size={16} />
         <span>Select Existing</span>
+      </button>
+
+      {/* Divider before text option */}
+      <div className="panel-edit-menu-divider" />
+      <button
+        className="panel-edit-menu-item"
+        onClick={(e) => { setIsOpen(false); if (onText) onText(e); }}
+      >
+        <TextFont size={16} />
+        <span>Text</span>
       </button>
     </div>
   ) : null;

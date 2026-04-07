@@ -474,7 +474,7 @@
       position: absolute;
       top: 0;
       left: 0;
-      right: 0;
+      right: 16px; // Leave space for resize handle
       height: 28px;
       background-color: rgba(22, 22, 22, 0.92);
       display: flex;
@@ -533,6 +533,19 @@
               svg { fill: #0f62fe; }
             }
           }
+        }
+
+        .panel-text-edit-btn {
+          min-height: 20px;
+          max-height: 20px;
+          min-width: 20px;
+          max-width: 20px;
+          width: 20px;
+          padding: 0;
+          cursor: pointer;
+
+          svg { fill: #78a9ff; }
+          &:hover svg { fill: #0f62fe; }
         }
 
         .panel-delete-btn {
@@ -608,10 +621,44 @@
       background-color: rgba(15, 98, 254, 0.03);
     }
 
-    // Text label panels keep their minimal style
+    // Text label panels (legacy control-based) keep their minimal style
     &.text-label-panel {
       border: 1px solid #0f62fe;
       background-color: #262626;
+    }
+
+    // Native text panels
+    &.text-panel {
+      border: none;
+      background-color: transparent;
+      box-shadow: none;
+
+      &.edit-mode {
+        border: 1px dashed #525252;
+        background-color: rgba(38, 38, 38, 0.5);
+      }
+    }
+  }
+
+  // Panel text rendering (native text panels)
+  .panel-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+
+    &--left { align-items: flex-start; text-align: left; }
+    &--center { align-items: center; text-align: center; }
+    &--right { align-items: flex-end; text-align: right; }
+
+    .panel-text-content {
+      color: var(--cds-text-primary);
+      font-weight: 600;
+      line-height: 1.2;
+      margin: 0;
+      padding: 0;
+      word-break: break-word;
     }
   }
 

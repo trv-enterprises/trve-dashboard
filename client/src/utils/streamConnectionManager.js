@@ -415,6 +415,23 @@ class StreamConnectionManager {
     const key = this._connectionKey(datasourceId, topics);
     return this.buffers.get(key) || [];
   }
+
+  /**
+   * Close all connections immediately, bypassing grace periods.
+   * Call on page/route navigation to free browser connection slots.
+   */
+  closeAll() {
+    // Clear all grace period timers
+    for (const [key, timeout] of this.gracePeriodTimeouts) {
+      clearTimeout(timeout);
+    }
+    this.gracePeriodTimeouts.clear();
+
+    // Cleanup all connections
+    for (const key of [...this.connections.keys()]) {
+      this._cleanup(key);
+    }
+  }
 }
 
 export default StreamConnectionManager;

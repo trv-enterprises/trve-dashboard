@@ -154,6 +154,11 @@ func main() {
 		log.Printf("Warning: Failed to create device indexes: %v", err)
 	}
 
+	// Run data migrations
+	if err := database.RunMigrations(ctx, mongodb.Database); err != nil {
+		log.Printf("Warning: Failed to run migrations: %v", err)
+	}
+
 	// Initialize services
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	chartService := service.NewChartService(chartRepo)

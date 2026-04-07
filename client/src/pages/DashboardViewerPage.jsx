@@ -45,10 +45,13 @@ import { ControlRenderer } from '../components/controls';
 import FrigateCameraViewer from '../components/frigate/FrigateCameraViewer';
 import WeatherDisplay from '../components/weather/WeatherDisplay';
 import PanelEditMenu from '../components/PanelEditMenu';
+import PanelText from '../components/PanelText';
+import PanelTextEditor from '../components/PanelTextEditor';
 import ChartEditorModal from '../components/ChartEditorModal';
 import ComponentPickerModal from '../components/ComponentPickerModal';
 import AIPreflightModal from '../components/AIPreflightModal';
 import apiClient from '../api/client';
+import StreamConnectionManager from '../utils/streamConnectionManager';
 import { getComponentMinSize } from '../config/layoutConfig';
 import './DashboardViewerPage.scss';
 
@@ -138,9 +141,19 @@ function DashboardViewerPage({ canDesign = false }) {
   const [aiPreflightOpen, setAiPreflightOpen] = useState(false);
   const [aiPreflightPanelId, setAiPreflightPanelId] = useState(null);
 
-  // Grid configuration - fixed 64x36px cells (16:9 aspect ratio)
-  const CELL_WIDTH = 64;
-  const CELL_HEIGHT = 36;
+  // Text panel editor state
+  const [textEditorPanelId, setTextEditorPanelId] = useState(null);
+  const [textEditorAnchorRect, setTextEditorAnchorRect] = useState(null);
+
+  // Close all SSE connections when leaving the dashboard viewer
+  // (frees browser connection slots so other pages load instantly)
+  useEffect(() => {
+    return () => StreamConnectionManager.getInstance().closeAll();
+  }, []);
+
+  // Grid configuration - 32x32px cells
+  const CELL_WIDTH = 32;
+  const CELL_HEIGHT = 32;
 
   // Layout dimension presets — defines the hard grid boundary
   const [dimensions, setDimensions] = useState([]);
@@ -240,11 +253,11 @@ function DashboardViewerPage({ canDesign = false }) {
   // In view mode, grid fits tightly around panels
   const maxGridCol = isEditMode && gridCols
     ? Math.max(gridCols, panelExtentCol)
-    : (isEditMode ? Math.max(panelExtentCol, 20) : (panelExtentCol || 30));
+    : (isEditMode ? Math.max(panelExtentCol, 40) : (panelExtentCol || 60));
 
   const maxGridRow = isEditMode && gridRows
     ? Math.max(gridRows, panelExtentRow)
-    : (isEditMode ? Math.max(panelExtentRow, 12) : (panelExtentRow || 30));
+    : (isEditMode ? Math.max(panelExtentRow, 24) : (panelExtentRow || 60));
 
   // Track container size for fit-to-screen scale calculation
   const hasPanels = panels && panels.length > 0;
@@ -878,6 +891,41 @@ function DashboardViewerPage({ canDesign = false }) {
 
   };
 
+  // ── Text panel helpers ────────────────────────────────────────────
+  const getPanelRect = (panelId) => {
+    if (!gridRef.current) return null;
+    const panelEl = gridRef.current.querySelector(`[data-panel-id="${panelId}"]`);
+    return panelEl ? panelEl.getBoundingClientRect() : null;
+  };
+
+  const setTextPanel = (panelId) => {
+    // Set default text config and clear chart_id
+    updateEditablePanel(panelId, {
+      chart_id: null,
+      text_config: { content: '', display_content: 'title', size: 20, align: 'center' }
+    });
+    // Open the text editor anchored to the panel
+    // Use requestAnimationFrame to ensure the panel has re-rendered with text_config
+    requestAnimationFrame(() => {
+      setTextEditorAnchorRect(getPanelRect(panelId));
+      setTextEditorPanelId(panelId);
+    });
+  };
+
+  const openTextEditor = (panelId) => {
+    setTextEditorAnchorRect(getPanelRect(panelId));
+    setTextEditorPanelId(panelId);
+  };
+
+  const handleTextConfigUpdate = (panelId, textConfig) => {
+    updateEditablePanel(panelId, { text_config: textConfig });
+  };
+
+  const closeTextEditor = () => {
+    setTextEditorPanelId(null);
+    setTextEditorAnchorRect(null);
+  };
+
   const openComponentPicker = (panelId, category) => {
     setComponentPickerPanelId(panelId);
     setComponentPickerCategory(category);
@@ -1189,12 +1237,15 @@ function DashboardViewerPage({ canDesign = false }) {
           >
             {panels.map((panel) => {
               const chart = panel.chart_id ? chartsMap[panel.chart_id] : null;
-              const hasChart = !!chart?.component_code || chart?.component_type === 'control' || chart?.component_type === 'display';
+              const hasText = !!panel.text_config;
+              const hasChart = !hasText && (!!chart?.component_code || chart?.component_type === 'control' || chart?.component_type === 'display');
+              const hasContent = hasText || hasChart;
 
               return (
                 <div
                   key={panel.id}
-                  className={`panel-container ${hasChart ? 'has-component' : 'empty-panel'} ${chart?.control_config?.control_type === 'text_label' ? 'text-label-panel' : ''} ${isEditMode ? 'edit-mode' : ''} ${draggingPanel?.id === panel.id ? 'dragging' : ''} ${resizingPanel?.id === panel.id ? 'resizing' : ''}`}
+                  data-panel-id={panel.id}
+                  className={`panel-container ${hasContent ? 'has-component' : 'empty-panel'} ${hasText ? 'text-panel' : ''} ${chart?.control_config?.control_type === 'text_label' ? 'text-label-panel' : ''} ${isEditMode ? 'edit-mode' : ''} ${draggingPanel?.id === panel.id ? 'dragging' : ''} ${resizingPanel?.id === panel.id ? 'resizing' : ''}`}
                   style={{
                     gridColumn: `${panel.x + 1} / span ${panel.w}`,
                     gridRow: `${panel.y + 1} / span ${panel.h}`,
@@ -1208,24 +1259,38 @@ function DashboardViewerPage({ canDesign = false }) {
                       onMouseDown={(e) => startDragging(e, panel)}
                     >
                       <span className="panel-title-label">
-                        {chart?.title || chart?.name || 'Empty'}
+                        {hasText ? (panel.text_config.content || 'Text') : (chart?.title || chart?.name || 'Empty')}
                       </span>
                       <div className="panel-header-right" style={{ pointerEvents: (draggingPanel || resizingPanel) ? 'none' : 'auto' }}>
                         <span className="panel-size-label">{panel.w}×{panel.h}</span>
                         <div className="panel-header-edit-menu" onMouseDown={(e) => e.stopPropagation()}>
-                          <PanelEditMenu
-                            minimal
-                            minimalIcon={hasChart ? <Edit size={14} /> : <Add size={14} />}
-                            hasExisting={hasChart}
-                            onEdit={hasChart ? () => openChartEditor(panel.id) : undefined}
-                            onEditWithAI={hasChart ? () => openAIEditor(panel.id) : undefined}
-                            onNew={() => {
-                              if (hasChart) updateEditablePanel(panel.id, { chart_id: null });
-                              openChartEditor(panel.id, null);
-                            }}
-                            onNewWithAI={() => openAIPreflightModal(panel.id)}
-                            onSelectExisting={() => openComponentPicker(panel.id, 'all')}
-                          />
+                          {hasText ? (
+                            <IconButton
+                              kind="ghost"
+                              size="sm"
+                              label="Edit text"
+                              className="panel-text-edit-btn"
+                              onClick={(e) => { e.stopPropagation(); openTextEditor(panel.id); }}
+                              onMouseDown={(e) => e.stopPropagation()}
+                            >
+                              <Edit size={14} />
+                            </IconButton>
+                          ) : (
+                            <PanelEditMenu
+                              minimal
+                              minimalIcon={hasChart ? <Edit size={14} /> : <Add size={14} />}
+                              hasExisting={hasChart}
+                              onEdit={hasChart ? () => openChartEditor(panel.id) : undefined}
+                              onEditWithAI={hasChart ? () => openAIEditor(panel.id) : undefined}
+                              onNew={() => {
+                                if (hasChart) updateEditablePanel(panel.id, { chart_id: null, text_config: null });
+                                openChartEditor(panel.id, null);
+                              }}
+                              onNewWithAI={() => openAIPreflightModal(panel.id)}
+                              onSelectExisting={() => openComponentPicker(panel.id, 'all')}
+                              onText={() => setTextPanel(panel.id)}
+                            />
+                          )}
                         </div>
                         <IconButton
                           kind="ghost"
@@ -1245,7 +1310,11 @@ function DashboardViewerPage({ canDesign = false }) {
                   )}
 
                   {/* Panel content */}
-                  {hasChart ? (
+                  {hasText ? (
+                    <div className="component-wrapper text-wrapper">
+                      <PanelText config={panel.text_config} />
+                    </div>
+                  ) : hasChart ? (
                     <>
                       {chart.component_type === 'control' ? (
                         <div className="component-wrapper control-wrapper" onDoubleClick={(e) => e.stopPropagation()}>
@@ -1296,7 +1365,7 @@ function DashboardViewerPage({ canDesign = false }) {
                   )}
 
                   {/* Edit mode: Add button for empty panels */}
-                  {isEditMode && !hasChart && (
+                  {isEditMode && !hasContent && (
                     <div className="edit-panel-menu-anchor" style={{ pointerEvents: (draggingPanel || resizingPanel) ? 'none' : 'auto' }}>
                       <PanelEditMenu
                         buttonLabel="Add"
@@ -1304,6 +1373,7 @@ function DashboardViewerPage({ canDesign = false }) {
                         onNew={() => openChartEditor(panel.id, null)}
                         onNewWithAI={() => openAIPreflightModal(panel.id)}
                         onSelectExisting={() => openComponentPicker(panel.id, 'all')}
+                        onText={() => setTextPanel(panel.id)}
                       />
                     </div>
                   )}
@@ -1395,6 +1465,16 @@ function DashboardViewerPage({ canDesign = false }) {
         }}
         onContinue={handleAIPreflightContinue}
       />
+
+      {/* Text panel editor */}
+      {textEditorPanelId && (
+        <PanelTextEditor
+          config={editablePanels.find(p => p.id === textEditorPanelId)?.text_config}
+          onUpdate={(config) => handleTextConfigUpdate(textEditorPanelId, config)}
+          onClose={closeTextEditor}
+          anchorRect={textEditorAnchorRect}
+        />
+      )}
 
       {/* Dashboard settings modal */}
       <Modal
