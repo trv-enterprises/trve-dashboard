@@ -177,9 +177,9 @@ function DashboardViewerPage({ canDesign = false }) {
   }, [dimensions, currentDimension]);
 
   // Grid bounds from layout dimension (matches DashboardDetailPage formula)
-  const VIEWER_CHROME_V = 113; // 48px app header + 57px toolbar + 8px padding
-  const VIEWER_CHROME_H = 8;
-  const VIEWER_GAP = 8;
+  const VIEWER_CHROME_V = 109; // 48px app header + 57px toolbar + 4px padding
+  const VIEWER_CHROME_H = 4;
+  const VIEWER_GAP = 4;
 
   const gridCols = useMemo(() => {
     if (!layoutDimension) return null;
@@ -271,11 +271,11 @@ function DashboardViewerPage({ canDesign = false }) {
   }, [hasPanels, isFullscreen, reduceToFit]);
 
   // Calculate fit-to-screen scale factor
-  const GAP = 8; // spacing.$spacing-03
+  const GAP = 4; // spacing.$spacing-02
   // The container has 8px padding on all sides. The grid starts inside the padding
   // (top-left offset), but clientWidth/clientHeight include padding on both sides.
   // Subtract the right/bottom padding so the scaled grid doesn't overflow into it.
-  const CONTAINER_PADDING = 8;
+  const CONTAINER_PADDING = 4;
   const fitScaleX = useMemo(() => {
     if (!reduceToFit || !containerSize.width) return 1;
     const gridNativeW = maxGridCol * CELL_WIDTH + (maxGridCol - 1) * GAP;
@@ -1125,18 +1125,22 @@ function DashboardViewerPage({ canDesign = false }) {
               >
                 {reduceToFit ? <CenterToFit size={20} /> : <FitToScreen size={20} />}
               </IconButton>
+              {canDesign && (
+                <IconButton
+                  kind="ghost"
+                  label="Edit dashboard"
+                  align="bottom"
+                  onClick={enterEditMode}
+                >
+                  <Edit size={20} />
+                </IconButton>
+              )}
               <OverflowMenu
                 renderIcon={() => <OverflowMenuVertical size={20} />}
                 flipped
                 direction="bottom"
                 iconDescription="Dashboard actions"
               >
-                {canDesign && (
-                  <OverflowMenuItem
-                    itemText="Edit Dashboard"
-                    onClick={enterEditMode}
-                  />
-                )}
                 {canDesign && (
                   <OverflowMenuItem
                     itemText={savingThumbnail ? "Saving..." : "Save Thumbnail"}

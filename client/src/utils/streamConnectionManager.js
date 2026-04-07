@@ -31,6 +31,10 @@ class StreamConnectionManager {
     this.buffers = new Map();
     // Max buffer size per datasource
     this.maxBufferSize = 1000;
+    // Grace period: defer cleanup when last subscriber leaves, allowing
+    // rapid remounts (edit mode, popups) to reuse the existing connection
+    this.gracePeriodTimeouts = new Map();
+    this.gracePeriodMs = 30000; // 30 seconds
   }
 
   static getInstance() {
@@ -81,6 +85,14 @@ class StreamConnectionManager {
     };
 
     this.subscribers.get(key).add(subscriber);
+
+    // Cancel any pending grace period cleanup — reuse the existing connection
+    const pendingTimeout = this.gracePeriodTimeouts.get(key);
+    if (pendingTimeout) {
+      clearTimeout(pendingTimeout);
+      this.gracePeriodTimeouts.delete(key);
+      console.log(`[StreamConnectionManager] Grace period cancelled for ${key} — reusing connection`);
+    }
 
     // Get current connection state
     const connection = this.connections.get(key);
@@ -267,9 +279,26 @@ class StreamConnectionManager {
 
     console.log(`[StreamConnectionManager] Subscriber removed from ${key} (${subscribers.size} remaining)`);
 
-    // If no more subscribers, close connection
+    // If no more subscribers, start grace period before cleanup
     if (subscribers.size === 0) {
-      this._cleanup(key);
+      if (this.gracePeriodMs > 0) {
+        // Clear any existing grace timer (defensive)
+        const existing = this.gracePeriodTimeouts.get(key);
+        if (existing) clearTimeout(existing);
+
+        console.log(`[StreamConnectionManager] Grace period started for ${key} (${this.gracePeriodMs}ms)`);
+        const timeout = setTimeout(() => {
+          this.gracePeriodTimeouts.delete(key);
+          const currentSubs = this.subscribers.get(key);
+          if (!currentSubs || currentSubs.size === 0) {
+            console.log(`[StreamConnectionManager] Grace period expired for ${key} — cleaning up`);
+            this._cleanup(key);
+          }
+        }, this.gracePeriodMs);
+        this.gracePeriodTimeouts.set(key, timeout);
+      } else {
+        this._cleanup(key);
+      }
     }
   }
 
@@ -278,6 +307,13 @@ class StreamConnectionManager {
    */
   _cleanup(key) {
     console.log(`[StreamConnectionManager] Cleaning up connection for ${key}`);
+
+    // Clear any grace period timer
+    const graceTimeout = this.gracePeriodTimeouts.get(key);
+    if (graceTimeout) {
+      clearTimeout(graceTimeout);
+      this.gracePeriodTimeouts.delete(key);
+    }
 
     const connection = this.connections.get(key);
     if (connection) {
@@ -365,7 +401,8 @@ class StreamConnectionManager {
       reconnecting: connection?.reconnecting || false,
       reconnectAttempts: connection?.reconnectAttempts || 0,
       subscriberCount: subscribers?.size || 0,
-      bufferSize: buffer?.length || 0
+      bufferSize: buffer?.length || 0,
+      inGracePeriod: this.gracePeriodTimeouts.has(key)
     };
   }
 
