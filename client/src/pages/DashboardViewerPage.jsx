@@ -694,8 +694,6 @@ function DashboardViewerPage({ canDesign = false }) {
   const getGridPosition = useCallback((e) => {
     if (!gridRef.current) return null;
     const rect = gridRef.current.getBoundingClientRect();
-    // The grid may be scaled via transform — getBoundingClientRect accounts for this,
-    // so we calculate the effective cell size from the rendered dimensions
     const cellW = rect.width / maxGridCol;
     const cellH = rect.height / maxGridRow;
     const x = Math.floor((e.clientX - rect.left) / cellW);
@@ -724,7 +722,6 @@ function DashboardViewerPage({ canDesign = false }) {
     // mouse movement doesn't immediately snap to the next grid cell.
     if (gridRef.current) {
       const rect = gridRef.current.getBoundingClientRect();
-      // getBoundingClientRect reflects the CSS transform, so rendered cell size is:
       const cellW = rect.width / maxGridCol;
       const cellH = rect.height / maxGridRow;
       const edgePixelX = rect.left + (panel.x + panel.w) * cellW;
@@ -814,7 +811,7 @@ function DashboardViewerPage({ canDesign = false }) {
     };
 
     const handleMouseUp = () => {
-      if (drawingPanel && drawingPanel.w >= 2 && drawingPanel.h >= 2) {
+      if (drawingPanel && drawingPanel.w >= 2 && drawingPanel.h >= 1) {
         addPanel({
           x: drawingPanel.x,
           y: drawingPanel.y,
@@ -1207,7 +1204,9 @@ function DashboardViewerPage({ canDesign = false }) {
                 >
                   {/* Edit mode: hover header overlay with title, actions, and delete */}
                   {isEditMode && (
-                    <div className="edit-hover-header">
+                    <div className="edit-hover-header"
+                      onMouseDown={(e) => startDragging(e, panel)}
+                    >
                       <span className="panel-title-label">
                         {chart?.title || chart?.name || 'Empty'}
                       </span>

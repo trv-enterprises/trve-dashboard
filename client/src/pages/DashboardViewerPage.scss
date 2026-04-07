@@ -260,7 +260,7 @@
       gap: spacing.$spacing-02;
       min-width: 800px;
       position: relative;
-      width: 100%;
+      width: fit-content;
 
       .panel-container {
         background-color: #262626;
@@ -589,7 +589,7 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      z-index: 5;
+      z-index: 4;
       pointer-events: auto;
 
       .cds--btn {
