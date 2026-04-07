@@ -272,16 +272,20 @@ function DashboardViewerPage({ canDesign = false }) {
 
   // Calculate fit-to-screen scale factor
   const GAP = 8; // spacing.$spacing-03
+  // The container has 8px padding on all sides. The grid starts inside the padding
+  // (top-left offset), but clientWidth/clientHeight include padding on both sides.
+  // Subtract the right/bottom padding so the scaled grid doesn't overflow into it.
+  const CONTAINER_PADDING = 8;
   const fitScaleX = useMemo(() => {
     if (!reduceToFit || !containerSize.width) return 1;
     const gridNativeW = maxGridCol * CELL_WIDTH + (maxGridCol - 1) * GAP;
-    return containerSize.width / gridNativeW;
+    return (containerSize.width - 2 * CONTAINER_PADDING) / gridNativeW;
   }, [reduceToFit, containerSize.width, maxGridCol, CELL_WIDTH]);
 
   const fitScaleY = useMemo(() => {
     if (!reduceToFit || !containerSize.height) return 1;
     const gridNativeH = maxGridRow * CELL_HEIGHT + (maxGridRow - 1) * GAP;
-    return containerSize.height / gridNativeH;
+    return (containerSize.height - 2 * CONTAINER_PADDING) / gridNativeH;
   }, [reduceToFit, containerSize.height, maxGridRow, CELL_HEIGHT]);
 
   // Fetch dashboard data and referenced charts
