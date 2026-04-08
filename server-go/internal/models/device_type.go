@@ -46,8 +46,11 @@ const (
 	ControlUITypeScalar         = "scalar"           // Slider/numeric input, sends number
 	ControlUITypeButton         = "button"           // Action trigger, sends null
 	ControlUITypeText           = "text"             // Text/command input, sends string
-	ControlUITypePlug           = "plug"             // Smart plug toggle, sends boolean
+	ControlUITypeSwitch         = "switch"           // On/off switch, sends boolean
+	ControlUITypePlug           = "plug"             // Alias for switch (backward compat)
 	ControlUITypeDimmer         = "dimmer"           // Vertical slider with on/off, sends number (0=off)
+	ControlUITypeTileSwitch     = "tile_switch"      // Compact tile switch
+	ControlUITypeTilePlug       = "tile_plug"        // Alias for tile_switch (backward compat)
 	ControlUITypeTileGarageDoor = "tile_garage_door" // Read-only garage door contact sensor tile
 )
 
@@ -58,8 +61,11 @@ func ValidControlUITypes() []string {
 		ControlUITypeScalar,
 		ControlUITypeButton,
 		ControlUITypeText,
+		ControlUITypeSwitch,
 		ControlUITypePlug,
 		ControlUITypeDimmer,
+		ControlUITypeTileSwitch,
+		ControlUITypeTilePlug,
 		ControlUITypeTileGarageDoor,
 	}
 }

@@ -112,5 +112,6 @@ TilePlug.propTypes = {
   onError: PropTypes.func
 };
 
-registerControl('tile_plug', TilePlug);
+registerControl('tile_switch', TilePlug);
+registerControl('tile_plug', TilePlug); // Backward compatibility
 export default TilePlug;

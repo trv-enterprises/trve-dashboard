@@ -25,9 +25,9 @@ export const CONTROL_TYPES = {
   TOGGLE: 'toggle',
   SLIDER: 'slider',
   TEXT_INPUT: 'text_input',
-  PLUG: 'plug',
+  SWITCH: 'switch',
   DIMMER: 'dimmer',
-  TILE_PLUG: 'tile_plug',
+  TILE_SWITCH: 'tile_switch',
   TILE_DIMMER: 'tile_dimmer',
   TILE_GARAGE_DOOR: 'tile_garage_door',
   TEXT_LABEL: 'text_label'
@@ -89,15 +89,15 @@ export const CONTROL_TYPE_INFO = {
       state_field: 'value'
     }
   },
-  [CONTROL_TYPES.PLUG]: {
-    label: 'Plug',
-    description: 'Smart plug toggle with HomeKit-style pill design',
+  [CONTROL_TYPES.SWITCH]: {
+    label: 'Switch',
+    description: 'On/off switch with HomeKit-style pill design',
     icon: mdiPowerPlug,
     category: 'switch',
     canWrite: true,
     canRead: true,
     defaultUIConfig: {
-      label: 'Plug',
+      label: 'Switch',
       onLabel: 'On',
       offLabel: 'Off',
       state_field: 'state'
@@ -118,15 +118,15 @@ export const CONTROL_TYPE_INFO = {
       state_field: 'level'
     }
   },
-  [CONTROL_TYPES.TILE_PLUG]: {
-    label: 'Tile Plug',
-    description: 'Compact tile showing plug on/off state. Tap to open full control.',
+  [CONTROL_TYPES.TILE_SWITCH]: {
+    label: 'Tile Switch',
+    description: 'Compact tile showing on/off state. Tap to open full control.',
     icon: mdiPowerPlug,
     category: 'switch',
     canWrite: true,
     canRead: true,
     defaultUIConfig: {
-      label: 'Plug',
+      label: 'Switch',
       onLabel: 'On',
       offLabel: 'Off',
       state_field: 'state'

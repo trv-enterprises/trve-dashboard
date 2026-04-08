@@ -101,9 +101,11 @@ export const COMPONENT_MIN_SIZES = {
   toggle:     { w: 6, h: 3 },
   slider:     { w: 8, h: 4 },
   text_input: { w: 6, h: 2 },
-  plug:       { w: 4, h: 8 },
+  switch:     { w: 4, h: 8 },
+  plug:       { w: 4, h: 8 },  // Backward compatibility
   dimmer:     { w: 4, h: 8 },
-  tile_plug:  { w: 4, h: 4 },
+  tile_switch:{ w: 4, h: 4 },
+  tile_plug:  { w: 4, h: 4 },  // Backward compatibility
   tile_dimmer:{ w: 4, h: 4 },
   tile_garage_door: { w: 4, h: 4 },
   text_label: { w: 2, h: 1 },

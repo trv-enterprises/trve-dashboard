@@ -88,5 +88,6 @@ ControlPlug.propTypes = {
   onError: PropTypes.func
 };
 
-registerControl('plug', ControlPlug);
+registerControl('switch', ControlPlug);
+registerControl('plug', ControlPlug); // Backward compatibility
 export default ControlPlug;

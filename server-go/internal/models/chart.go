@@ -33,9 +33,11 @@ const (
 	ControlTypeToggle    = "toggle"      // On/off toggle switch
 	ControlTypeSlider    = "slider"      // Numeric slider
 	ControlTypeTextInput = "text_input"  // Text input field
-	ControlTypePlug      = "plug"        // Smart plug toggle
+	ControlTypeSwitch    = "switch"      // On/off switch (HomeKit-style pill)
+	ControlTypePlug      = "plug"        // Alias for switch (backward compat)
 	ControlTypeDimmer    = "dimmer"      // Light dimmer
-	ControlTypeTilePlug       = "tile_plug"        // Compact tile plug
+	ControlTypeTileSwitch     = "tile_switch"      // Compact tile switch
+	ControlTypeTilePlug       = "tile_plug"        // Alias for tile_switch (backward compat)
 	ControlTypeTileDimmer     = "tile_dimmer"      // Compact tile dimmer
 	ControlTypeTileGarageDoor = "tile_garage_door"  // Compact garage door status tile
 	ControlTypeTextLabel      = "text_label"        // Static text/label display
