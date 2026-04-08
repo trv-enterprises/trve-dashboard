@@ -3,6 +3,7 @@
 // See LICENSE file for details.
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Select,
   SelectItem,
@@ -266,52 +267,56 @@ function ControlEditor({
       <div className="control-type-section">
         <h4>Control Type</h4>
         <div className="control-type-current" onClick={() => setTypeModalOpen(true)}>
+          <Button kind="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setTypeModalOpen(true); }}>
+            Change
+          </Button>
           {typeInfo?.icon && <Icon path={typeInfo.icon} size={1} className="current-type-icon" />}
           <div className="current-type-info">
             <span className="current-type-label">{typeInfo?.label || controlType}</span>
             <span className="current-type-description">{typeInfo?.description || ''}</span>
           </div>
-          <Button kind="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setTypeModalOpen(true); }}>
-            Change
-          </Button>
         </div>
       </div>
 
-      {/* Control Type Selection Modal */}
-      <Modal
-        open={typeModalOpen}
-        onRequestClose={() => setTypeModalOpen(false)}
-        modalHeading="Select Control Type"
-        passiveModal
-        size="md"
-        className="control-type-modal"
-      >
-        <div className="control-type-modal-body">
-          {Object.entries(CONTROL_CATEGORIES).map(([catId, catInfo]) => {
-            const typesInCategory = Object.entries(CONTROL_TYPE_INFO)
-              .filter(([, info]) => info.category === catId && !info.hidden);
-            if (typesInCategory.length === 0) return null;
-            return (
-              <div key={catId} className="control-type-category">
-                <h5 className="category-label">{catInfo.label}</h5>
-                <div className="category-grid">
-                  {typesInCategory.map(([type, info]) => (
-                    <div
-                      key={type}
-                      className={`control-type-option ${controlType === type ? 'selected' : ''}`}
-                      onClick={() => { handleControlTypeChange(type); setTypeModalOpen(false); }}
-                    >
-                      {info.icon && <Icon path={info.icon} size={0.9} className="type-icon" />}
-                      <div className="type-label">{info.label}</div>
-                      <div className="type-description">{info.description}</div>
-                    </div>
-                  ))}
+      {/* Control Type Selection Modal — portaled to body to escape parent modal */}
+      {typeModalOpen && createPortal(
+        <Modal
+          open
+          onRequestClose={() => setTypeModalOpen(false)}
+          onRequestSubmit={() => setTypeModalOpen(false)}
+          modalHeading="Select Control Type"
+          primaryButtonText="Close"
+          size="md"
+          className="control-type-modal"
+        >
+          <div className="control-type-modal-body">
+            {Object.entries(CONTROL_CATEGORIES).map(([catId, catInfo]) => {
+              const typesInCategory = Object.entries(CONTROL_TYPE_INFO)
+                .filter(([, info]) => info.category === catId && !info.hidden);
+              if (typesInCategory.length === 0) return null;
+              return (
+                <div key={catId} className="control-type-category">
+                  <h5 className="category-label">{catInfo.label}</h5>
+                  <div className="category-grid">
+                    {typesInCategory.map(([type, info]) => (
+                      <div
+                        key={type}
+                        className={`control-type-option ${controlType === type ? 'selected' : ''}`}
+                        onClick={() => { handleControlTypeChange(type); setTypeModalOpen(false); }}
+                      >
+                        {info.icon && <Icon path={info.icon} size={0.9} className="type-icon" />}
+                        <div className="type-label">{info.label}</div>
+                        <div className="type-description">{info.description}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </Modal>
+              );
+            })}
+          </div>
+        </Modal>,
+        document.body
+      )}
 
       {/* Connection & Command — hidden for decorative controls */}
       {needsConnection && <><div className="connection-section">
