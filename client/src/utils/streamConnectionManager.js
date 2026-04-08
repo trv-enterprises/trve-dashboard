@@ -6,12 +6,12 @@
  * Stream Connection Manager
  *
  * Provides a singleton manager for SSE/EventSource connections to socket datasources.
- * Multiple chart components can subscribe to the same datasource and share a single
- * connection, reducing network overhead and ensuring data consistency.
+ * Multiple components share a SINGLE connection per datasource — topics from all
+ * subscribers are combined into one SSE URL, and records are filtered client-side.
  *
  * Usage:
  * const manager = StreamConnectionManager.getInstance();
- * const unsubscribe = manager.subscribe(datasourceId, callback);
+ * const unsubscribe = manager.subscribe(datasourceId, callback, { topics: 'my/topic' });
  * // When done:
  * unsubscribe();
  */
@@ -25,14 +25,13 @@ class StreamConnectionManager {
   constructor() {
     // Map of datasourceId -> connection state
     this.connections = new Map();
-    // Map of datasourceId -> Set of subscriber callbacks
+    // Map of datasourceId -> Set of subscriber objects
     this.subscribers = new Map();
     // Map of datasourceId -> data buffer (for late subscribers)
     this.buffers = new Map();
     // Max buffer size per datasource
     this.maxBufferSize = 1000;
-    // Grace period: defer cleanup when last subscriber leaves, allowing
-    // rapid remounts (edit mode, popups) to reuse the existing connection
+    // Grace period: defer cleanup when last subscriber leaves
     this.gracePeriodTimeouts = new Map();
     this.gracePeriodMs = 30000; // 30 seconds
   }
@@ -45,21 +44,27 @@ class StreamConnectionManager {
   }
 
   /**
-   * Build a connection key from datasource ID and optional topics filter.
-   * Different topic filters on the same datasource get separate SSE connections
-   * so the server can filter at the source.
+   * Compute the combined topic set for all subscribers of a datasource.
+   * Returns comma-separated sorted topics, or null if any subscriber wants all topics.
    */
-  _connectionKey(datasourceId, topics) {
-    if (!topics) return datasourceId;
-    return `${datasourceId}::${topics}`;
+  _getCombinedTopics(datasourceId) {
+    const subscribers = this.subscribers.get(datasourceId);
+    if (!subscribers || subscribers.size === 0) return null;
+
+    const topicSet = new Set();
+    for (const sub of subscribers) {
+      if (!sub.topics) return null; // Wildcard subscriber — subscribe to all
+      sub.topics.forEach(t => topicSet.add(t));
+    }
+    return [...topicSet].sort().join(',');
   }
 
   /**
    * Subscribe to a datasource stream
    * @param {string} datasourceId - The datasource ID
-   * @param {function} callback - Called with each record: callback(record)
-   * @param {object} options - Options: { onConnect, onDisconnect, onError, onReconnecting, topics }
-   *   topics: comma-separated MQTT topic filter string (e.g., "sensors/temp/#,home/+/status")
+   * @param {function} callback - Called with each matching record
+   * @param {object} options - { onConnect, onDisconnect, onError, onReconnecting, topics }
+   *   topics: comma-separated MQTT topic filter (e.g., "sensors/temp/#,home/+/status")
    * @returns {function} Unsubscribe function
    */
   subscribe(datasourceId, callback, options = {}) {
@@ -68,70 +73,80 @@ class StreamConnectionManager {
       return () => {};
     }
 
-    const key = this._connectionKey(datasourceId, options.topics);
-
-    // Initialize subscribers set for this connection key
-    if (!this.subscribers.has(key)) {
-      this.subscribers.set(key, new Set());
+    // Initialize subscribers set
+    if (!this.subscribers.has(datasourceId)) {
+      this.subscribers.set(datasourceId, new Set());
     }
 
-    // Create subscriber entry
+    // Create subscriber entry with topic filter for client-side routing
     const subscriber = {
       callback,
+      topics: options.topics ? options.topics.split(',') : null, // null = all topics
       onConnect: options.onConnect || (() => {}),
       onDisconnect: options.onDisconnect || (() => {}),
       onError: options.onError || (() => {}),
       onReconnecting: options.onReconnecting || (() => {})
     };
 
-    this.subscribers.get(key).add(subscriber);
+    this.subscribers.get(datasourceId).add(subscriber);
 
-    // Cancel any pending grace period cleanup — reuse the existing connection
-    const pendingTimeout = this.gracePeriodTimeouts.get(key);
+    // Cancel any pending grace period cleanup
+    const pendingTimeout = this.gracePeriodTimeouts.get(datasourceId);
     if (pendingTimeout) {
       clearTimeout(pendingTimeout);
-      this.gracePeriodTimeouts.delete(key);
-      console.log(`[StreamConnectionManager] Grace period cancelled for ${key} — reusing connection`);
+      this.gracePeriodTimeouts.delete(datasourceId);
+      console.log(`[StreamConnectionManager] Grace period cancelled for ${datasourceId} — reusing connection`);
     }
 
-    // Get current connection state
-    const connection = this.connections.get(key);
+    const connection = this.connections.get(datasourceId);
+    const newTopics = this._getCombinedTopics(datasourceId);
 
-    // If already connected, notify subscriber immediately
-    if (connection?.connected) {
-      subscriber.onConnect();
-
-      // Send buffered records to new subscriber
-      const buffer = this.buffers.get(key);
-      if (buffer && buffer.length > 0) {
-        buffer.forEach(record => subscriber.callback(record));
+    if (connection) {
+      // Connection exists — check if topics changed
+      if (connection.connected) {
+        subscriber.onConnect();
+        // Replay buffered records matching this subscriber's topics
+        const buffer = this.buffers.get(datasourceId);
+        if (buffer && buffer.length > 0) {
+          buffer.forEach(record => {
+            if (this._matchesTopic(record, subscriber)) {
+              subscriber.callback(record);
+            }
+          });
+        }
       }
+
+      // If topics changed, reconnect with updated set
+      if (newTopics !== connection.topics) {
+        console.log(`[StreamConnectionManager] Topics changed for ${datasourceId}, reconnecting`);
+        this._reconnectWithTopics(datasourceId, newTopics);
+      }
+    } else {
+      // No connection yet — create one
+      this._connect(datasourceId, newTopics);
     }
 
-    // Start connection if not already active
-    if (!connection) {
-      this._connect(key, datasourceId, options.topics);
-    }
-
-    // Return unsubscribe function
     return () => {
-      this._unsubscribe(key, subscriber);
+      this._unsubscribe(datasourceId, subscriber);
     };
   }
 
   /**
-   * Internal: Connect to a datasource
-   * @param {string} key - Connection key (datasourceId or datasourceId::topics)
-   * @param {string} datasourceId - The datasource ID
-   * @param {string} topics - Optional comma-separated MQTT topic filter
+   * Check if a record matches a subscriber's topic filter
    */
-  _connect(key, datasourceId, topics) {
-    if (this.connections.has(key)) {
-      return; // Already connecting/connected
-    }
+  _matchesTopic(record, subscriber) {
+    if (!subscriber.topics) return true; // Wildcard — matches all
+    if (!record.topic) return true; // No topic on record — pass through
+    return subscriber.topics.includes(record.topic);
+  }
 
-    // Mark as connecting
-    this.connections.set(key, {
+  /**
+   * Internal: Connect to a datasource
+   */
+  _connect(datasourceId, topics) {
+    if (this.connections.has(datasourceId)) return;
+
+    this.connections.set(datasourceId, {
       eventSource: null,
       connected: false,
       reconnecting: false,
@@ -140,63 +155,81 @@ class StreamConnectionManager {
       heartbeatTimer: null,
       lastActivity: 0,
       datasourceId,
-      topics
+      topics // Combined topics string or null
     });
 
-    // Initialize buffer
-    this.buffers.set(key, []);
+    if (!this.buffers.has(datasourceId)) {
+      this.buffers.set(datasourceId, []);
+    }
 
-    this._createEventSource(key);
+    this._createEventSource(datasourceId);
+  }
+
+  /**
+   * Internal: Reconnect with new topic set (topics added/removed)
+   */
+  _reconnectWithTopics(datasourceId, newTopics) {
+    const connection = this.connections.get(datasourceId);
+    if (!connection) return;
+
+    // Close existing EventSource
+    this._stopHeartbeatWatchdog(datasourceId);
+    if (connection.eventSource) {
+      connection.eventSource.close();
+      connection.eventSource = null;
+    }
+    if (connection.reconnectTimeout) {
+      clearTimeout(connection.reconnectTimeout);
+      connection.reconnectTimeout = null;
+    }
+
+    // Update topics and reconnect
+    connection.connected = false;
+    connection.reconnecting = false;
+    connection.reconnectAttempts = 0;
+    connection.topics = newTopics;
+
+    this._createEventSource(datasourceId);
   }
 
   /**
    * Internal: Create EventSource connection
    */
-  _createEventSource(key) {
-    const connection = this.connections.get(key);
+  _createEventSource(datasourceId) {
+    const connection = this.connections.get(datasourceId);
     if (!connection) return;
 
-    const { datasourceId, topics } = connection;
+    const { topics } = connection;
 
-    // Build URL with optional user ID and topic filters
+    // Build URL
     const userGuid = apiClient.getCurrentUserGuid();
     const params = new URLSearchParams();
-    if (userGuid) {
-      params.set('user_id', userGuid);
-    }
-    if (topics) {
-      params.set('topics', topics);
-    }
+    if (userGuid) params.set('user_id', userGuid);
+    if (topics) params.set('topics', topics);
     const queryString = params.toString();
     let url = `${API_BASE}/api/connections/${datasourceId}/stream`;
-    if (queryString) {
-      url += `?${queryString}`;
-    }
+    if (queryString) url += `?${queryString}`;
 
-    console.log(`[StreamConnectionManager] Connecting to ${key}${topics ? ` (topics: ${topics})` : ''}`);
+    console.log(`[StreamConnectionManager] Connecting to ${datasourceId}${topics ? ` (topics: ${topics})` : ''}`);
 
     const eventSource = new EventSource(url);
     connection.eventSource = eventSource;
 
     eventSource.onopen = () => {
-      console.log(`[StreamConnectionManager] Connected to ${key}`);
+      console.log(`[StreamConnectionManager] Connected to ${datasourceId}`);
       connection.connected = true;
       connection.reconnecting = false;
       connection.reconnectAttempts = 0;
       connection.lastActivity = Date.now();
 
-      // Start heartbeat watchdog — server sends heartbeats every 30s,
-      // so if we see nothing for 60s the connection is likely dead
-      this._startHeartbeatWatchdog(key);
+      this._startHeartbeatWatchdog(datasourceId);
 
-      // Notify all subscribers
-      const subscribers = this.subscribers.get(key);
+      const subscribers = this.subscribers.get(datasourceId);
       if (subscribers) {
         subscribers.forEach(sub => sub.onConnect());
       }
     };
 
-    // Track heartbeat events for the watchdog
     eventSource.addEventListener('heartbeat', () => {
       connection.lastActivity = Date.now();
     });
@@ -206,20 +239,20 @@ class StreamConnectionManager {
       try {
         const record = JSON.parse(event.data);
 
-        // Add to buffer
-        const buffer = this.buffers.get(key) || [];
+        // Buffer the record (unfiltered — all topics)
+        const buffer = this.buffers.get(datasourceId) || [];
         buffer.push(record);
+        if (buffer.length > this.maxBufferSize) buffer.shift();
+        this.buffers.set(datasourceId, buffer);
 
-        // Trim buffer if too large
-        if (buffer.length > this.maxBufferSize) {
-          buffer.shift();
-        }
-        this.buffers.set(key, buffer);
-
-        // Distribute to all subscribers
-        const subscribers = this.subscribers.get(key);
+        // Distribute to matching subscribers only
+        const subscribers = this.subscribers.get(datasourceId);
         if (subscribers) {
-          subscribers.forEach(sub => sub.callback(record));
+          subscribers.forEach(sub => {
+            if (this._matchesTopic(record, sub)) {
+              sub.callback(record);
+            }
+          });
         }
       } catch (err) {
         console.error('[StreamConnectionManager] Error parsing record:', err);
@@ -227,42 +260,35 @@ class StreamConnectionManager {
     });
 
     eventSource.onerror = () => {
-      // Stop watchdog and close current connection
-      this._stopHeartbeatWatchdog(key);
+      this._stopHeartbeatWatchdog(datasourceId);
       eventSource.close();
       connection.eventSource = null;
       connection.connected = false;
 
-      // Check if we still have subscribers
-      const subscribers = this.subscribers.get(key);
+      const subscribers = this.subscribers.get(datasourceId);
       if (!subscribers || subscribers.size === 0) {
-        // No subscribers, clean up completely
-        this._cleanup(key);
+        this._cleanup(datasourceId);
         return;
       }
 
-      // Notify subscribers of disconnect
       subscribers.forEach(sub => sub.onDisconnect());
 
-      // Attempt reconnection with exponential backoff
       connection.reconnecting = true;
       connection.reconnectAttempts++;
 
       const delay = Math.min(1000 * Math.pow(2, connection.reconnectAttempts - 1), 30000);
 
-      // Only log after repeated failures to avoid console noise
       if (connection.reconnectAttempts <= 1) {
-        console.debug(`[StreamConnectionManager] Reconnecting to ${key} in ${delay}ms`);
+        console.debug(`[StreamConnectionManager] Reconnecting to ${datasourceId} in ${delay}ms`);
       } else if (connection.reconnectAttempts % 5 === 0) {
-        console.warn(`[StreamConnectionManager] Reconnecting to ${key} (attempt ${connection.reconnectAttempts})`);
+        console.warn(`[StreamConnectionManager] Reconnecting to ${datasourceId} (attempt ${connection.reconnectAttempts})`);
       }
 
-      // Notify subscribers of reconnecting state
       subscribers.forEach(sub => sub.onReconnecting(connection.reconnectAttempts, delay));
 
       connection.reconnectTimeout = setTimeout(() => {
-        if (this.connections.has(key)) {
-          this._createEventSource(key);
+        if (this.connections.has(datasourceId)) {
+          this._createEventSource(datasourceId);
         }
       }, delay);
     };
@@ -271,33 +297,42 @@ class StreamConnectionManager {
   /**
    * Internal: Unsubscribe a subscriber
    */
-  _unsubscribe(key, subscriber) {
-    const subscribers = this.subscribers.get(key);
+  _unsubscribe(datasourceId, subscriber) {
+    const subscribers = this.subscribers.get(datasourceId);
     if (!subscribers) return;
 
     subscribers.delete(subscriber);
 
-    console.log(`[StreamConnectionManager] Subscriber removed from ${key} (${subscribers.size} remaining)`);
+    console.log(`[StreamConnectionManager] Subscriber removed from ${datasourceId} (${subscribers.size} remaining)`);
 
-    // If no more subscribers, start grace period before cleanup
     if (subscribers.size === 0) {
+      // Last subscriber — start grace period
       if (this.gracePeriodMs > 0) {
-        // Clear any existing grace timer (defensive)
-        const existing = this.gracePeriodTimeouts.get(key);
+        const existing = this.gracePeriodTimeouts.get(datasourceId);
         if (existing) clearTimeout(existing);
 
-        console.log(`[StreamConnectionManager] Grace period started for ${key} (${this.gracePeriodMs}ms)`);
+        console.log(`[StreamConnectionManager] Grace period started for ${datasourceId} (${this.gracePeriodMs}ms)`);
         const timeout = setTimeout(() => {
-          this.gracePeriodTimeouts.delete(key);
-          const currentSubs = this.subscribers.get(key);
+          this.gracePeriodTimeouts.delete(datasourceId);
+          const currentSubs = this.subscribers.get(datasourceId);
           if (!currentSubs || currentSubs.size === 0) {
-            console.log(`[StreamConnectionManager] Grace period expired for ${key} — cleaning up`);
-            this._cleanup(key);
+            console.log(`[StreamConnectionManager] Grace period expired for ${datasourceId} — cleaning up`);
+            this._cleanup(datasourceId);
           }
         }, this.gracePeriodMs);
-        this.gracePeriodTimeouts.set(key, timeout);
+        this.gracePeriodTimeouts.set(datasourceId, timeout);
       } else {
-        this._cleanup(key);
+        this._cleanup(datasourceId);
+      }
+    } else {
+      // Check if topics changed (a topic may no longer be needed)
+      const connection = this.connections.get(datasourceId);
+      if (connection) {
+        const newTopics = this._getCombinedTopics(datasourceId);
+        if (newTopics !== connection.topics) {
+          console.log(`[StreamConnectionManager] Topics reduced for ${datasourceId}, reconnecting`);
+          this._reconnectWithTopics(datasourceId, newTopics);
+        }
       }
     }
   }
@@ -305,80 +340,69 @@ class StreamConnectionManager {
   /**
    * Internal: Clean up a connection
    */
-  _cleanup(key) {
-    console.log(`[StreamConnectionManager] Cleaning up connection for ${key}`);
+  _cleanup(datasourceId) {
+    console.log(`[StreamConnectionManager] Cleaning up connection for ${datasourceId}`);
 
-    // Clear any grace period timer
-    const graceTimeout = this.gracePeriodTimeouts.get(key);
+    const graceTimeout = this.gracePeriodTimeouts.get(datasourceId);
     if (graceTimeout) {
       clearTimeout(graceTimeout);
-      this.gracePeriodTimeouts.delete(key);
+      this.gracePeriodTimeouts.delete(datasourceId);
     }
 
-    const connection = this.connections.get(key);
+    const connection = this.connections.get(datasourceId);
     if (connection) {
-      this._stopHeartbeatWatchdog(key);
-      if (connection.eventSource) {
-        connection.eventSource.close();
-      }
-      if (connection.reconnectTimeout) {
-        clearTimeout(connection.reconnectTimeout);
-      }
+      this._stopHeartbeatWatchdog(datasourceId);
+      if (connection.eventSource) connection.eventSource.close();
+      if (connection.reconnectTimeout) clearTimeout(connection.reconnectTimeout);
     }
 
-    this.connections.delete(key);
-    this.subscribers.delete(key);
-    this.buffers.delete(key);
+    this.connections.delete(datasourceId);
+    this.subscribers.delete(datasourceId);
+    this.buffers.delete(datasourceId);
   }
 
   /**
-   * Internal: Start a heartbeat watchdog that force-reconnects if no activity
-   * is seen for 60 seconds. The server sends heartbeats every 30s, so missing
-   * two in a row means the connection is dead (e.g., laptop sleep/wake).
+   * Internal: Start heartbeat watchdog
    */
-  _startHeartbeatWatchdog(key) {
-    this._stopHeartbeatWatchdog(key);
-    const connection = this.connections.get(key);
+  _startHeartbeatWatchdog(datasourceId) {
+    this._stopHeartbeatWatchdog(datasourceId);
+    const connection = this.connections.get(datasourceId);
     if (!connection) return;
 
     connection.heartbeatTimer = setInterval(() => {
-      const conn = this.connections.get(key);
+      const conn = this.connections.get(datasourceId);
       if (!conn || !conn.connected) return;
 
       const elapsed = Date.now() - conn.lastActivity;
       if (elapsed > 60000) {
-        console.warn(`[StreamConnectionManager] No activity on ${key} for ${Math.round(elapsed / 1000)}s — forcing reconnect`);
-        this._stopHeartbeatWatchdog(key);
+        console.warn(`[StreamConnectionManager] No activity on ${datasourceId} for ${Math.round(elapsed / 1000)}s — forcing reconnect`);
+        this._stopHeartbeatWatchdog(datasourceId);
 
-        // Close the stale EventSource
         if (conn.eventSource) {
           conn.eventSource.close();
           conn.eventSource = null;
         }
         conn.connected = false;
 
-        // Notify subscribers of disconnect
-        const subscribers = this.subscribers.get(key);
+        const subscribers = this.subscribers.get(datasourceId);
         if (subscribers && subscribers.size > 0) {
           subscribers.forEach(sub => sub.onDisconnect());
-
-          // Reconnect immediately (no backoff — this is a stale connection, not a server error)
           conn.reconnecting = true;
           conn.reconnectAttempts = 0;
           subscribers.forEach(sub => sub.onReconnecting(1, 0));
-          this._createEventSource(key);
+          this._createEventSource(datasourceId);
         } else {
-          this._cleanup(key);
+          this._cleanup(datasourceId);
         }
       }
-    }, 15000); // Check every 15 seconds
+    }, 15000);
   }
 
   /**
-   * Internal: Stop the heartbeat watchdog
+   * Internal: Stop heartbeat watchdog
    */
-  _stopHeartbeatWatchdog(key) {
-    const connection = this.connections.get(key);
+  _stopHeartbeatWatchdog(datasourceId) {
+    const connection = this.connections.get(datasourceId);
     if (connection?.heartbeatTimer) {
       clearInterval(connection.heartbeatTimer);
       connection.heartbeatTimer = null;
@@ -387,14 +411,11 @@ class StreamConnectionManager {
 
   /**
    * Get connection status for a datasource
-   * @param {string} datasourceId - The datasource ID
-   * @param {string} topics - Optional topic filter (must match what was used in subscribe)
    */
-  getStatus(datasourceId, topics) {
-    const key = this._connectionKey(datasourceId, topics);
-    const connection = this.connections.get(key);
-    const subscribers = this.subscribers.get(key);
-    const buffer = this.buffers.get(key);
+  getStatus(datasourceId) {
+    const connection = this.connections.get(datasourceId);
+    const subscribers = this.subscribers.get(datasourceId);
+    const buffer = this.buffers.get(datasourceId);
 
     return {
       connected: connection?.connected || false,
@@ -402,34 +423,32 @@ class StreamConnectionManager {
       reconnectAttempts: connection?.reconnectAttempts || 0,
       subscriberCount: subscribers?.size || 0,
       bufferSize: buffer?.length || 0,
-      inGracePeriod: this.gracePeriodTimeouts.has(key)
+      topics: connection?.topics || null,
+      inGracePeriod: this.gracePeriodTimeouts.has(datasourceId)
     };
   }
 
   /**
-   * Get the current buffer for a datasource
-   * @param {string} datasourceId - The datasource ID
-   * @param {string} topics - Optional topic filter (must match what was used in subscribe)
+   * Get the current buffer for a datasource (optionally filtered by topic)
    */
   getBuffer(datasourceId, topics) {
-    const key = this._connectionKey(datasourceId, topics);
-    return this.buffers.get(key) || [];
+    const buffer = this.buffers.get(datasourceId) || [];
+    if (!topics) return buffer;
+    const topicList = topics.split(',');
+    return buffer.filter(r => !r.topic || topicList.includes(r.topic));
   }
 
   /**
    * Close all connections immediately, bypassing grace periods.
-   * Call on page/route navigation to free browser connection slots.
    */
   closeAll() {
-    // Clear all grace period timers
-    for (const [key, timeout] of this.gracePeriodTimeouts) {
+    for (const [, timeout] of this.gracePeriodTimeouts) {
       clearTimeout(timeout);
     }
     this.gracePeriodTimeouts.clear();
 
-    // Cleanup all connections
-    for (const key of [...this.connections.keys()]) {
-      this._cleanup(key);
+    for (const datasourceId of [...this.connections.keys()]) {
+      this._cleanup(datasourceId);
     }
   }
 }
