@@ -22,10 +22,43 @@ import {
 } from '@carbon/react';
 import { Renew } from '@carbon/icons-react';
 import Icon from '@mdi/react';
+import {
+  mdiPowerPlug,
+  mdiLightbulbOn,
+  mdiLightbulbOutline,
+  mdiCeilingFanLight,
+  mdiTelevision,
+  mdiWaterPump,
+  mdiFan,
+  mdiPowerSocket,
+  mdiGarage,
+  mdiGateOpen,
+  mdiDoorOpen,
+  mdiThermometer
+} from '@mdi/js';
 import { CONTROL_TYPES, CONTROL_TYPE_INFO, CONTROL_CATEGORIES } from './controls';
 import { DISPLAY_CONTENT_FORMATS } from './controls/ControlTextLabel';
 import apiClient from '../api/client';
 import './ControlEditor.scss';
+
+// Available icons for tile/switch controls
+const TILE_ICONS = [
+  { id: 'power-plug', path: mdiPowerPlug, label: 'Plug' },
+  { id: 'lightbulb-on', path: mdiLightbulbOn, label: 'Light (on)' },
+  { id: 'lightbulb-outline', path: mdiLightbulbOutline, label: 'Light (outline)' },
+  { id: 'ceiling-fan-light', path: mdiCeilingFanLight, label: 'Fan Light' },
+  { id: 'fan', path: mdiFan, label: 'Fan' },
+  { id: 'television', path: mdiTelevision, label: 'TV' },
+  { id: 'water-pump', path: mdiWaterPump, label: 'Pump' },
+  { id: 'power-socket', path: mdiPowerSocket, label: 'Outlet' },
+  { id: 'garage', path: mdiGarage, label: 'Garage' },
+  { id: 'gate-open', path: mdiGateOpen, label: 'Gate' },
+  { id: 'door-open', path: mdiDoorOpen, label: 'Door' },
+  { id: 'thermometer', path: mdiThermometer, label: 'Thermostat' },
+];
+
+// Export for use by tile components
+export { TILE_ICONS };
 
 /**
  * ControlEditor Component
@@ -584,18 +617,9 @@ function ControlEditor({
             </>
           )}
 
-          {/* Plug UI Config */}
-          {controlType === CONTROL_TYPES.PLUG && (
+          {/* Switch UI Config */}
+          {controlType === CONTROL_TYPES.SWITCH && (
             <>
-              <Column lg={4} md={4} sm={4}>
-                <TextInput
-                  id="ui-label"
-                  labelText="Label"
-                  value={uiConfig.label || ''}
-                  onChange={(e) => updateUIConfig('label', e.target.value)}
-                  placeholder="Plug"
-                />
-              </Column>
               <Column lg={4} md={4} sm={4}>
                 <TextInput
                   id="ui-on-label"
@@ -620,15 +644,6 @@ function ControlEditor({
           {/* Dimmer UI Config */}
           {controlType === CONTROL_TYPES.DIMMER && (
             <>
-              <Column lg={4} md={4} sm={4}>
-                <TextInput
-                  id="ui-label"
-                  labelText="Label"
-                  value={uiConfig.label || ''}
-                  onChange={(e) => updateUIConfig('label', e.target.value)}
-                  placeholder="Light"
-                />
-              </Column>
               <Column lg={3} md={2} sm={4}>
                 <NumberInput
                   id="ui-min"
@@ -665,35 +680,25 @@ function ControlEditor({
             </>
           )}
 
-          {/* Tile Plug UI Config */}
-          {controlType === CONTROL_TYPES.TILE_PLUG && (
+          {/* Tile Switch UI Config */}
+          {controlType === CONTROL_TYPES.TILE_SWITCH && (
             <>
-              <Column lg={4} md={4} sm={4}>
-                <TextInput
-                  id="ui-label"
-                  labelText="Label"
-                  value={uiConfig.label || ''}
-                  onChange={(e) => updateUIConfig('label', e.target.value)}
-                  placeholder="Plug"
-                />
-              </Column>
-              <Column lg={4} md={4} sm={4}>
-                <TextInput
-                  id="ui-on-label"
-                  labelText="On Label"
-                  value={uiConfig.onLabel || ''}
-                  onChange={(e) => updateUIConfig('onLabel', e.target.value)}
-                  placeholder="On"
-                />
-              </Column>
-              <Column lg={4} md={4} sm={4}>
-                <TextInput
-                  id="ui-off-label"
-                  labelText="Off Label"
-                  value={uiConfig.offLabel || ''}
-                  onChange={(e) => updateUIConfig('offLabel', e.target.value)}
-                  placeholder="Off"
-                />
+              <Column lg={12} md={8} sm={4}>
+                <div className="icon-selector">
+                  <span className="icon-selector-label">Icon</span>
+                  <div className="icon-selector-grid">
+                    {TILE_ICONS.map(icon => (
+                      <div
+                        key={icon.id}
+                        className={`icon-option ${(uiConfig.icon || 'power-plug') === icon.id ? 'selected' : ''}`}
+                        onClick={() => updateUIConfig('icon', icon.id)}
+                        title={icon.label}
+                      >
+                        <Icon path={icon.path} size={0.9} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </Column>
             </>
           )}
@@ -701,14 +706,22 @@ function ControlEditor({
           {/* Tile Dimmer UI Config */}
           {controlType === CONTROL_TYPES.TILE_DIMMER && (
             <>
-              <Column lg={4} md={4} sm={4}>
-                <TextInput
-                  id="ui-label"
-                  labelText="Label"
-                  value={uiConfig.label || ''}
-                  onChange={(e) => updateUIConfig('label', e.target.value)}
-                  placeholder="Light"
-                />
+              <Column lg={12} md={8} sm={4}>
+                <div className="icon-selector">
+                  <span className="icon-selector-label">Icon</span>
+                  <div className="icon-selector-grid">
+                    {TILE_ICONS.map(icon => (
+                      <div
+                        key={icon.id}
+                        className={`icon-option ${(uiConfig.icon || 'lightbulb-on') === icon.id ? 'selected' : ''}`}
+                        onClick={() => updateUIConfig('icon', icon.id)}
+                        title={icon.label}
+                      >
+                        <Icon path={icon.path} size={0.9} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </Column>
               <Column lg={3} md={2} sm={4}>
                 <NumberInput

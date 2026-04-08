@@ -139,7 +139,6 @@ function ControlDimmer({ control, readOnly = false, onSuccess, onError }) {
         </div>
         {loading && <InlineLoading description="" className="dimmer-inline-loading" />}
       </div>
-      <span className="dimmer-label">{label}</span>
       <span className={`dimmer-state ${isOn ? 'dimmer-state-on' : ''}`}>
         {isOn ? `${Math.round(displayLevel)}%` : 'OFF'}
       </span>

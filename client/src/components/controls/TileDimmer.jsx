@@ -5,7 +5,26 @@
 import { useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '@mdi/react';
-import { mdiLightbulbOn } from '@mdi/js';
+import {
+  mdiPowerPlug, mdiLightbulbOn, mdiLightbulbOutline, mdiCeilingFanLight,
+  mdiTelevision, mdiWaterPump, mdiFan, mdiPowerSocket, mdiGarage,
+  mdiGateOpen, mdiDoorOpen, mdiThermometer
+} from '@mdi/js';
+
+const ICON_MAP = {
+  'power-plug': mdiPowerPlug,
+  'lightbulb-on': mdiLightbulbOn,
+  'lightbulb-outline': mdiLightbulbOutline,
+  'ceiling-fan-light': mdiCeilingFanLight,
+  'fan': mdiFan,
+  'television': mdiTelevision,
+  'water-pump': mdiWaterPump,
+  'power-socket': mdiPowerSocket,
+  'garage': mdiGarage,
+  'gate-open': mdiGateOpen,
+  'door-open': mdiDoorOpen,
+  'thermometer': mdiThermometer,
+};
 import PropTypes from 'prop-types';
 import { useControlState } from './useControlState';
 import { useTileFontSize } from './useTileFontSize';
@@ -23,6 +42,7 @@ function TileDimmer({ control, readOnly = false, onSuccess, onError }) {
   const displayName = control.title || control.name || uiConfig.label || 'Light';
   const min = uiConfig.min ?? 0;
   const max = uiConfig.max ?? 100;
+  const iconPath = ICON_MAP[uiConfig.icon] || mdiLightbulbOn;
 
   const { value: level } = useControlState({
     connectionId: control.connection_id,
@@ -81,7 +101,7 @@ function TileDimmer({ control, readOnly = false, onSuccess, onError }) {
         aria-label={`${displayName}: ${isOn ? `${Math.round(level)}%` : 'Off'}`}
       >
         <div className="tile-dimmer-fill" style={{ height: `${fillPercent}%` }} />
-        <Icon path={mdiLightbulbOn} size={0.8} className="tile-icon" />
+        <Icon path={iconPath} size={0.8} className="tile-icon" />
         <span className="tile-name">{displayName}</span>
         <div className="tile-bottom-row">
           <span className="tile-state">{isOn ? 'ON' : 'OFF'}</span>

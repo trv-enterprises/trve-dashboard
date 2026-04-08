@@ -65,7 +65,6 @@ function ControlPlug({ control, readOnly = false, onSuccess, onError }) {
         </div>
         {loading && <InlineLoading description="" className="plug-inline-loading" />}
       </div>
-      <span className="plug-label">{label}</span>
       <span className={`plug-state ${toggled ? 'plug-state-on' : ''}`}>
         {toggled ? onLabel.toUpperCase() : offLabel.toUpperCase()}
       </span>

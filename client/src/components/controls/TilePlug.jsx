@@ -5,7 +5,26 @@
 import { useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '@mdi/react';
-import { mdiPowerPlug } from '@mdi/js';
+import {
+  mdiPowerPlug, mdiLightbulbOn, mdiLightbulbOutline, mdiCeilingFanLight,
+  mdiTelevision, mdiWaterPump, mdiFan, mdiPowerSocket, mdiGarage,
+  mdiGateOpen, mdiDoorOpen, mdiThermometer
+} from '@mdi/js';
+
+const ICON_MAP = {
+  'power-plug': mdiPowerPlug,
+  'lightbulb-on': mdiLightbulbOn,
+  'lightbulb-outline': mdiLightbulbOutline,
+  'ceiling-fan-light': mdiCeilingFanLight,
+  'fan': mdiFan,
+  'television': mdiTelevision,
+  'water-pump': mdiWaterPump,
+  'power-socket': mdiPowerSocket,
+  'garage': mdiGarage,
+  'gate-open': mdiGateOpen,
+  'door-open': mdiDoorOpen,
+  'thermometer': mdiThermometer,
+};
 import PropTypes from 'prop-types';
 import { useControlState } from './useControlState';
 import { normalizeBoolean } from './controlUtils';
@@ -21,9 +40,10 @@ function TilePlug({ control, readOnly = false, onSuccess, onError }) {
   const fontSize = useTileFontSize();
 
   const uiConfig = control.control_config?.ui_config || {};
-  const displayName = control.title || control.name || uiConfig.label || 'Plug';
+  const displayName = control.title || control.name || uiConfig.label || 'Switch';
   const onLabel = uiConfig.onLabel || 'On';
   const offLabel = uiConfig.offLabel || 'Off';
+  const iconPath = ICON_MAP[uiConfig.icon] || mdiPowerPlug;
 
   const { value: toggled } = useControlState({
     connectionId: control.connection_id,
@@ -73,7 +93,7 @@ function TilePlug({ control, readOnly = false, onSuccess, onError }) {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleTileClick(); }}
         aria-label={`${displayName}: ${toggled ? onLabel : offLabel}`}
       >
-        <Icon path={mdiPowerPlug} size={0.8} className="tile-icon" />
+        <Icon path={iconPath} size={0.8} className="tile-icon" />
         <span className="tile-name">{displayName}</span>
         <span className="tile-state">{toggled ? onLabel.toUpperCase() : offLabel.toUpperCase()}</span>
       </div>

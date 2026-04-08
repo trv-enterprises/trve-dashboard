@@ -1270,7 +1270,7 @@ function DashboardViewerPage({ canDesign = false }) {
                               size="sm"
                               label="Edit text"
                               className="panel-text-edit-btn"
-                              onClick={(e) => { e.stopPropagation(); openTextEditor(panel.id); }}
+                              onClick={(e) => { e.stopPropagation(); textEditorPanelId === panel.id ? closeTextEditor() : openTextEditor(panel.id); }}
                               onMouseDown={(e) => e.stopPropagation()}
                             >
                               <Edit size={14} />

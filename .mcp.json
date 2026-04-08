@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "homelab-deploy": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["-c", "cd /Users/tviviano/Documents/GitHub/homelab-deploy/tools/mcp-deploy && node index.js"],
+      "env": {}
+    }
+  }
+}

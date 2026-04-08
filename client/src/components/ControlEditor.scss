@@ -179,6 +179,48 @@
   .cds--number-input__controls button {
     background-color: var(--cds-layer-accent-01);
   }
+
+  // Icon selector for tiles
+  .icon-selector {
+    .icon-selector-label {
+      display: block;
+      color: var(--cds-text-secondary);
+      font-size: 0.75rem;
+      margin-bottom: spacing.$spacing-02;
+    }
+
+    .icon-selector-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: spacing.$spacing-02;
+    }
+
+    .icon-option {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--cds-icon-secondary);
+      background-color: var(--cds-layer-01);
+      transition: all 0.15s ease;
+
+      &:hover {
+        background-color: var(--cds-layer-hover-01);
+        border-color: var(--cds-border-subtle-01);
+        color: var(--cds-text-primary);
+      }
+
+      &.selected {
+        background-color: rgba(15, 98, 254, 0.15);
+        border-color: var(--cds-interactive);
+        color: var(--cds-interactive);
+      }
+    }
+  }
 }
 
 // Control type selection modal

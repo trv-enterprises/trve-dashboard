@@ -70,15 +70,14 @@ function PanelTextEditor({ config, onUpdate, onClose, anchorRect }) {
     };
   }, [onClose]);
 
-  // Position below the anchor
+  // Position below the panel's hover header, aligned to the right (near edit button)
   const style = {};
   if (anchorRect) {
-    const viewportWidth = window.innerWidth;
     const editorWidth = 320;
-    const left = Math.min(anchorRect.left, viewportWidth - editorWidth - 16);
+    const right = anchorRect.right - editorWidth;
     style.position = 'fixed';
-    style.top = anchorRect.bottom + 4;
-    style.left = Math.max(8, left);
+    style.top = anchorRect.top + 32; // 28px header + 4px gap
+    style.left = Math.max(8, Math.min(right, window.innerWidth - editorWidth - 8));
     style.zIndex = 9999;
   }
 

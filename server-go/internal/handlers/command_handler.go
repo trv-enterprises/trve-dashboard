@@ -255,10 +255,14 @@ func (h *CommandHandler) buildCommandFromDeviceType(c *gin.Context, controlConfi
 	}
 
 	// Get the command definition for this control type
-	// Tile controls (tile_plug, tile_dimmer) map to their base type (plug, dimmer)
+	// Tile controls (tile_switch, tile_dimmer) map to their base type
+	// "switch" maps to "plug" for backward compat with existing device type commands
 	lookupType := controlConfig.ControlType
 	if strings.HasPrefix(lookupType, "tile_") {
 		lookupType = strings.TrimPrefix(lookupType, "tile_")
+	}
+	if lookupType == "switch" {
+		lookupType = "plug"
 	}
 	commandDef, ok := deviceType.Commands[lookupType]
 	if !ok {
