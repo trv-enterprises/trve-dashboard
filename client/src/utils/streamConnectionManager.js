@@ -132,12 +132,33 @@ class StreamConnectionManager {
   }
 
   /**
-   * Check if a record matches a subscriber's topic filter
+   * Check if a record matches a subscriber's topic filter.
+   * Supports MQTT wildcards: + (single level) and # (multi-level).
    */
   _matchesTopic(record, subscriber) {
-    if (!subscriber.topics) return true; // Wildcard — matches all
+    if (!subscriber.topics) return true; // No filter — matches all
     if (!record.topic) return true; // No topic on record — pass through
-    return subscriber.topics.includes(record.topic);
+    return subscriber.topics.some(filter => this._mqttTopicMatch(filter, record.topic));
+  }
+
+  /**
+   * MQTT topic pattern matching.
+   * '+' matches exactly one level, '#' matches zero or more levels (must be last).
+   */
+  _mqttTopicMatch(filter, topic) {
+    if (filter === '#') return true;
+    if (filter === topic) return true;
+
+    const filterParts = filter.split('/');
+    const topicParts = topic.split('/');
+
+    for (let i = 0; i < filterParts.length; i++) {
+      if (filterParts[i] === '#') return true; // # matches rest
+      if (i >= topicParts.length) return false; // topic shorter than filter
+      if (filterParts[i] !== '+' && filterParts[i] !== topicParts[i]) return false;
+    }
+
+    return filterParts.length === topicParts.length;
   }
 
   /**

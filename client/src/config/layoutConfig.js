@@ -83,34 +83,34 @@ export const ANIMATION = {
 // Grid cells are 32x32px. Used to prevent panels from being resized smaller than the component can render.
 export const COMPONENT_MIN_SIZES = {
   // Default fallback
-  default: { w: 4, h: 4 },
+  default: { w: 4, h: 2 },
 
   // Charts (component_type='chart')
-  bar:       { w: 6, h: 8 },
-  line:      { w: 6, h: 8 },
-  area:      { w: 6, h: 8 },
-  pie:       { w: 6, h: 8 },
-  scatter:   { w: 6, h: 8 },
-  gauge:     { w: 4, h: 6 },
-  dataview:  { w: 8, h: 6 },
-  number:    { w: 4, h: 4 },
-  custom:    { w: 4, h: 4 },
+  bar:       { w: 6, h: 4 },
+  line:      { w: 6, h: 4 },
+  area:      { w: 6, h: 4 },
+  pie:       { w: 6, h: 4 },
+  scatter:   { w: 6, h: 4 },
+  gauge:     { w: 4, h: 3 },
+  dataview:  { w: 8, h: 3 },
+  number:    { w: 4, h: 2 },
+  custom:    { w: 4, h: 2 },
 
   // Controls (component_type='control')
-  button:     { w: 4, h: 4 },
-  toggle:     { w: 6, h: 6 },
-  slider:     { w: 6, h: 6 },
-  text_input: { w: 6, h: 4 },
-  plug:       { w: 4, h: 14 },
-  dimmer:     { w: 4, h: 14 },
+  button:     { w: 4, h: 2 },
+  toggle:     { w: 6, h: 3 },
+  slider:     { w: 8, h: 4 },
+  text_input: { w: 6, h: 2 },
+  plug:       { w: 4, h: 8 },
+  dimmer:     { w: 4, h: 8 },
   tile_plug:  { w: 4, h: 4 },
   tile_dimmer:{ w: 4, h: 4 },
   tile_garage_door: { w: 4, h: 4 },
-  text_label: { w: 2, h: 2 },
+  text_label: { w: 2, h: 1 },
 
   // Displays (component_type='display')
-  frigate_camera: { w: 6, h: 8 },
-  weather:        { w: 12, h: 16 },
+  frigate_camera: { w: 6, h: 4 },
+  weather:        { w: 12, h: 8 },
 };
 
 // Get minimum size for a component subtype

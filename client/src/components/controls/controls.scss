@@ -93,35 +93,64 @@
 .control-slider-container {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   width: 100%;
-  max-width: 300px;
+  gap: spacing.$spacing-02;
 
-  .slider-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: spacing.$spacing-03;
-  }
-
-  .slider-label {
-    color: var(--cds-text-secondary);
-    font-size: 0.875rem;
-  }
-
-  .slider-value {
+  .slider-value-box {
     color: var(--cds-text-primary);
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     font-weight: 600;
     font-family: 'IBM Plex Mono', monospace;
+    background-color: var(--cds-field-01);
+    border: 1px solid var(--cds-border-subtle-01);
+    border-radius: 4px;
+    padding: 2px 12px;
+    min-width: 48px;
+    text-align: center;
   }
 
   .slider-row {
     display: flex;
     align-items: center;
-    gap: spacing.$spacing-03;
+    gap: spacing.$spacing-02;
+    width: 100%;
 
     .cds--slider-container {
       flex: 1;
+      min-width: 0; // Allow flex shrinking
+    }
+
+    .cds--slider {
+      min-height: unset;
+      // Remove top padding that misaligns the track with our custom range labels
+      padding-top: 0;
+      margin-top: 0;
+    }
+
+    // Remove Carbon's label text spacing that offsets the track
+    .cds--slider-container .cds--label {
+      display: none;
+    }
+
+    .cds--slider-container {
+      padding-top: 0;
+    }
+
+    // Hide Carbon's built-in range labels — we render our own outside the component
+    .cds--slider__range-label {
+      display: none;
+    }
+
+    .slider-range-label {
+      color: var(--cds-text-secondary);
+      font-size: 0.875rem;
+      font-family: 'IBM Plex Mono', monospace;
+      flex-shrink: 0;
+      white-space: nowrap;
+      align-self: center;
+      margin-top: -9px;
     }
   }
 

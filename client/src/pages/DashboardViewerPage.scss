@@ -324,11 +324,12 @@
             padding: 0;
           }
 
-          // Control components don't need the absolute positioning
+          // Control components — centered, extra right padding for slider labels
           &.control-wrapper {
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: spacing.$spacing-03;
 
             > .control-renderer {
               position: relative;

@@ -50,11 +50,9 @@ function ControlSlider({ control, readOnly = false, onSuccess, onError }) {
 
   return (
     <div className="control-slider-container">
-      <div className="slider-header">
-        <span className="slider-label">{label}</span>
-        <span className="slider-value">{value}</span>
-      </div>
+      <div className="slider-value-box">{value}</div>
       <div className="slider-row">
+        <span className="slider-range-label">{min}</span>
         <Slider
           id={`control-slider-${control.id}`}
           labelText=""
@@ -67,6 +65,7 @@ function ControlSlider({ control, readOnly = false, onSuccess, onError }) {
           disabled={loading || readOnly}
           hideTextInput
         />
+        <span className="slider-range-label">{max}</span>
         {!sendOnRelease && !readOnly && (
           <Button
             kind="primary"
