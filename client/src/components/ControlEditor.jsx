@@ -15,10 +15,13 @@ import {
   InlineNotification,
   ComboBox,
   IconButton,
-  Loading
+  Loading,
+  Modal,
+  Button
 } from '@carbon/react';
 import { Renew } from '@carbon/icons-react';
-import { CONTROL_TYPES, CONTROL_TYPE_INFO } from './controls';
+import Icon from '@mdi/react';
+import { CONTROL_TYPES, CONTROL_TYPE_INFO, CONTROL_CATEGORIES } from './controls';
 import { DISPLAY_CONTENT_FORMATS } from './controls/ControlTextLabel';
 import apiClient from '../api/client';
 import './ControlEditor.scss';
@@ -36,6 +39,7 @@ function ControlEditor({
   onControlConfigChange,
   onConnectionIdChange
 }) {
+  const [typeModalOpen, setTypeModalOpen] = useState(false);
   const [connections, setConnections] = useState([]);
   const [selectedConnection, setSelectedConnection] = useState(null);
   const [loadingConnections, setLoadingConnections] = useState(true);
@@ -258,22 +262,56 @@ function ControlEditor({
 
   return (
     <div className="control-editor">
-      {/* Control Type Selection */}
+      {/* Control Type Selection — compact display + modal */}
       <div className="control-type-section">
         <h4>Control Type</h4>
-        <div className="control-type-grid">
-          {Object.entries(CONTROL_TYPE_INFO).map(([type, info]) => (
-            <div
-              key={type}
-              className={`control-type-option ${controlType === type ? 'selected' : ''}`}
-              onClick={() => handleControlTypeChange(type)}
-            >
-              <div className="type-label">{info.label}</div>
-              <div className="type-description">{info.description}</div>
-            </div>
-          ))}
+        <div className="control-type-current" onClick={() => setTypeModalOpen(true)}>
+          {typeInfo?.icon && <Icon path={typeInfo.icon} size={1} className="current-type-icon" />}
+          <div className="current-type-info">
+            <span className="current-type-label">{typeInfo?.label || controlType}</span>
+            <span className="current-type-description">{typeInfo?.description || ''}</span>
+          </div>
+          <Button kind="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setTypeModalOpen(true); }}>
+            Change
+          </Button>
         </div>
       </div>
+
+      {/* Control Type Selection Modal */}
+      <Modal
+        open={typeModalOpen}
+        onRequestClose={() => setTypeModalOpen(false)}
+        modalHeading="Select Control Type"
+        passiveModal
+        size="md"
+        className="control-type-modal"
+      >
+        <div className="control-type-modal-body">
+          {Object.entries(CONTROL_CATEGORIES).map(([catId, catInfo]) => {
+            const typesInCategory = Object.entries(CONTROL_TYPE_INFO)
+              .filter(([, info]) => info.category === catId && !info.hidden);
+            if (typesInCategory.length === 0) return null;
+            return (
+              <div key={catId} className="control-type-category">
+                <h5 className="category-label">{catInfo.label}</h5>
+                <div className="category-grid">
+                  {typesInCategory.map(([type, info]) => (
+                    <div
+                      key={type}
+                      className={`control-type-option ${controlType === type ? 'selected' : ''}`}
+                      onClick={() => { handleControlTypeChange(type); setTypeModalOpen(false); }}
+                    >
+                      {info.icon && <Icon path={info.icon} size={0.9} className="type-icon" />}
+                      <div className="type-label">{info.label}</div>
+                      <div className="type-description">{info.description}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
 
       {/* Connection & Command — hidden for decorative controls */}
       {needsConnection && <><div className="connection-section">

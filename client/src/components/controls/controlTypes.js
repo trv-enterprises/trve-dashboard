@@ -39,7 +39,7 @@ export const CONTROL_TYPE_INFO = {
     label: 'Button',
     description: 'Simple action button that triggers a command when clicked',
     icon: mdiGestureTap,
-    category: 'action',
+    category: 'carbon',
     canWrite: true,
     canRead: false,
     defaultUIConfig: {
@@ -51,7 +51,7 @@ export const CONTROL_TYPE_INFO = {
     label: 'Toggle',
     description: 'On/off switch that sends true or false',
     icon: mdiToggleSwitch,
-    category: 'switch',
+    category: 'carbon',
     canWrite: true,
     canRead: true,
     defaultUIConfig: {
@@ -64,7 +64,7 @@ export const CONTROL_TYPE_INFO = {
     label: 'Slider',
     description: 'Numeric slider for setting values within a range',
     icon: mdiTuneVertical,
-    category: 'numeric',
+    category: 'carbon',
     canWrite: true,
     canRead: true,
     defaultUIConfig: {
@@ -79,7 +79,7 @@ export const CONTROL_TYPE_INFO = {
     label: 'Text Input',
     description: 'Text field for entering custom values or commands',
     icon: mdiFormTextbox,
-    category: 'input',
+    category: 'carbon',
     canWrite: true,
     canRead: true,
     defaultUIConfig: {
@@ -93,7 +93,7 @@ export const CONTROL_TYPE_INFO = {
     label: 'Switch',
     description: 'On/off switch with HomeKit-style pill design',
     icon: mdiPowerPlug,
-    category: 'switch',
+    category: 'custom',
     canWrite: true,
     canRead: true,
     defaultUIConfig: {
@@ -107,7 +107,7 @@ export const CONTROL_TYPE_INFO = {
     label: 'Dimmer',
     description: 'Vertical slider for dimming lights, drag to set level',
     icon: mdiLightbulbOn,
-    category: 'numeric',
+    category: 'custom',
     canWrite: true,
     canRead: true,
     defaultUIConfig: {
@@ -122,7 +122,7 @@ export const CONTROL_TYPE_INFO = {
     label: 'Tile Switch',
     description: 'Compact tile showing on/off state. Tap to open full control.',
     icon: mdiPowerPlug,
-    category: 'switch',
+    category: 'tile',
     canWrite: true,
     canRead: true,
     defaultUIConfig: {
@@ -136,7 +136,7 @@ export const CONTROL_TYPE_INFO = {
     label: 'Tile Dimmer',
     description: 'Compact tile showing dimmer level with vertical fill. Tap to open full control.',
     icon: mdiLightbulbOn,
-    category: 'numeric',
+    category: 'tile',
     canWrite: true,
     canRead: true,
     defaultUIConfig: {
@@ -151,7 +151,7 @@ export const CONTROL_TYPE_INFO = {
     label: 'Tile Garage Door',
     description: 'Compact tile showing garage door open/closed state from a contact sensor.',
     icon: mdiGarage,
-    category: 'indicator',
+    category: 'tile',
     canWrite: false,
     canRead: true,
     defaultUIConfig: {
@@ -164,6 +164,7 @@ export const CONTROL_TYPE_INFO = {
     description: 'Static text display for section headers, date/time, or dashboard titles. No connection needed.',
     icon: mdiFormatText,
     category: 'decorative',
+    hidden: true, // Replaced by native text panels — kept for backward compat
     canWrite: false,
     canRead: false,
     defaultUIConfig: {
@@ -176,10 +177,7 @@ export const CONTROL_TYPE_INFO = {
 
 // Categories for widget selector grouping
 export const CONTROL_CATEGORIES = {
-  switch: { label: 'Switches', description: 'On/off controls' },
-  numeric: { label: 'Numeric', description: 'Sliders and dimmers' },
-  action: { label: 'Actions', description: 'Buttons and triggers' },
-  input: { label: 'Input', description: 'Text and command entry' },
-  indicator: { label: 'Indicators', description: 'Read-only state displays' },
-  decorative: { label: 'Decorative', description: 'Labels, headers, and layout elements' }
+  carbon: { label: 'Carbon Controls', description: 'Standard Carbon Design System components' },
+  custom: { label: 'Custom Controls', description: 'Full-size custom controls for switches and dimmers' },
+  tile: { label: 'Tiles', description: 'Compact state tiles for dashboards' }
 };

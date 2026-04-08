@@ -145,14 +145,12 @@ function DailyForecast({ data }) {
         {days.map((d, i) => (
           <div key={i} className="daily-card">
             <span className="daily-day">{formatDay(d.datetime)}</span>
-            {weatherIcon(d.icon, 40)}
-            <div className="daily-temps">
-              <span className="daily-high">{Math.round(d.tempmax)}°</span>
-              <span className="daily-low">{Math.round(d.tempmin)}°</span>
-            </div>
-            {d.precipprob > 20 && (
-              <span className="daily-precip">{Math.round(d.precipprob)}%</span>
-            )}
+            <div className="daily-icon">{weatherIcon(d.icon, 40)}</div>
+            <span className="daily-high">{Math.round(d.tempmax)}°</span>
+            <span className="daily-low">{Math.round(d.tempmin)}°</span>
+            <span className="daily-precip">
+              {d.precipprob > 20 ? `${Math.round(d.precipprob)}%` : '\u00A0'}
+            </span>
           </div>
         ))}
       </div>
