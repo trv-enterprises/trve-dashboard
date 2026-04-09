@@ -45,7 +45,9 @@ function weatherIcon(icon, size = 64) {
 }
 
 function formatHour(datetime) {
-  const hour = parseInt(datetime.split(':')[0], 10);
+  // Handle both "HH:MM:SS" and "YYYY-MM-DDThh:mm:ss" formats
+  const timePart = datetime.includes('T') ? datetime.split('T')[1] : datetime;
+  const hour = parseInt(timePart.split(':')[0], 10);
   if (hour === 0) return '12AM';
   if (hour === 12) return '12PM';
   return hour > 12 ? `${hour - 12}PM` : `${hour}AM`;
@@ -107,13 +109,8 @@ function SunBar({ data }) {
 
 function HourlyForecast({ data }) {
   if (!data || data.length === 0) return null;
-  const now = new Date();
-  const currentHour = now.getHours();
-  const upcoming = data.filter(h => {
-    const hour = parseInt(h.datetime.split(':')[0], 10);
-    return hour >= currentHour;
-  }).slice(0, 6);
-  const hours = upcoming.length > 0 ? upcoming : data.slice(0, 6);
+  // Data is pre-filtered by the poller to next 24 hours; show first 8 in this compact view
+  const hours = data.slice(0, 8);
 
   return (
     <div className="weather-hourly">
