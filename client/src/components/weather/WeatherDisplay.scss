@@ -9,8 +9,8 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: #262626;
-  color: #f4f4f4;
+  background-color: var(--cds-layer-01);
+  color: var(--cds-text-primary);
   font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
   user-select: none;
   overflow: hidden;
@@ -26,10 +26,10 @@
 // Location header
 .weather-location {
   text-align: center;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 1.0rem;
+  opacity: 0.7;
+  font-weight: 600;
   letter-spacing: 0.05em;
-  opacity: 0.5;
   padding: spacing.$spacing-03 0 0;
   flex-shrink: 0;
 }
@@ -42,7 +42,7 @@
 // Alert banner
 .weather-alert {
   padding: spacing.$spacing-03 spacing.$spacing-05;
-  background-color: rgba(218, 30, 40, 0.85);
+  background-color: var(--cds-support-error);
   color: #fff;
   font-size: 0.875rem;
   font-weight: 500;
@@ -152,14 +152,14 @@
 // Dividers
 .weather-divider {
   height: 1px;
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--cds-border-subtle-01);
   margin: spacing.$spacing-02 spacing.$spacing-05;
   flex-shrink: 0;
 }
 
 .weather-divider--vertical {
   width: 1px;
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--cds-border-subtle-01);
   align-self: stretch;
   margin: 0 spacing.$spacing-03;
   flex-shrink: 0;
@@ -172,7 +172,7 @@
   gap: spacing.$spacing-02;
   padding: spacing.$spacing-03 spacing.$spacing-04 spacing.$spacing-04;
   overflow: hidden;
-  min-height: 0;
+  min-height: 180px ;
 }
 
 .forecast-label {
@@ -206,15 +206,14 @@
     align-items: center;
     gap: spacing.$spacing-02;
     padding: 2px spacing.$spacing-03;
-    background-color: rgba(255, 255, 255, 0.04);
+    background-color: var(--cds-layer-02);
     border-radius: 6px;
     flex: 1;
   }
 
   .hourly-time {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    opacity: 0.6;
+    font-size: 0.9375rem;
+    font-weight: 700;
     width: 40px;
     flex-shrink: 0;
   }
@@ -227,7 +226,7 @@
 
   .hourly-precip {
     font-size: 0.8125rem;
-    color: #78a9ff;
+    color: var(--cds-link-primary);
     font-weight: 500;
     margin-left: auto;
   }
@@ -251,10 +250,10 @@
     flex: 1;
     display: grid;
     // day 15%, icon 20%, space 15%, high 13%, low 9%, precip 10%, bottom-pad 11%
-    grid-template-rows: 15% 20% 15% 13% 7% 6% 24%;
+    grid-template-rows: 20% 23% 18% 13% 7% 6% 13%;
     justify-items: center;
     padding: 0 spacing.$spacing-02;
-    background-color: rgba(255, 255, 255, 0.04);
+    background-color: var(--cds-layer-02);
     border-radius: 8px;
   }
 
@@ -288,7 +287,7 @@
 
   .daily-precip {
     font-size: 0.875rem;
-    color: #78a9ff;
+    color: var(--cds-link-primary);
     font-weight: 500;
     align-self: center;
   }

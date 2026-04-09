@@ -160,10 +160,12 @@ function DashboardDetailPage() {
   // Get minimum panel size based on assigned component's subtype
   const getMinSizeForPanel = (panelId) => {
     const panel = panels.find(p => p.id === panelId);
-    if (!panel?.chart_id) return getComponentMinSize('default');
+    if (!panel) return getComponentMinSize('default');
+    if (panel.text_config) return { w: 2, h: 1 };
+    if (!panel.chart_id) return getComponentMinSize('default');
     const chart = chartsMap[panel.chart_id];
     if (!chart) return getComponentMinSize('default');
-    const subtype = chart.control_config?.control_type || chart.chart_type;
+    const subtype = chart.control_config?.control_type || chart.display_config?.display_type || chart.chart_type;
     return getComponentMinSize(subtype);
   };
 
@@ -376,7 +378,7 @@ function DashboardDetailPage() {
 
   // Expand a panel to fit the minimum size for a component, clamping to grid bounds
   const expandPanelToMinSize = (panelId, component) => {
-    const subtype = component.control_config?.control_type || component.chart_type;
+    const subtype = component.control_config?.control_type || component.display_config?.display_type || component.chart_type;
     const minSize = getComponentMinSize(subtype);
     setPanels(prev => prev.map(p => {
       if (p.id !== panelId) return p;
@@ -397,7 +399,7 @@ function DashboardDetailPage() {
     }));
 
     // Update panel to reference this chart_id and expand to minimum size
-    const subtype = chartInfo.control_config?.control_type || chartInfo.chart_type;
+    const subtype = chartInfo.control_config?.control_type || chartInfo.display_config?.display_type || chartInfo.chart_type;
     const minSize = getComponentMinSize(subtype);
     setPanels(prev => prev.map(p => {
       if (p.id !== panel_id) return p;

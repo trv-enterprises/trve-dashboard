@@ -27,7 +27,7 @@ const ICON_MAP = {
 };
 import PropTypes from 'prop-types';
 import { useControlState } from './useControlState';
-import { normalizeBoolean } from './controlUtils';
+import { normalizeBoolean, formatTitle } from './controlUtils';
 import { useTileFontSize } from './useTileFontSize';
 import { registerControl } from './controlRegistry';
 import ControlPlug from './ControlPlug';
@@ -94,7 +94,7 @@ function TilePlug({ control, readOnly = false, onSuccess, onError }) {
         aria-label={`${displayName}: ${toggled ? onLabel : offLabel}`}
       >
         <Icon path={iconPath} size={0.8} className="tile-icon" />
-        <span className="tile-name">{displayName}</span>
+        <span className="tile-name">{formatTitle(displayName)}</span>
         <span className="tile-state">{toggled ? onLabel.toUpperCase() : offLabel.toUpperCase()}</span>
       </div>
 

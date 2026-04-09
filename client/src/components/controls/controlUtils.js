@@ -51,3 +51,12 @@ export function extractStateValue(record, stateField, fallbacks = []) {
   }
   return undefined;
 }
+
+/**
+ * Format a title string, converting `|` to newline for line breaks.
+ * Pair with `white-space: pre-line` in CSS.
+ */
+export function formatTitle(text) {
+  if (!text) return text;
+  return text.replaceAll('|', '\n');
+}

@@ -695,10 +695,12 @@ function DashboardViewerPage({ canDesign = false }) {
   // Get minimum panel size based on assigned component
   const getMinSizeForPanel = (panelId) => {
     const panel = editablePanels.find(p => p.id === panelId);
-    if (!panel?.chart_id) return getComponentMinSize('default');
+    if (!panel) return getComponentMinSize('default');
+    if (panel.text_config) return { w: 2, h: 1 };
+    if (!panel.chart_id) return getComponentMinSize('default');
     const chart = chartsMap[panel.chart_id];
     if (!chart) return getComponentMinSize('default');
-    const subtype = chart.control_config?.control_type || chart.chart_type;
+    const subtype = chart.control_config?.control_type || chart.display_config?.display_type || chart.chart_type;
     return getComponentMinSize(subtype);
   };
 
@@ -869,7 +871,7 @@ function DashboardViewerPage({ canDesign = false }) {
     const { panel_id, ...chartInfo } = chartData;
     setChartsMap(prev => ({ ...prev, [chartInfo.id]: chartInfo }));
 
-    const subtype = chartInfo.control_config?.control_type || chartInfo.chart_type;
+    const subtype = chartInfo.control_config?.control_type || chartInfo.display_config?.display_type || chartInfo.chart_type;
     const minSize = getComponentMinSize(subtype);
     setEditablePanels(prev => prev.map(p => {
       if (p.id !== panel_id) return p;
@@ -944,7 +946,7 @@ function DashboardViewerPage({ canDesign = false }) {
       setChartsMap(prev => ({ ...prev, [component.id]: component }));
     }
 
-    const subtype = component.control_config?.control_type || component.chart_type;
+    const subtype = component.control_config?.control_type || component.display_config?.display_type || component.chart_type;
     const minSize = getComponentMinSize(subtype);
     setEditablePanels(prev => prev.map(p => {
       if (p.id !== componentPickerPanelId) return p;

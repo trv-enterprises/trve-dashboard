@@ -5,6 +5,7 @@
 import PropTypes from 'prop-types';
 import { getControlComponent } from './controlRegistry';
 import { CONTROL_TYPE_INFO } from './controlTypes';
+import { formatTitle } from './controlUtils';
 import './controls.scss';
 
 /**
@@ -41,7 +42,7 @@ function ControlRenderer({ control, onSuccess, onError }) {
 
   return (
     <div className={`control-renderer ${isTile ? 'control-renderer--tile' : ''} ${controlType === 'text_label' ? 'control-renderer--text-label' : ''}`}>
-      {title && !isTile && controlType !== 'text_label' && <div className="control-title">{title}</div>}
+      {title && !isTile && controlType !== 'text_label' && <div className="control-title">{formatTitle(title)}</div>}
       <div className="control-body">
         <Component
           control={control}

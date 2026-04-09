@@ -9,6 +9,7 @@ import { mdiGarage } from '@mdi/js';
 import PropTypes from 'prop-types';
 import { useControlState } from './useControlState';
 import { useTileFontSize } from './useTileFontSize';
+import { formatTitle } from './controlUtils';
 import { registerControl } from './controlRegistry';
 import './controls.scss';
 
@@ -157,7 +158,7 @@ function TileGarageDoor({ control, readOnly = false }) {
         aria-label={`${displayName}: ${stateLabel}`}
       >
         <Icon path={mdiGarage} size={0.8} className="tile-icon" />
-        <span className="tile-name">{displayName}</span>
+        <span className="tile-name">{formatTitle(displayName)}</span>
         <span className="tile-state">{stateLabel.toUpperCase()}</span>
       </div>
 

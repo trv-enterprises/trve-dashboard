@@ -5,6 +5,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from '@mdi/react';
+import { formatTitle } from './controlUtils';
 import {
   mdiPowerPlug, mdiLightbulbOn, mdiLightbulbOutline, mdiCeilingFanLight,
   mdiTelevision, mdiWaterPump, mdiFan, mdiPowerSocket, mdiGarage,
@@ -102,7 +103,7 @@ function TileDimmer({ control, readOnly = false, onSuccess, onError }) {
       >
         <div className="tile-dimmer-fill" style={{ height: `${fillPercent}%` }} />
         <Icon path={iconPath} size={0.8} className="tile-icon" />
-        <span className="tile-name">{displayName}</span>
+        <span className="tile-name">{formatTitle(displayName)}</span>
         <div className="tile-bottom-row">
           <span className="tile-state">{isOn ? 'ON' : 'OFF'}</span>
           <span className="tile-value">{isOn ? `${Math.round(level)}%` : ''}</span>

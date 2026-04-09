@@ -104,15 +104,15 @@ export const COMPONENT_MIN_SIZES = {
   switch:     { w: 4, h: 8 },
   plug:       { w: 4, h: 8 },  // Backward compatibility
   dimmer:     { w: 4, h: 8 },
-  tile_switch:{ w: 4, h: 4 },
-  tile_plug:  { w: 4, h: 4 },  // Backward compatibility
-  tile_dimmer:{ w: 4, h: 4 },
-  tile_garage_door: { w: 4, h: 4 },
+  tile_switch:{ w: 3, h: 3 },
+  tile_plug:  { w: 3, h: 3 },  // Backward compatibility
+  tile_dimmer:{ w: 3, h: 3 },
+  tile_garage_door: { w: 3, h: 3 },
   text_label: { w: 2, h: 1 },
 
   // Displays (component_type='display')
-  frigate_camera: { w: 6, h: 4 },
-  weather:        { w: 12, h: 8 },
+  frigate_camera: { w: 8, h: 6 },
+  weather:        { w: 14, h: 12 },
 };
 
 // Get minimum size for a component subtype
