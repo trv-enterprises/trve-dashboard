@@ -45,12 +45,14 @@ function weatherIcon(icon, size = 64) {
 }
 
 function formatHour(datetime) {
-  // Handle both "HH:MM:SS" and "YYYY-MM-DDThh:mm:ss" formats
-  const timePart = datetime.includes('T') ? datetime.split('T')[1] : datetime;
+  // Extract hour from "HH:MM:SS", "YYYY-MM-DDThh:mm:ss", or "YYYY-MM-DD hh:mm:ss"
+  const timePart = datetime.includes('T') ? datetime.split('T')[1]
+    : datetime.includes(' ') ? datetime.split(' ')[1]
+    : datetime;
   const hour = parseInt(timePart.split(':')[0], 10);
-  if (hour === 0) return '12AM';
-  if (hour === 12) return '12PM';
-  return hour > 12 ? `${hour - 12}PM` : `${hour}AM`;
+  if (hour === 0) return '12 AM';
+  if (hour === 12) return '12 PM';
+  return hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
 }
 
 function formatDay(datetime) {
