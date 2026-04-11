@@ -28,7 +28,7 @@ import {
   Tooltip,
   Dropdown
 } from '@carbon/react';
-import { TrashCan, DataBase, List, Grid, Edit, Information, Sql, Api, Document, NetworkEnterprise, ChartLineSmooth } from '@carbon/icons-react';
+import { TrashCan, DataBase, List, Grid, Edit, Information, Sql, Api, Document, NetworkEnterprise, ChartLineSmooth, Meter, Db2Database, Tree, Video } from '@carbon/icons-react';
 import apiClient from '../api/client';
 import TagFilter from '../components/shared/TagFilter';
 import './ConnectionsPage.scss';
@@ -72,15 +72,18 @@ function ConnectionsPage() {
   }, [searchTerm, sortKey, sortDirection, viewMode, typeFilter, tagFilter]);
 
   // Connection types for filter dropdown
+  // Keep in sync with server-go/internal/models/datasource.go DatasourceType* constants
   const CONNECTION_TYPES = [
     { id: 'all', text: 'All Types' },
     { id: 'sql', text: 'SQL Database' },
     { id: 'api', text: 'REST API' },
     { id: 'csv', text: 'CSV File' },
     { id: 'socket', text: 'WebSocket' },
+    { id: 'mqtt', text: 'MQTT' },
     { id: 'tsstore', text: 'TS-Store' },
     { id: 'prometheus', text: 'Prometheus' },
-    { id: 'edgelake', text: 'EdgeLake' }
+    { id: 'edgelake', text: 'EdgeLake' },
+    { id: 'frigate', text: 'Frigate' }
   ];
 
   // Get icon for connection type
@@ -89,7 +92,12 @@ function ConnectionsPage() {
       'sql': Sql,
       'api': Api,
       'csv': Document,
-      'socket': NetworkEnterprise
+      'socket': NetworkEnterprise,
+      'mqtt': Tree,
+      'tsstore': ChartLineSmooth,
+      'prometheus': Meter,
+      'edgelake': Db2Database,
+      'frigate': Video
     };
     return icons[type?.toLowerCase()] || DataBase;
   };
@@ -167,7 +175,12 @@ function ConnectionsPage() {
       'sql': 'blue',
       'api': 'green',
       'csv': 'purple',
-      'socket': 'cyan'
+      'socket': 'cyan',
+      'mqtt': 'teal',
+      'tsstore': 'magenta',
+      'prometheus': 'red',
+      'edgelake': 'blue',
+      'frigate': 'warm-gray'
     };
     return colors[type?.toLowerCase()] || 'gray';
   };

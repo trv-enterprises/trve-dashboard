@@ -93,7 +93,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
   }, [datasourceId]);
 
   // Streaming datasource types use SSE instead of polling
-  const isStreamingType = datasourceType === 'socket' || datasourceType === 'mqtt';
+  const isStreamingType = datasourceType === 'socket' || datasourceType === 'mqtt' || datasourceType === 'tsstore';
 
   // === STREAMING LOGIC (for streaming datasources) ===
   const processStreamRecord = useCallback((record) => {

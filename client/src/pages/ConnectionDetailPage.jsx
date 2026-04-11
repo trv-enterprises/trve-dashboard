@@ -171,7 +171,8 @@ function ConnectionDetailPage() {
             auth_credentials: {},
             timeout: 30,
             retry_count: 3,
-            retry_delay: 1000
+            retry_delay: 1000,
+            data_path: ''
           }
         };
       case 'tsstore':
@@ -868,6 +869,15 @@ function ConnectionDetailPage() {
           onChange={(e, { value }) => updateConfig('api.retry_delay', value)}
           min={100}
           max={10000}
+        />
+
+        <TextInput
+          id="api-data-path"
+          labelText="Data Path"
+          value={apiConfig.data_path || ''}
+          onChange={(e) => updateConfig('api.data_path', e.target.value)}
+          placeholder="data"
+          helperText="For wrapped JSON responses, the key containing the data array (e.g., 'data' for {data: [...], total, limit}). Leave blank if the response is already a bare array."
         />
       </div>
     );
