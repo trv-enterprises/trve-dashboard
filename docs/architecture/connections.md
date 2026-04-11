@@ -215,3 +215,7 @@ current for the list page's status indicators.
   are persisted
 - [Streaming](streaming.md) — how read-streams become SSE frames
 - [API reference](api-reference.md) — full endpoint tables
+- [Datasource processing](../datasources/DATASOURCE_PROCESSING.md) —
+  post-query filtering, aggregation, and column-mapping pipeline
+- [ts-store architecture](../datasources/TSSTORE_ARCHITECTURE.md) —
+  deep dive on the ts-store circular-buffer adapter

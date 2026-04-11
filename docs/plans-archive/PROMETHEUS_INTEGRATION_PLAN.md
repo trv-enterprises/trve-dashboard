@@ -1,5 +1,13 @@
 # Prometheus Data Source Integration Plan
 
+> **Archived 2026-04-11.** Historical integration plan for the
+> Prometheus data source type. The feature shipped (Phases 1-6
+> per the footer of this doc); the current-state documentation
+> lives under the Prometheus section of
+> [`docs/architecture/connections.md`](../architecture/connections.md).
+> The "Phase 7 (Streaming) Optional/Future" item at the bottom
+> was never implemented.
+
 ## Overview
 
 Add Prometheus as a new data source type, enabling users to query and visualize Prometheus metrics through the dashboard. The integration maintains our existing data interface pattern while adding Prometheus-specific schema discovery and a visual query builder.

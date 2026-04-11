@@ -207,3 +207,5 @@ Key behaviors:
 - [Frontend architecture](frontend.md) — how
   `StreamConnectionManager` plugs into components via
   `useControlState` and similar hooks
+- [MQTT pipeline](../design-notes/mqtt_pipeline.md) — deep dive on
+  the MQTT subscribe/publish path and the retained-state cache

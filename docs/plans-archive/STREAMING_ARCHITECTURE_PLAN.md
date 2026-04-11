@@ -1,5 +1,14 @@
 # Streaming Architecture for Socket Data Sources
 
+> **Archived 2026-04-11.** Historical planning document for the
+> server-side SSE streaming proxy. The feature shipped and its
+> current-state documentation lives at
+> [`docs/architecture/streaming.md`](../architecture/streaming.md).
+> The "Phase 1–4" implementation plan and "Future Enhancements"
+> sections below reflect the original design intent, not the final
+> implementation — see the current streaming doc for the real
+> MQTT stream, retained-state cache, and aggregator details.
+
 This document describes the server-side streaming proxy architecture for WebSocket/socket data sources.
 
 ## Problem Statement

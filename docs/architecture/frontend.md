@@ -236,3 +236,5 @@ build they're running.
   layout presets
 - [API reference](api-reference.md) — endpoint tables
 - [Data model](data-model.md) — the shapes coming from the API
+- [Dashboard rendering](../design-notes/dashboard_rendering.md) —
+  deep dive on thumbnail capture and chart preview rendering

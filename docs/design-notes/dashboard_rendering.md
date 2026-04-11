@@ -13,7 +13,7 @@ This document covers the code involved in dashboard thumbnail rendering and char
 
 Thumbnails are captured when a dashboard is saved. The process involves switching to preview mode, waiting for charts to render, and using html2canvas to capture the grid.
 
-### Capture Function (`DashboardDetailPage.jsx`)
+### Capture Function (`DashboardViewerPage.jsx`)
 
 ```javascript
 // Capture thumbnail of the dashboard grid (switches to preview mode temporarily)
@@ -79,7 +79,7 @@ const captureThumbnail = async () => {
 };
 ```
 
-### Thumbnail Capture CSS (`DashboardDetailPage.scss`)
+### Thumbnail Capture CSS (`DashboardViewerPage.scss`)
 
 ```scss
 // Thumbnail capture mode - hide design elements, show clean preview
@@ -283,7 +283,7 @@ The viewer renders charts using `DynamicComponentLoader`:
 }
 ```
 
-### Dashboard Detail Page Preview Mode (`DashboardDetailPage.jsx`)
+### Dashboard Viewer Page Preview Mode (`DashboardViewerPage.jsx`)
 
 In the detail/editor page, preview mode renders charts similarly:
 

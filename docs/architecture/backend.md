@@ -195,3 +195,6 @@ the usual service layer.
 - [API reference](api-reference.md) — full endpoint tables
 - [AI chart editor architecture](AI_CHART_EDITOR_ARCHITECTURE.md) —
   AI Builder internals (separate doc)
+- [Datasource processing](../datasources/DATASOURCE_PROCESSING.md) —
+  deep dive on how raw connection results flow through filters,
+  aggregation, and column mapping before reaching the frontend
