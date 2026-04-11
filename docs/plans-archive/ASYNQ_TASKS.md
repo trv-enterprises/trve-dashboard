@@ -1,5 +1,13 @@
 # Asynq Task Processing
 
+> **Archived 2026-04-11.** Asynq was evaluated as the task queue for
+> async work (chart generation, background refresh, etc.) but was
+> never integrated into the Go server. The feature set described here
+> was not implemented. Kept as a historical record of the design
+> exploration. For the current async model, chart generation happens
+> via the AI Builder session flow (see
+> `docs/architecture/backend.md` → AI Builder).
+
 ## Overview
 
 Asynq is used for async task processing instead of Temporal for simplicity. Redis is the backing store.

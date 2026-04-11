@@ -1,5 +1,14 @@
 # MCP Component Specification Tool
 
+> **Archived 2026-04-11.** The `get_component_specification` MCP tool
+> described here is no longer registered in the MCP server (verified
+> via grep against `server-go/internal/mcp/`). Component generation
+> for the AI Builder is now handled via the integrated AI session
+> flow and system prompt rather than a discrete MCP tool. Kept for
+> historical record. For the current AI builder architecture see
+> `docs/architecture/backend.md` → AI Builder, or
+> `docs/architecture/AI_CHART_EDITOR_ARCHITECTURE.md`.
+
 **Created**: 2025-11-13
 **Purpose**: Provide AI assistants (MCP clients) with design constraints for creating React components
 

@@ -324,9 +324,10 @@ dashboard/
 │   └── docs/                  # Swagger documentation
 │
 └── docs/                      # Documentation
-    ├── ARCHITECTURE.md
-    ├── TECH_STACK_SUMMARY.md
-    └── REFACTOR_PLAN.md
+    ├── architecture/          # Architecture doc set (start at ARCHITECTURE.md)
+    ├── DEPLOYMENT.md
+    ├── TEST_PLAN.md
+    └── plans-archive/         # Historical planning docs
 ```
 
 ## API Endpoints
@@ -644,11 +645,11 @@ Tiles (`tile_*`) and `text_label` skip the top `.control-title` entirely — the
 
 ## Documentation
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
-- [TECH_STACK_SUMMARY.md](docs/TECH_STACK_SUMMARY.md) - Technology decisions
-- [REFACTOR_PLAN.md](docs/REFACTOR_PLAN.md) - Refactoring roadmap
-- [PROMETHEUS_INTEGRATION.md](docs/PROMETHEUS_INTEGRATION.md) - Prometheus data source integration plan
-- [EDGELAKE_DATASOURCE_PLAN.md](docs/EDGELAKE_DATASOURCE_PLAN.md) - EdgeLake data source integration plan
+- [Architecture doc set](docs/architecture/ARCHITECTURE.md) — landing page for current architecture (data model, backend, frontend, streaming, connections, database, api reference, grid system)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Test plan](docs/TEST_PLAN.md)
+- [Third-party licenses](THIRD_PARTY_LICENSES.md)
+- Historical plans + archived implementation notes live in [`docs/plans-archive/`](docs/plans-archive/)
 - Swagger UI: http://localhost:3001/swagger/index.html
 
 ---

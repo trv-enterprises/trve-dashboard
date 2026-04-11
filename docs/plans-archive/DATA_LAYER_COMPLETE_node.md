@@ -1,5 +1,13 @@
 # Data Layer Integration - Completion Report
 
+> **Archived 2026-04-11.** This is a completion report from the
+> pre-migration Node.js + Express backend (November 2025). It
+> references files under `server/services/*.js` that no longer
+> exist — the backend was rewritten in Go. Kept for historical
+> record. For the current data layer and streaming architecture,
+> see `docs/architecture/backend.md` and
+> `docs/architecture/streaming.md`.
+
 **Date**: 2025-11-13
 **Status**: ✅ **COMPLETE AND READY FOR TESTING**
 

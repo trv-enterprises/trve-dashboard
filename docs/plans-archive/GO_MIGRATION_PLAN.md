@@ -1,5 +1,12 @@
 # Dashboard Refactoring - Technology Stack Summary
 
+> **Archived 2026-04-11.** This is a historical planning document from
+> the Node.js → Go backend migration. It describes choices made during
+> that migration (Go, MongoDB, "no ORM") and features that were planned
+> but either shipped differently (e.g. Asynq task queue → not used in
+> the end) or shipped later with different details. For current
+> architecture, start at `docs/architecture/ARCHITECTURE.md`.
+
 ## Final Technology Stack
 
 ### **Backend: Go**

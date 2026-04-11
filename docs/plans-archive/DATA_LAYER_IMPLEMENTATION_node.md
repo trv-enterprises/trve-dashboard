@@ -1,5 +1,12 @@
 # Data Layer & MCP Server Implementation
 
+> **Archived 2026-04-11.** This is an implementation note from the
+> pre-migration Node.js + Express backend (November 2025). It
+> describes services under `server/services/*.js` that no longer
+> exist — the backend was rewritten in Go. Kept for historical
+> record. For the current backend, see
+> `docs/architecture/backend.md`.
+
 **Date**: 2025-11-13
 **Status**: ✅ Complete and Integrated
 

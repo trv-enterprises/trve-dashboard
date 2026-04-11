@@ -403,10 +403,12 @@ curl http://localhost:3001/health
 4. Test with curl or Swagger UI
 
 ## Reference Documents
-- `docs/REFACTOR_PLAN.md` - Complete 8-phase refactoring plan
-- `docs/ASYNQ_TASKS.md` - Background task specifications
-- `docs/TECH_STACK_SUMMARY.md` - Technology decisions
-- Parent CLAUDE.md - Overall project context
+- `../docs/architecture/ARCHITECTURE.md` — landing page for the current architecture doc set
+- `../docs/architecture/backend.md` — Go backend layered architecture
+- `../docs/architecture/streaming.md` — SSE + MQTT streaming, retained-state cache
+- `../docs/architecture/database.md` — MongoDB collations, migrations, indexes
+- `../docs/plans-archive/` — historical planning docs (Go migration, old Node.js data layer, Asynq exploration)
+- Parent CLAUDE.md — overall project context
 
 ## Current Server Status
 - Running: Yes (PID varies)
