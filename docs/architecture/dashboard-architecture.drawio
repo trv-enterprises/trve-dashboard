@@ -57,25 +57,28 @@
         <mxCell id="view-fullscreen" value="Fullscreen Mode" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=10;fontColor=#c6c6c6" vertex="1" parent="1">
           <mxGeometry x="245" y="234" width="150" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="view-reduce" value="Reduce-to-Fit Scaling" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=10;fontColor=#c6c6c6" vertex="1" parent="1">
+        <mxCell id="view-reduce" value="Four Fit Modes (uniform/width/stretch)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=10;fontColor=#c6c6c6" vertex="1" parent="1">
           <mxGeometry x="245" y="261" width="150" height="22" as="geometry" />
         </mxCell>
 
-        <!-- Manage Mode (Future) -->
-        <mxCell id="manage-mode" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#262626;strokeColor=#6f6f6f;strokeWidth=1;arcSize=5;dashed=1" vertex="1" parent="1">
+        <!-- Manage Mode -->
+        <mxCell id="manage-mode" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#262626;strokeColor=#78a9ff;strokeWidth=1;arcSize=5" vertex="1" parent="1">
           <mxGeometry x="415" y="145" width="170" height="150" as="geometry" />
         </mxCell>
-        <mxCell id="manage-mode-title" value="Manage Mode" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontColor=#6f6f6f;fontStyle=1" vertex="1" parent="1">
-          <mxGeometry x="445" y="150" width="110" height="25" as="geometry" />
+        <mxCell id="manage-mode-title" value="Manage Mode" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=13;fontColor=#78a9ff;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="445" y="155" width="110" height="25" as="geometry" />
         </mxCell>
-        <mxCell id="manage-future" value="(Future)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#525252;fontStyle=2" vertex="1" parent="1">
-          <mxGeometry x="465" y="175" width="60" height="20" as="geometry" />
+        <mxCell id="manage-users" value="Users (RBAC)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=10;fontColor=#c6c6c6" vertex="1" parent="1">
+          <mxGeometry x="425" y="185" width="150" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="manage-settings" value="Settings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=10;fontColor=#525252;opacity=50" vertex="1" parent="1">
-          <mxGeometry x="425" y="207" width="150" height="22" as="geometry" />
+        <mxCell id="manage-settings" value="Settings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=10;fontColor=#c6c6c6" vertex="1" parent="1">
+          <mxGeometry x="425" y="212" width="150" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="manage-users" value="User Config" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=10;fontColor=#525252;opacity=50" vertex="1" parent="1">
-          <mxGeometry x="425" y="234" width="150" height="22" as="geometry" />
+        <mxCell id="manage-devices" value="Devices" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=10;fontColor=#c6c6c6" vertex="1" parent="1">
+          <mxGeometry x="425" y="239" width="150" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="manage-device-types" value="Device Types" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=10;fontColor=#c6c6c6" vertex="1" parent="1">
+          <mxGeometry x="425" y="266" width="150" height="22" as="geometry" />
         </mxCell>
 
         <!-- Core Components -->
@@ -122,19 +125,19 @@
         <mxCell id="fe-tech-label" value="Tech Stack:" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#8d8d8d;fontStyle=1" vertex="1" parent="1">
           <mxGeometry x="65" y="420" width="70" height="25" as="geometry" />
         </mxCell>
-        <mxCell id="fe-react" value="React 18" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#78a9ff" vertex="1" parent="1">
+        <mxCell id="fe-react" value="React 19" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#78a9ff" vertex="1" parent="1">
           <mxGeometry x="140" y="420" width="60" height="25" as="geometry" />
         </mxCell>
-        <mxCell id="fe-vite" value="Vite 5" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#78a9ff" vertex="1" parent="1">
+        <mxCell id="fe-vite" value="Vite 7" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#78a9ff" vertex="1" parent="1">
           <mxGeometry x="210" y="420" width="50" height="25" as="geometry" />
         </mxCell>
-        <mxCell id="fe-router" value="React Router 6" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#78a9ff" vertex="1" parent="1">
+        <mxCell id="fe-router" value="React Router 7" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#78a9ff" vertex="1" parent="1">
           <mxGeometry x="270" y="420" width="90" height="25" as="geometry" />
         </mxCell>
         <mxCell id="fe-carbon" value="Carbon 11" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#78a9ff" vertex="1" parent="1">
           <mxGeometry x="370" y="420" width="70" height="25" as="geometry" />
         </mxCell>
-        <mxCell id="fe-echarts" value="ECharts 5" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#78a9ff" vertex="1" parent="1">
+        <mxCell id="fe-echarts" value="ECharts 6" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#78a9ff" vertex="1" parent="1">
           <mxGeometry x="450" y="420" width="70" height="25" as="geometry" />
         </mxCell>
         <mxCell id="fe-scss" value="SCSS" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#78a9ff" vertex="1" parent="1">
@@ -287,11 +290,11 @@
         <mxCell id="adapt-udp" value="UDP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=9;fontColor=#c6c6c6" vertex="1" parent="1">
           <mxGeometry x="905" y="515" width="45" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="adapt-mqtt" value="MQTT (Future)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=9;fontColor=#525252;dashed=1" vertex="1" parent="1">
-          <mxGeometry x="960" y="515" width="80" height="22" as="geometry" />
+        <mxCell id="adapt-mqtt" value="MQTT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=9;fontColor=#c6c6c6" vertex="1" parent="1">
+          <mxGeometry x="960" y="515" width="55" height="22" as="geometry" />
         </mxCell>
-        <mxCell id="adapt-kafka" value="Kafka (Future)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=9;fontColor=#525252;dashed=1" vertex="1" parent="1">
-          <mxGeometry x="1050" y="515" width="80" height="22" as="geometry" />
+        <mxCell id="adapt-frigate" value="Frigate NVR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=#393939;fontSize=9;fontColor=#c6c6c6" vertex="1" parent="1">
+          <mxGeometry x="1025" y="515" width="75" height="22" as="geometry" />
         </mxCell>
 
         <!-- Backend Tech Stack -->
@@ -301,7 +304,7 @@
         <mxCell id="be-tech-label" value="Tech Stack:" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#8d8d8d;fontStyle=1" vertex="1" parent="1">
           <mxGeometry x="665" y="567" width="70" height="25" as="geometry" />
         </mxCell>
-        <mxCell id="be-go" value="Go 1.25" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#6fdc8c" vertex="1" parent="1">
+        <mxCell id="be-go" value="Go 1.24" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#6fdc8c" vertex="1" parent="1">
           <mxGeometry x="740" y="567" width="55" height="25" as="geometry" />
         </mxCell>
         <mxCell id="be-gin" value="Gin" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#6fdc8c" vertex="1" parent="1">
@@ -566,17 +569,17 @@
         <mxCell id="comp-title" value="Component Types:" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#f4f4f4;fontStyle=1" vertex="1" parent="1">
           <mxGeometry x="750" y="840" width="120" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="comp-displays" value="Displays: bar, line, area, pie, scatter, gauge, dataview, number, custom" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#c6c6c6" vertex="1" parent="1">
+        <mxCell id="comp-displays" value="Charts: bar, line, area, pie, scatter, gauge, dataview, number, custom&#xa;Displays: frigate_camera, frigate_alerts, weather" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#c6c6c6" vertex="1" parent="1">
           <mxGeometry x="750" y="860" width="350" height="18" as="geometry" />
         </mxCell>
-        <mxCell id="comp-controls" value="Controls: button, toggle, slider, text_input" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#c6c6c6" vertex="1" parent="1">
+        <mxCell id="comp-controls" value="Controls: button, toggle, slider, text_input, switch, dimmer, garage_door, tile_*, text_label" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#c6c6c6" vertex="1" parent="1">
           <mxGeometry x="750" y="878" width="280" height="18" as="geometry" />
         </mxCell>
 
         <mxCell id="conn-title" value="Connection Types:" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#f4f4f4;fontStyle=1" vertex="1" parent="1">
           <mxGeometry x="750" y="905" width="120" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="conn-types" value="SQL, API, CSV, WebSocket, TCP, UDP, Prometheus, EdgeLake, TS-Store" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#c6c6c6" vertex="1" parent="1">
+        <mxCell id="conn-types" value="SQL, REST API, CSV, WebSocket, TCP, UDP, MQTT, Prometheus, EdgeLake, TS-Store, Frigate NVR" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#c6c6c6" vertex="1" parent="1">
           <mxGeometry x="750" y="925" width="380" height="18" as="geometry" />
         </mxCell>
 
