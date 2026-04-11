@@ -114,6 +114,7 @@ type Dashboard struct {
 	Panels      []DashboardPanel       `json:"panels" bson:"panels"`           // Panels with chart_id references
 	Thumbnail   string                 `json:"thumbnail" bson:"thumbnail"`     // Base64 encoded thumbnail image
 	Settings    DashboardSettings      `json:"settings" bson:"settings"`
+	Tags        []string               `json:"tags,omitempty" bson:"tags,omitempty"` // User-defined tags for filtering/grouping
 	Metadata    map[string]interface{} `json:"metadata,omitempty" bson:"metadata,omitempty"`
 	Created     time.Time              `json:"created" bson:"created"`
 	Updated     time.Time              `json:"updated" bson:"updated"`
@@ -139,6 +140,7 @@ type CreateDashboardRequest struct {
 	Description string                 `json:"description"`
 	Panels      []DashboardPanel       `json:"panels"` // Panels with optional chart_id
 	Settings    DashboardSettings      `json:"settings"`
+	Tags        []string               `json:"tags,omitempty"`
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -150,6 +152,7 @@ type UpdateDashboardRequest struct {
 	Panels      *[]DashboardPanel       `json:"panels,omitempty"` // Panels with optional chart_id
 	Thumbnail   *string                 `json:"thumbnail,omitempty"`
 	Settings    *DashboardSettings      `json:"settings,omitempty"`
+	Tags        *[]string               `json:"tags,omitempty"`
 	Metadata    *map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -165,12 +168,13 @@ type DashboardListResponse struct {
 // DashboardQueryParams defines query parameters for listing dashboards
 // @Description Query parameters for filtering and pagination
 type DashboardQueryParams struct {
-	Name               string `form:"name"`
-	IsPublic           *bool  `form:"is_public"`
-	ChartID            string `form:"chart_id"`            // Filter dashboards using a specific chart
-	IncludeDatasources bool   `form:"include_datasources"` // Include data source names from charts
-	Page               int    `form:"page"`
-	PageSize           int    `form:"page_size"`
+	Name               string   `form:"name"`
+	IsPublic           *bool    `form:"is_public"`
+	ChartID            string   `form:"chart_id"`            // Filter dashboards using a specific chart
+	Tags               []string `form:"tags"`                // Filter dashboards with any of the given tags (OR)
+	IncludeDatasources bool     `form:"include_datasources"` // Include data source names from charts
+	Page               int      `form:"page"`
+	PageSize           int      `form:"page_size"`
 }
 
 // DashboardSummary is a lightweight dashboard representation for tile listings
@@ -181,6 +185,7 @@ type DashboardSummary struct {
 	Description     string            `json:"description"`
 	Thumbnail       string            `json:"thumbnail,omitempty"`
 	Settings        DashboardSettings `json:"settings"`
+	Tags            []string          `json:"tags,omitempty"`
 	PanelCount      int               `json:"panel_count"`
 	DatasourceNames []string          `json:"datasource_names,omitempty"` // Unique data source names used by charts
 	Created         time.Time         `json:"created"`

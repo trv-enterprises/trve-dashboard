@@ -89,9 +89,12 @@ function ControlEditor({
   // Detect MQTT connection
   const isMQTT = selectedConnection?.type === 'mqtt';
 
-  // Check if this control type needs a connection (decorative types don't)
+  // Check if this control type needs a connection (decorative types don't).
+  // Default to TRUE when typeInfo is missing so legacy/unknown control types
+  // still get the connection dropdown — better than stranding the user with
+  // an un-editable component.
   const typeInfo = CONTROL_TYPE_INFO[controlType];
-  const needsConnection = typeInfo?.canWrite || typeInfo?.canRead;
+  const needsConnection = typeInfo ? (typeInfo.canWrite || typeInfo.canRead) : true;
 
   // If we already have a connectionId, fetch that connection immediately for fast display
   useEffect(() => {

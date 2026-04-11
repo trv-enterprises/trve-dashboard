@@ -37,7 +37,7 @@ import ChartsListPage from './pages/ChartsListPage';
 import ChartDetailPage from './pages/ChartDetailPage';
 import AIBuilderPage from './pages/AIBuilderPage';
 import DashboardsListPage from './pages/DashboardsListPage';
-// DashboardDetailPage replaced by DashboardViewerPage edit mode
+// Dashboard design/edit lives in DashboardViewerPage edit mode
 import DashboardViewerPage from './pages/DashboardViewerPage';
 import DashboardTileViewPage from './pages/DashboardTileViewPage';
 import ModeToggle from './components/mode/ModeToggle';

@@ -587,6 +587,26 @@
     margin: 0;
   }
 
+  // Name cell with tags stacked below
+  .name-cell {
+    vertical-align: top;
+
+    &__name {
+      line-height: 1.4;
+    }
+
+    &__tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: spacing.$spacing-02;
+      margin-top: spacing.$spacing-02;
+
+      .cds--tag {
+        margin: 0;
+      }
+    }
+  }
+
   // Control notice (fixed position at bottom)
   .control-notice {
     position: fixed;

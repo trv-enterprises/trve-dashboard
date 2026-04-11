@@ -27,6 +27,7 @@ export const CONTROL_TYPES = {
   TEXT_INPUT: 'text_input',
   SWITCH: 'switch',
   DIMMER: 'dimmer',
+  GARAGE_DOOR: 'garage_door',
   TILE_SWITCH: 'tile_switch',
   TILE_DIMMER: 'tile_dimmer',
   TILE_GARAGE_DOOR: 'tile_garage_door',
@@ -118,6 +119,18 @@ export const CONTROL_TYPE_INFO = {
       state_field: 'level'
     }
   },
+  [CONTROL_TYPES.GARAGE_DOOR]: {
+    label: 'Garage Door',
+    description: 'Full-size animated garage door with open/closed state from a contact sensor.',
+    icon: mdiGarage,
+    category: 'custom',
+    canWrite: false,
+    canRead: true,
+    defaultUIConfig: {
+      label: 'Garage',
+      state_field: 'contact'
+    }
+  },
   [CONTROL_TYPES.TILE_SWITCH]: {
     label: 'Tile Switch',
     description: 'Compact tile showing on/off state. Tap to open full control.',
@@ -171,6 +184,44 @@ export const CONTROL_TYPE_INFO = {
       display_content: 'title',
       align: 'center',
       size: 'md'
+    }
+  },
+
+  // --- Backward-compat aliases ---
+  // Legacy DB records may still have these control types. The renderers
+  // self-register both old and new names (see ControlPlug.jsx, TilePlug.jsx),
+  // but the editor also needs metadata entries so the Connection dropdown
+  // and other editor fields render correctly. Hidden from the type selector
+  // so users can't create new ones — they only appear when editing legacy
+  // components.
+  plug: {
+    label: 'Plug (legacy)',
+    description: 'Legacy name for Switch. Kept so existing components can still be edited.',
+    icon: mdiPowerPlug,
+    category: 'custom',
+    hidden: true,
+    canWrite: true,
+    canRead: true,
+    defaultUIConfig: {
+      label: 'Switch',
+      onLabel: 'On',
+      offLabel: 'Off',
+      state_field: 'state'
+    }
+  },
+  tile_plug: {
+    label: 'Tile Plug (legacy)',
+    description: 'Legacy name for Tile Switch. Kept so existing components can still be edited.',
+    icon: mdiPowerPlug,
+    category: 'tile',
+    hidden: true,
+    canWrite: true,
+    canRead: true,
+    defaultUIConfig: {
+      label: 'Switch',
+      onLabel: 'On',
+      offLabel: 'Off',
+      state_field: 'state'
     }
   }
 };

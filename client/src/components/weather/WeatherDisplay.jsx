@@ -29,7 +29,13 @@ const ICON_MAP = {
   'sleet': 'sleet',
 };
 
-const ICON_BASE = 'https://basmilius.github.io/weather-icons/production/fill/all';
+// Weather icons are bundled locally in client/public/weather-icons/ so the
+// app doesn't depend on an external CDN (the upstream repo was renamed from
+// `weather-icons` to `meteocons` once already) and works offline on kiosk
+// displays. Source: https://github.com/basmilius/meteocons (MIT licensed).
+// To refresh: re-download the 19 mapped names via curl from
+// https://basmilius.github.io/meteocons/production/fill/svg/<name>.svg
+const ICON_BASE = '/weather-icons';
 
 function weatherIcon(icon, size = 64) {
   const mapped = ICON_MAP[icon] || 'not-available';

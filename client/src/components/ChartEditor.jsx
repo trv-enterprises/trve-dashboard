@@ -33,6 +33,8 @@ import ControlEditor from './ControlEditor';
 import DisplayEditor from './DisplayEditor';
 import { transformData, formatCellValue } from '../utils/dataTransforms';
 import apiClient from '../api/client';
+import TagInput from './shared/TagInput';
+import { invalidateTagsCache } from './shared/tagsApi';
 import './ChartEditor.scss';
 
 // Chart types available
@@ -208,6 +210,7 @@ const ChartEditor = forwardRef(function ChartEditor({
   const [nameError, setNameError] = useState('');
   const [title, setTitle] = useState(''); // Display title (defaults to name)
   const [description, setDescription] = useState('');
+  const [tags, setTags] = useState([]);
   const [componentType, setComponentType] = useState('chart'); // 'chart', 'control', or 'display'
   const [chartType, setChartType] = useState('bar');
 
@@ -398,6 +401,7 @@ const ChartEditor = forwardRef(function ChartEditor({
       setName(chart.name || '');
       setTitle(chart.title || '');
       setDescription(chart.description || '');
+      setTags(chart.tags || []);
       setComponentType(chart.component_type || 'chart');
       setChartType(chart.chart_type || 'bar');
       const loadedControlConfig = chart.control_config || null;
@@ -497,6 +501,7 @@ const ChartEditor = forwardRef(function ChartEditor({
       setInitialState(JSON.stringify({
         name: chart.name || '',
         description: chart.description || '',
+        tags: chart.tags || [],
         chartType: chart.chart_type || 'bar',
         datasourceId: chart.datasource_id || '',
         queryRaw: chart.query_config?.raw || '',
@@ -511,6 +516,7 @@ const ChartEditor = forwardRef(function ChartEditor({
       setInitialState(JSON.stringify({
         name: '',
         description: '',
+        tags: [],
         chartType: 'bar',
         datasourceId: '',
         queryRaw: '',
@@ -529,6 +535,7 @@ const ChartEditor = forwardRef(function ChartEditor({
     const currentState = JSON.stringify({
       name,
       description,
+      tags,
       chartType,
       datasourceId: selectedDatasourceId,
       queryRaw,
@@ -538,7 +545,7 @@ const ChartEditor = forwardRef(function ChartEditor({
       showCustomCode
     });
     setHasChanges(currentState !== initialState);
-  }, [name, description, chartType, selectedDatasourceId, queryRaw, xAxisColumn, yAxisColumns, filters, showCustomCode, initialState]);
+  }, [name, description, tags, chartType, selectedDatasourceId, queryRaw, xAxisColumn, yAxisColumns, filters, showCustomCode, initialState]);
 
   // Notify parent of validity changes
   useEffect(() => {
@@ -936,6 +943,7 @@ const ChartEditor = forwardRef(function ChartEditor({
       name: name.trim(),
       title: title.trim() || name.trim(), // Default to name if no title provided
       description: description.trim(),
+      tags,
       component_type: componentType,
       chart_type: componentType === 'chart' ? chartType : '',
       control_config: componentType === 'control' ? controlConfig : null,
@@ -1131,6 +1139,12 @@ const ChartEditor = forwardRef(function ChartEditor({
             onChange={(e) => setDescription(e.target.value)}
             placeholder={componentType === 'control' ? 'Enter control description' : 'Enter chart description'}
             size="md"
+          />
+          <TagInput
+            id="chart-tags"
+            label="Tags"
+            value={tags}
+            onChange={setTags}
           />
         </div>
       </div>

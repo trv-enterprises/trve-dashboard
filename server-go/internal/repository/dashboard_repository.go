@@ -61,6 +61,7 @@ func (r *DashboardRepository) Create(ctx context.Context, req *models.CreateDash
 		Description: req.Description,
 		Panels:      panels,
 		Settings:    req.Settings,
+		Tags:        req.Tags,
 		Metadata:    req.Metadata,
 		Created:     time.Now(),
 		Updated:     time.Now(),
@@ -105,6 +106,8 @@ func (r *DashboardRepository) List(ctx context.Context, params models.DashboardQ
 	// Build filter
 	filter := bson.M{}
 	if params.Name != "" {
+		// $regex does NOT respect collection collation (MongoDB limitation),
+		// so we must explicitly request case-insensitive matching.
 		filter["name"] = bson.M{"$regex": params.Name, "$options": "i"}
 	}
 	if params.IsPublic != nil {
@@ -112,6 +115,9 @@ func (r *DashboardRepository) List(ctx context.Context, params models.DashboardQ
 	}
 	if params.ChartID != "" {
 		filter["panels.chart_id"] = params.ChartID
+	}
+	if len(params.Tags) > 0 {
+		filter["tags"] = bson.M{"$in": params.Tags}
 	}
 
 	// Count total documents
@@ -180,6 +186,9 @@ func (r *DashboardRepository) Update(ctx context.Context, id string, req *models
 	}
 	if req.Settings != nil {
 		setFields["settings"] = *req.Settings
+	}
+	if req.Tags != nil {
+		setFields["tags"] = *req.Tags
 	}
 	if req.Metadata != nil {
 		setFields["metadata"] = *req.Metadata
@@ -263,6 +272,8 @@ func (r *DashboardRepository) ListWithDatasources(ctx context.Context, params mo
 	// Build filter
 	filter := bson.M{}
 	if params.Name != "" {
+		// $regex does NOT respect collection collation (MongoDB limitation),
+		// so we must explicitly request case-insensitive matching.
 		filter["name"] = bson.M{"$regex": params.Name, "$options": "i"}
 	}
 	if params.IsPublic != nil {
@@ -270,6 +281,9 @@ func (r *DashboardRepository) ListWithDatasources(ctx context.Context, params mo
 	}
 	if params.ChartID != "" {
 		filter["panels.chart_id"] = params.ChartID
+	}
+	if len(params.Tags) > 0 {
+		filter["tags"] = bson.M{"$in": params.Tags}
 	}
 
 	// Count total documents (without aggregation for performance)
@@ -389,6 +403,7 @@ func (r *DashboardRepository) ListWithDatasources(ctx context.Context, params mo
 			{Key: "description", Value: 1},
 			{Key: "thumbnail", Value: 1},
 			{Key: "settings", Value: 1},
+			{Key: "tags", Value: 1},
 			{Key: "panel_count", Value: bson.D{{Key: "$size", Value: bson.D{{Key: "$ifNull", Value: bson.A{"$panels", bson.A{}}}}}}},
 			{Key: "datasource_names", Value: "$matched_datasources.name"},
 			{Key: "created", Value: 1},

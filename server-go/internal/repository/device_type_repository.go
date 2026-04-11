@@ -35,6 +35,12 @@ func (r *DeviceTypeRepository) CreateIndexes(ctx context.Context) error {
 		{Keys: bson.D{{Key: "name", Value: 1}}},
 		{Keys: bson.D{{Key: "supported_types", Value: 1}}},
 		{Keys: bson.D{{Key: "updated", Value: -1}}},
+		// List page compound: sort by (is_built_in DESC, name ASC) matches
+		// the List handler's exact sort pattern.
+		{Keys: bson.D{
+			{Key: "is_built_in", Value: -1},
+			{Key: "name", Value: 1},
+		}},
 	}
 
 	_, err := r.collection.Indexes().CreateMany(ctx, indexes)

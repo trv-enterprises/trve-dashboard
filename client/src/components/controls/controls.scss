@@ -690,8 +690,65 @@
   50%      { opacity: 0.35; }
 }
 
-.tile-garage-door-pulse {
+.garage-door-pulse {
   animation: gd-pulse 1.8s ease-in-out infinite;
+}
+
+// Full-size garage door control — renders a large door illustration
+// centered in its panel with a label strip below it. State is read-only
+// from an MQTT contact sensor (same source as TileGarageDoor).
+.control-garage-door {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 12px;
+  gap: 12px;
+  box-sizing: border-box;
+
+  &__svg-wrapper {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    width: 100%;
+  }
+
+  &__svg {
+    max-width: 100%;
+    max-height: 100%;
+    height: auto;
+  }
+
+  &__footer {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+    width: 100%;
+  }
+
+  &__name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--cds-text-primary);
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  &__state {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    font-family: 'IBM Plex Mono', monospace;
+  }
 }
 
 // Tile renderer overrides — no padding, no title

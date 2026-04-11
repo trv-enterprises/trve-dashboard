@@ -240,6 +240,23 @@
           transform: translateY(-50%) rotate(-90deg) !important;
         }
       }
+
+      // Fit-mode dropdown trigger: Carbon hard-codes overflow-menu icons
+      // to 16×16 via .cds--overflow-menu__icon, which makes the trigger
+      // look smaller than the neighboring IconButton toolbar controls.
+      // 22px makes it read as equally prominent or slightly bolder than
+      // the surrounding 20px icons, matching the user's preference.
+      .fit-mode-menu {
+        .cds--overflow-menu__icon {
+          block-size: 22px;
+          inline-size: 22px;
+        }
+        svg {
+          block-size: 22px;
+          inline-size: 22px;
+        }
+      }
+
     }
   }
 
@@ -248,11 +265,71 @@
     min-height: 0; // Required for flex overflow to work
     height: 0; // Force flex to control height, not content
     padding: spacing.$spacing-02; // Match grid gap for consistent outer spacing
-    overflow: auto; // THIS is the only scrolling element
+    overflow: auto; // Default: both-axis scroll (used by "actual" mode)
     background-color: var(--cds-background);
 
-    &.fit-to-screen {
-      overflow: hidden; // No scrollbars — everything fits via scale transform
+    // "actual" mode — no scale, native pixels, scroll in both axes.
+    // "edit" mode — uses manual zoom, behaves like actual here.
+    &.fit-mode-actual,
+    &.fit-mode-edit {
+      overflow: auto;
+    }
+
+    // "window" mode — uniform scale, center the scaled grid in the container.
+    // The inner .dashboard-grid-scale-wrapper has an explicit width/height
+    // matching the post-scale size (set inline from fitTransform.scaledW/H),
+    // so flex centering can position it correctly.
+    &.fit-mode-window {
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    // "width" mode — scale fills width, vertical scroll when content
+    // overflows. Auto-hide the scrollbar so it only shows on mouse hover
+    // over the container.
+    &.fit-mode-width {
+      overflow-x: hidden;
+      overflow-y: auto;
+
+      // Firefox
+      scrollbar-width: thin;
+      scrollbar-color: transparent transparent;
+      transition: scrollbar-color 150ms;
+
+      &:hover {
+        scrollbar-color: var(--cds-icon-secondary) transparent;
+      }
+
+      // Webkit (Chrome/Safari/Edge)
+      &::-webkit-scrollbar {
+        width: 8px;
+      }
+      &::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: transparent;
+        border-radius: 4px;
+        transition: background 150ms;
+      }
+      &:hover::-webkit-scrollbar-thumb {
+        background: var(--cds-icon-secondary);
+      }
+    }
+
+    // "stretch" mode — legacy fill-both-axes behavior. Distorts round charts.
+    // Kept for back-compat with users who liked the old fit-to-screen toggle.
+    &.fit-mode-stretch {
+      overflow: hidden;
+    }
+
+    // Wrapper that reserves post-scale size for flex centering and scroll.
+    // In "actual"/"edit" modes it has no explicit dimensions and flows at
+    // native size; in the other modes the inline style sets width/height.
+    .dashboard-grid-scale-wrapper {
+      flex-shrink: 0;
     }
 
     .dashboard-grid {
@@ -709,5 +786,25 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+// "Stretch to fill" menu item: label on the left, info icon on the right
+// that shows a native browser tooltip on hover explaining the distortion
+// caveat. This rule is at global scope (not under .dashboard-viewer-page)
+// because Carbon's OverflowMenu renders its items in a portal appended to
+// document.body, outside the page component's DOM subtree.
+.fit-mode-item-with-info {
+  display: inline-flex;
+  align-items: center;
+  gap: spacing.$spacing-03;
+  width: 100%;
+
+  .fit-mode-info-icon {
+    flex-shrink: 0;
+    block-size: 14px;
+    inline-size: 14px;
+    color: var(--cds-icon-secondary);
+    cursor: help;
   }
 }

@@ -363,4 +363,9 @@ Every code change increments the build number in `client/build.json`. Current bu
 
 ## License
 
-Apache 2.0
+Apache 2.0 — see [LICENSE](LICENSE).
+
+## Acknowledgements
+
+This project bundles third-party assets. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)
+for full attribution and license texts.

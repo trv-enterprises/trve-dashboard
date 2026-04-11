@@ -60,7 +60,7 @@ func (s *DatasourceService) CreateDatasource(ctx context.Context, req *models.Cr
 		Description: req.Description,
 		Type:        req.Type,
 		Config:      req.Config,
-		Tags:        req.Tags,
+		Tags:        models.NormalizeTags(req.Tags),
 		MaskSecrets: maskSecrets,
 		Health: models.HealthInfo{
 			Status: models.HealthStatusUnknown,
@@ -130,6 +130,22 @@ func (s *DatasourceService) ListDatasourcesByType(ctx context.Context, dsType mo
 	return datasources, total, nil
 }
 
+// ListDatasourcesFiltered retrieves datasources with optional type and tag
+// filters. Tags are OR-matched; normalized before the query.
+func (s *DatasourceService) ListDatasourcesFiltered(ctx context.Context, typeFilter string, tags []string, limit, offset int64) ([]*models.Datasource, int64, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if len(tags) > 0 {
+		tags = models.NormalizeTags(tags)
+	}
+
+	return s.repo.List(ctx, typeFilter, tags, limit, offset)
+}
+
 // UpdateDatasource updates an existing datasource
 func (s *DatasourceService) UpdateDatasource(ctx context.Context, id string, req *models.UpdateDatasourceRequest) (*models.Datasource, error) {
 	// Get existing datasource
@@ -176,7 +192,7 @@ func (s *DatasourceService) UpdateDatasource(ctx context.Context, id string, req
 	}
 
 	if req.Tags != nil {
-		datasource.Tags = req.Tags
+		datasource.Tags = models.NormalizeTags(req.Tags)
 	}
 
 	if err := s.repo.Update(ctx, id, datasource); err != nil {
@@ -248,6 +264,17 @@ func preserveSecrets(newConfig, existingConfig *models.DatasourceConfig) {
 	}
 }
 
+// resolveMaskedSecrets looks up an existing connection by ID and replaces any
+// masked secret values ("********") in the test request with the real values from DB.
+// This allows testing with current form values without exposing secrets to the frontend.
+func (s *DatasourceService) resolveMaskedSecrets(ctx context.Context, req *models.TestDatasourceRequest) {
+	existing, err := s.repo.FindByID(ctx, req.ID)
+	if err != nil || existing == nil {
+		return
+	}
+	preserveSecrets(&req.Config, &existing.Config)
+}
+
 // DeleteDatasource deletes a datasource by ID
 func (s *DatasourceService) DeleteDatasource(ctx context.Context, id string) error {
 	// Check if datasource exists
@@ -268,6 +295,11 @@ func (s *DatasourceService) DeleteDatasource(ctx context.Context, id string) err
 
 // TestDatasource tests a datasource connection without saving
 func (s *DatasourceService) TestDatasource(ctx context.Context, req *models.TestDatasourceRequest) (*models.TestDatasourceResponse, error) {
+	// If an existing connection ID is provided, resolve any masked secrets from DB
+	if req.ID != "" {
+		s.resolveMaskedSecrets(ctx, req)
+	}
+
 	if err := s.validateConfig(req.Type, req.Config); err != nil {
 		return &models.TestDatasourceResponse{
 			Success: false,
@@ -653,7 +685,12 @@ func (s *DatasourceService) testAPIConnection(ctx context.Context, config *model
 
 // testFileConnection tests a CSV file datasource
 func (s *DatasourceService) testFileConnection(config *models.CSVConfig) *models.TestDatasourceResponse {
-	// Check if file exists
+	// Handle HTTP/HTTPS URLs
+	if strings.HasPrefix(config.Path, "http://") || strings.HasPrefix(config.Path, "https://") {
+		return s.testCSVURLConnection(config)
+	}
+
+	// Local file path handling
 	info, err := os.Stat(config.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -670,7 +707,6 @@ func (s *DatasourceService) testFileConnection(config *models.CSVConfig) *models
 		}
 	}
 
-	// Check if it's a regular file
 	if info.IsDir() {
 		return &models.TestDatasourceResponse{
 			Success: false,
@@ -679,7 +715,6 @@ func (s *DatasourceService) testFileConnection(config *models.CSVConfig) *models
 		}
 	}
 
-	// Check file extension is CSV
 	ext := strings.TrimPrefix(filepath.Ext(config.Path), ".")
 	if ext != "csv" {
 		return &models.TestDatasourceResponse{
@@ -689,7 +724,6 @@ func (s *DatasourceService) testFileConnection(config *models.CSVConfig) *models
 		}
 	}
 
-	// Try to open and read first few bytes
 	file, err := os.Open(config.Path)
 	if err != nil {
 		return &models.TestDatasourceResponse{
@@ -700,7 +734,6 @@ func (s *DatasourceService) testFileConnection(config *models.CSVConfig) *models
 	}
 	defer file.Close()
 
-	// Try reading first 1KB to verify readability
 	buffer := make([]byte, 1024)
 	_, err = file.Read(buffer)
 	if err != nil && err != io.EOF {
@@ -715,6 +748,52 @@ func (s *DatasourceService) testFileConnection(config *models.CSVConfig) *models
 		Success: true,
 		Status:  models.HealthStatusHealthy,
 		Message: fmt.Sprintf("File accessible (size: %d bytes)", info.Size()),
+	}
+}
+
+// testCSVURLConnection tests a CSV file served over HTTP/HTTPS
+func (s *DatasourceService) testCSVURLConnection(config *models.CSVConfig) *models.TestDatasourceResponse {
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(config.Path)
+	if err != nil {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Failed to fetch CSV from URL: %v", err),
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("HTTP %d: %s", resp.StatusCode, resp.Status),
+		}
+	}
+
+	// Read first 1KB to verify it's readable CSV content
+	buffer := make([]byte, 1024)
+	n, err := resp.Body.Read(buffer)
+	if err != nil && err != io.EOF {
+		return &models.TestDatasourceResponse{
+			Success: false,
+			Status:  models.HealthStatusUnhealthy,
+			Message: fmt.Sprintf("Cannot read response body: %v", err),
+		}
+	}
+
+	size := "unknown"
+	if resp.ContentLength > 0 {
+		size = fmt.Sprintf("%d bytes", resp.ContentLength)
+	} else {
+		size = fmt.Sprintf("%d+ bytes", n)
+	}
+
+	return &models.TestDatasourceResponse{
+		Success: true,
+		Status:  models.HealthStatusHealthy,
+		Message: fmt.Sprintf("URL accessible (size: %s)", size),
 	}
 }
 

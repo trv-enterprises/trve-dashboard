@@ -596,6 +596,9 @@ type TestDatasourceRequest struct {
 	// LEGACY: Keep for backwards compatibility
 	Type   DatasourceType   `json:"type,omitempty"`
 	Config DatasourceConfig `json:"config,omitempty"`
+
+	// Optional: existing connection ID to resolve masked secrets from DB
+	ID string `json:"id,omitempty"`
 }
 
 // TestDatasourceResponse represents response from testing a data source

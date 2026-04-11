@@ -39,6 +39,7 @@ import ChartDeleteDialog from '../components/ChartDeleteDialog';
 import CreateMenu from '../components/CreateMenu';
 import ComponentPickerModal from '../components/ComponentPickerModal';
 import AIPreflightModal from '../components/AIPreflightModal';
+import TagFilter from '../components/shared/TagFilter';
 import './ChartsListPage.scss';
 
 /**
@@ -71,6 +72,7 @@ function ChartsListPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [aiPreflightOpen, setAiPreflightOpen] = useState(false);
   const [connectionFilter, setConnectionFilter] = useState(savedFilters.ds || 'all'); // 'all' or connection id
+  const [tagFilter, setTagFilter] = useState(savedFilters.tags || []); // array of tag names
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);
   const [collapsedTypes, setCollapsedTypes] = useState(new Set(['display', 'control'])); // Display and Control start collapsed
   const typeFilterRef = useRef(null); // Ref for click-outside detection
@@ -243,9 +245,10 @@ function ChartsListPage() {
       sortDir: sortDirection,
       view: viewMode,
       ds: connectionFilter,
-      types: selectedTypes !== null && selectedTypes.size > 0 ? Array.from(selectedTypes).join(',') : ''
+      types: selectedTypes !== null && selectedTypes.size > 0 ? Array.from(selectedTypes).join(',') : '',
+      tags: tagFilter
     });
-  }, [searchTerm, sortKey, sortDirection, viewMode, connectionFilter, selectedTypes]);
+  }, [searchTerm, sortKey, sortDirection, viewMode, connectionFilter, selectedTypes, tagFilter]);
 
   // Close type filter popover when clicking outside
   useEffect(() => {
@@ -463,6 +466,14 @@ function ChartsListPage() {
       result = result.filter(item => (item.connection_id || item.datasource_id) === connectionFilter);
     }
 
+    // Filter by tags (OR semantics)
+    if (tagFilter.length > 0) {
+      result = result.filter(chart => {
+        const chartTags = chart.tags || [];
+        return tagFilter.some(t => chartTags.includes(t));
+      });
+    }
+
     // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -514,7 +525,7 @@ function ChartsListPage() {
     });
 
     return result;
-  }, [charts, connections, dashboardCounts, searchTerm, sortKey, sortDirection, selectedTypes, connectionFilter]);
+  }, [charts, connections, dashboardCounts, searchTerm, sortKey, sortDirection, selectedTypes, connectionFilter, tagFilter]);
 
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
@@ -668,6 +679,11 @@ function ChartsListPage() {
             }}
             size="md"
           />
+          <TagFilter
+            entityType="components"
+            selected={tagFilter}
+            onChange={setTagFilter}
+          />
           <ContentSwitcher
             onChange={(e) => setViewMode(e.name)}
             selectedIndex={viewMode === 'list' ? 0 : 1}
@@ -734,6 +750,21 @@ function ChartsListPage() {
                               ? (chart.version > 0 ? `DRAFT (v${chart.version} saved)` : 'DRAFT')
                               : `V${chart.version || 0}`}
                           </Tag>
+                          {(chart.tags || []).map((t) => (
+                            <Tag
+                              key={`ct-${t}`}
+                              type="cyan"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!tagFilter.includes(t)) setTagFilter([...tagFilter, t]);
+                              }}
+                              title={`Filter by ${t}`}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              {t}
+                            </Tag>
+                          ))}
                         </div>
                       </div>
 
@@ -842,6 +873,33 @@ function ChartsListPage() {
                           className="clickable-row"
                         >
                           {row.cells.map((cell) => {
+                            if (cell.info.header === 'name') {
+                              const chartTags = chart?.tags || [];
+                              return (
+                                <TableCell key={cell.id} className="name-cell">
+                                  <div className="name-cell__name">{cell.value}</div>
+                                  {chartTags.length > 0 && (
+                                    <div className="name-cell__tags">
+                                      {chartTags.map((t) => (
+                                        <Tag
+                                          key={t}
+                                          type="cyan"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (!tagFilter.includes(t)) setTagFilter([...tagFilter, t]);
+                                          }}
+                                          title={`Filter by ${t}`}
+                                          style={{ cursor: 'pointer' }}
+                                        >
+                                          {t}
+                                        </Tag>
+                                      ))}
+                                    </div>
+                                  )}
+                                </TableCell>
+                              );
+                            }
                             if (cell.info.header === 'component_type') {
                               const tagType = cell.value === 'control' ? 'purple' : cell.value === 'display' ? 'teal' : 'blue';
                               const tagLabel = cell.value === 'control' ? 'CONTROL' : cell.value === 'display' ? 'DISPLAY' : 'CHART';

@@ -20,6 +20,30 @@ const API_BASE_URL = getApiBaseUrl();
 export const API_BASE = API_BASE_URL;
 
 /**
+ * Build a URLSearchParams string from a filters object, handling array
+ * values (like `tags`) by repeating the parameter. Empty strings, null,
+ * and undefined values are dropped.
+ *
+ *   buildListParams({ type: 'sql', tags: ['home', 'sensors'] })
+ *   // → "type=sql&tags=home&tags=sensors"
+ */
+function buildListParams(filters = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item !== null && item !== undefined && item !== '') {
+          params.append(key, item);
+        }
+      });
+    } else if (value !== null && value !== undefined && value !== '') {
+      params.append(key, value);
+    }
+  });
+  return params.toString();
+}
+
+/**
  * API Client for Dashboard Server
  */
 class APIClient {
@@ -118,7 +142,7 @@ class APIClient {
 
   // Chart endpoints
   async getCharts(filters = {}) {
-    const params = new URLSearchParams({ page_size: 1000, ...filters });
+    const params = buildListParams({ page_size: 1000, ...filters });
     return this.request(`/api/charts?${params}`);
   }
 
@@ -181,7 +205,7 @@ class APIClient {
 
   // Dashboard endpoints
   async getDashboards(filters = {}) {
-    const params = new URLSearchParams(filters);
+    const params = buildListParams(filters);
     return this.request(`/api/dashboards?${params}`);
   }
 
@@ -211,7 +235,7 @@ class APIClient {
 
   // Connection endpoints (new terminology - preferred)
   async getConnections(filters = {}) {
-    const params = new URLSearchParams(filters);
+    const params = buildListParams(filters);
     return this.request(`/api/connections?${params}`);
   }
 
@@ -250,10 +274,14 @@ class APIClient {
     });
   }
 
-  async testConnection(type, config) {
+  async testConnection(type, config, id = null) {
+    const payload = { type, config };
+    if (id) {
+      payload.id = id;
+    }
     return this.request('/api/connections/test', {
       method: 'POST',
-      body: JSON.stringify({ type, config }),
+      body: JSON.stringify(payload),
     });
   }
 
@@ -408,6 +436,34 @@ class APIClient {
 
   async getFrigateEvents(connectionId, camera, limit = 10) {
     return this.request(`/api/frigate/${connectionId}/events/${encodeURIComponent(camera)}?limit=${limit}`);
+  }
+
+  /**
+   * Fetch Frigate review segments (the "reviewed/unreviewed" queue).
+   * Defaults to unreviewed alerts. Pass `reviewed: 1` to include reviewed.
+   *
+   * @param {string} connectionId Frigate connection
+   * @param {object} opts
+   * @param {number} [opts.limit=20] Max segments to return
+   * @param {string} [opts.camera] Camera name filter
+   * @param {string} [opts.severity] 'alert' | 'detection'
+   * @param {number} [opts.reviewed=0] 0 for unreviewed only, 1 to include reviewed
+   */
+  async getFrigateReviews(connectionId, opts = {}) {
+    const params = new URLSearchParams();
+    params.append('limit', String(opts.limit ?? 20));
+    params.append('reviewed', String(opts.reviewed ?? 0));
+    if (opts.camera) params.append('camera', opts.camera);
+    if (opts.severity) params.append('severity', opts.severity);
+    return this.request(`/api/frigate/${connectionId}/reviews?${params}`);
+  }
+
+  getFrigateReviewThumbnailUrl(connectionId, reviewId) {
+    return `${this.baseURL}/api/frigate/${connectionId}/review/${encodeURIComponent(reviewId)}/thumbnail`;
+  }
+
+  getFrigateReviewClipUrl(connectionId, reviewId) {
+    return `${this.baseURL}/api/frigate/${connectionId}/review/${encodeURIComponent(reviewId)}/clip`;
   }
 
   getFrigateEventClipUrl(connectionId, eventId) {
@@ -615,6 +671,11 @@ class APIClient {
     return this.request(`/api/users/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // Tags endpoint (shared pool across connections/components/dashboards)
+  async getAllTags() {
+    return this.request('/api/tags');
   }
 
   // Settings endpoints

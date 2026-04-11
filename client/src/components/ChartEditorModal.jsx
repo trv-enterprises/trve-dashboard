@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Modal } from '@carbon/react';
 import ChartEditor from './ChartEditor';
 import apiClient from '../api/client';
+import { invalidateTagsCache } from './shared/tagsApi';
 import './ChartEditorModal.scss';
 
 /**
@@ -53,6 +54,10 @@ function ChartEditorModal({ open, onClose, onSave, chart, panelId }) {
         // Create new chart
         savedChart = await apiClient.createChart(payloadWithThumbnail);
       }
+
+      // Drop the shared tag cache so the next TagInput/TagFilter mount
+      // sees any newly-added tags.
+      invalidateTagsCache();
 
       // Return the saved chart with panel_id for dashboard to link
       await onSave({

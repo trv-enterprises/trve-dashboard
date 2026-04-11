@@ -65,7 +65,7 @@ func (s *ChartService) CreateChart(ctx context.Context, req *models.CreateChartR
 		UseCustomCode: req.UseCustomCode,
 		Options:       req.Options,
 		Thumbnail:     req.Thumbnail,
-		Tags:          req.Tags,
+		Tags:          models.NormalizeTags(req.Tags),
 	}
 
 	if err := s.repo.Create(ctx, chart); err != nil {
@@ -165,6 +165,16 @@ func (s *ChartService) ListCharts(ctx context.Context, params models.ChartQueryP
 		params.PageSize = 20
 	}
 
+	// Back-compat: backfill the deprecated single-value Tag param into Tags
+	// so the repository only deals with the slice form.
+	if len(params.Tags) == 0 && params.Tag != "" {
+		params.Tags = []string{params.Tag}
+	}
+	// Normalize filter tags to match how they're stored.
+	if len(params.Tags) > 0 {
+		params.Tags = models.NormalizeTags(params.Tags)
+	}
+
 	charts, total, err := s.repo.FindAllLatest(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("error listing charts: %w", err)
@@ -248,7 +258,7 @@ func (s *ChartService) UpdateChart(ctx context.Context, id string, req *models.U
 		chart.Thumbnail = *req.Thumbnail
 	}
 	if req.Tags != nil {
-		chart.Tags = *req.Tags
+		chart.Tags = models.NormalizeTags(*req.Tags)
 	}
 
 	// Update in place (same version)

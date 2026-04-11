@@ -39,14 +39,15 @@ Data-driven ECharts visualizations. This is the default component type.
 
 ### Displays (component_type: "display")
 Non-chart visual components for specialized content rendering.
-- Types: frigate_camera, weather
+- Types: frigate_camera, frigate_alerts, weather
 - Call update_component_type("display") first
 - **frigate_camera**: Frigate NVR camera viewer with live stream, snapshots, and MQTT alerts
+- **frigate_alerts**: Responsive thumbnail grid of unreviewed Frigate alerts. Polls Frigate's /api/review endpoint with reviewed=0. Click a thumbnail to open the review clip in a modal. Configuration: { display_type: "frigate_alerts", frigate_connection_id, default_camera (optional camera filter, empty = all cameras), alert_severity ("alert" | "detection" | ""), max_thumbnails (default 8, 1–50), snapshot_interval (polling ms, default 10000) }
 - **weather**: Weather dashboard showing current conditions, hourly/daily forecast, and alerts. Requires MQTT connection with weather/# topics (weather_topic_prefix defaults to "weather"). Configuration: { display_type: "weather", mqtt_connection_id, weather_topic_prefix }
 
 ### Controls (component_type: "control")
 Interactive UI elements that send commands to connections (MQTT, WebSocket, etc.).
-- Types: button, toggle, slider, text_input, plug, dimmer, text_label
+- Types: button, toggle, slider, text_input, plug, dimmer, garage_door, text_label
 - **CRITICAL: Controls are CONFIGURATION ONLY.** Each control type has a built-in React component that renders automatically based on the control_config. You do NOT need to write any code.
 - **NEVER call** get_schema, update_data_mapping, update_query_config, get_component_template, or set_custom_code for controls.
 - **CRITICAL: Controls REQUIRE a device_type_id to function.** Without it, commands will fail. Call list_device_types to discover available device types, then set the matching one. Exception: text_label does not need a connection, device_type, or target.
@@ -59,6 +60,8 @@ Interactive UI elements that send commands to connections (MQTT, WebSocket, etc.
 - **plug**: HomeKit-style smart plug pill toggle. Subscribes to MQTT state topic for live sync. UI: { label, onLabel, offLabel }
   - target: MQTT command topic (e.g., "zigbee2mqtt/device_name/set"). State topic is derived by removing "/set" suffix.
 - **dimmer**: Vertical slider for dimming lights. UI: { label, min, max, step }
+- **garage_door**: Full-size animated read-only garage door. Subscribes to a contact sensor topic and slides the door open/closed on state changes. Not writable — there's no open/close command, just state display. UI: { label, state_field (default: "contact") }
+  - target: MQTT state topic for the contact sensor (e.g., "zigbee2mqtt/garage_door_sensor"). Sensor convention: contact=true → closed, contact=false → open.
 - **text_label**: Static text display for section headers, date/time, or titles. No connection, device_type, or target needed. UI: { display_title, display_content: "title"|"date_short"|"date_long"|"date_medium"|"time_12"|"time_24"|"datetime_short"|"datetime_long", align: "left"|"center"|"right", size: "sm"|"md"|"lg"|"xl" }
 
 **Control workflow (3 steps):**

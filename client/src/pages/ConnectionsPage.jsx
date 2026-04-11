@@ -30,6 +30,7 @@ import {
 } from '@carbon/react';
 import { TrashCan, DataBase, List, Grid, Edit, Information, Sql, Api, Document, NetworkEnterprise, ChartLineSmooth } from '@carbon/icons-react';
 import apiClient from '../api/client';
+import TagFilter from '../components/shared/TagFilter';
 import './ConnectionsPage.scss';
 
 /**
@@ -56,6 +57,7 @@ function ConnectionsPage() {
   const [sortDirection, setSortDirection] = useState(savedFilters.sortDir || 'asc');
   const [viewMode, setViewMode] = useState(savedFilters.view || 'list'); // 'list' or 'tile'
   const [typeFilter, setTypeFilter] = useState(savedFilters.type || 'all'); // 'all' or specific type
+  const [tagFilter, setTagFilter] = useState(savedFilters.tags || []); // array of tag names
 
   // Save filters to session store when they change
   useEffect(() => {
@@ -64,9 +66,10 @@ function ConnectionsPage() {
       sortKey,
       sortDir: sortDirection,
       view: viewMode,
-      type: typeFilter
+      type: typeFilter,
+      tags: tagFilter
     });
-  }, [searchTerm, sortKey, sortDirection, viewMode, typeFilter]);
+  }, [searchTerm, sortKey, sortDirection, viewMode, typeFilter, tagFilter]);
 
   // Connection types for filter dropdown
   const CONNECTION_TYPES = [
@@ -188,6 +191,14 @@ function ConnectionsPage() {
       result = result.filter(connection => connection.type?.toLowerCase() === typeFilter);
     }
 
+    // Filter by tags (OR semantics: match any selected tag)
+    if (tagFilter.length > 0) {
+      result = result.filter(connection => {
+        const connTags = connection.tags || [];
+        return tagFilter.some(t => connTags.includes(t));
+      });
+    }
+
     // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -226,12 +237,13 @@ function ConnectionsPage() {
     });
 
     return result;
-  }, [connections, chartCounts, searchTerm, sortKey, sortDirection, typeFilter]);
+  }, [connections, chartCounts, searchTerm, sortKey, sortDirection, typeFilter, tagFilter]);
 
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
     { key: 'type', header: 'Type', isSortable: true },
     { key: 'charts', header: 'Charts', isSortable: true },
+    { key: 'tags', header: 'Tags', isSortable: false },
     { key: 'description', header: 'Description', isSortable: false },
     { key: 'updated_at', header: 'Last modified', isSortable: true },
     { key: 'actions', header: '', isSortable: false }
@@ -242,6 +254,7 @@ function ConnectionsPage() {
     name: connection.name,
     type: connection.type,
     charts: chartCounts[connection.id] || 0,
+    tags: connection.tags || [],
     description: connection.description || '',
     updated_at: formatDate(connection.updated_at)
   }));
@@ -293,6 +306,11 @@ function ConnectionsPage() {
             selectedItem={CONNECTION_TYPES.find(t => t.id === typeFilter) || CONNECTION_TYPES[0]}
             onChange={({ selectedItem }) => setTypeFilter(selectedItem?.id || 'all')}
             size="md"
+          />
+          <TagFilter
+            entityType="connections"
+            selected={tagFilter}
+            onChange={setTagFilter}
           />
           <ContentSwitcher
             onChange={(e) => setViewMode(e.name)}
@@ -363,6 +381,21 @@ function ConnectionsPage() {
                         <Tag type={getTypeColor(connection.type)} size="sm">
                           {connection.type?.toUpperCase() || 'N/A'}
                         </Tag>
+                        {(connection.tags || []).map((t) => (
+                          <Tag
+                            key={t}
+                            type="blue"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!tagFilter.includes(t)) setTagFilter([...tagFilter, t]);
+                            }}
+                            title={`Filter by ${t}`}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            {t}
+                          </Tag>
+                        ))}
                       </div>
 
                       {chartCounts[connection.id] > 0 && (
@@ -458,6 +491,28 @@ function ConnectionsPage() {
                                   <Tag type={getTypeColor(cell.value)} size="md">
                                     {cell.value?.toUpperCase() || 'N/A'}
                                   </Tag>
+                                </TableCell>
+                              );
+                            }
+                            if (cell.info.header === 'tags') {
+                              const cellTags = Array.isArray(cell.value) ? cell.value : [];
+                              return (
+                                <TableCell key={cell.id} className="tags-cell">
+                                  {cellTags.map((t) => (
+                                    <Tag
+                                      key={t}
+                                      type="blue"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!tagFilter.includes(t)) setTagFilter([...tagFilter, t]);
+                                      }}
+                                      title={`Filter by ${t}`}
+                                      style={{ cursor: 'pointer' }}
+                                    >
+                                      {t}
+                                    </Tag>
+                                  ))}
                                 </TableCell>
                               );
                             }

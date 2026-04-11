@@ -65,9 +65,21 @@ func main() {
 	}
 	defer mongodb.Disconnect()
 
-	// Create indexes
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// Startup context for migrations and index creation.
+	// Longer timeout to accommodate one-time collation migration on first boot
+	// after deploy.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
+
+	// Run data migrations BEFORE creating indexes. The collation migration
+	// rebuilds collections, which drops any indexes that were created on the
+	// old collection; running indexes after migrations avoids wasted work and
+	// ensures new indexes inherit the collection's collation.
+	if err := database.RunMigrations(ctx, mongodb.Database); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+
+	// Create indexes for datasources + dashboards (managed via mongodb.go).
 	if err := mongodb.CreateIndexes(ctx); err != nil {
 		log.Fatalf("Failed to create MongoDB indexes: %v", err)
 	}
@@ -154,11 +166,6 @@ func main() {
 		log.Printf("Warning: Failed to create device indexes: %v", err)
 	}
 
-	// Run data migrations
-	if err := database.RunMigrations(ctx, mongodb.Database); err != nil {
-		log.Printf("Warning: Failed to run migrations: %v", err)
-	}
-
 	// Initialize services
 	datasourceService := service.NewDatasourceService(datasourceRepo)
 	chartService := service.NewChartService(chartRepo)
@@ -240,6 +247,7 @@ func main() {
 	deviceTypeHandler := handlers.NewDeviceTypeHandler(deviceTypeService)
 	deviceHandler := handlers.NewDeviceHandler(deviceService, deviceDiscoveryService)
 	statusHandler := handlers.NewStatusHandler(mongodb, streamManager)
+	tagHandler := handlers.NewTagHandler(mongodb.Database)
 
 	// Initialize auth middleware
 	authMiddleware := middleware.NewAuthMiddleware(userService)
@@ -372,6 +380,9 @@ func main() {
 			frigate.GET("/events/:camera", frigateHandler.GetEvents)
 			frigate.GET("/event/:event_id/clip", frigateHandler.GetEventClip)
 			frigate.GET("/event/:event_id/snapshot", frigateHandler.GetEventSnapshot)
+			frigate.GET("/reviews", frigateHandler.GetReviews)
+			frigate.GET("/review/:review_id/thumbnail", frigateHandler.GetReviewThumbnail)
+			frigate.GET("/review/:review_id/clip", frigateHandler.GetReviewClip)
 			frigate.GET("/info", frigateHandler.GetInfo)
 			frigate.GET("/live/:camera", frigateHandler.ProxyLiveStream)
 		}
@@ -438,6 +449,9 @@ func main() {
 
 		// Settings routes (new settings management system)
 		settingsHandler.RegisterRoutes(api)
+
+		// Tags routes (shared tag pool across connections/components/dashboards)
+		api.GET("/tags", tagHandler.ListTags)
 	}
 
 	// MCP routes (outside /api group)

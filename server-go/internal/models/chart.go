@@ -35,7 +35,8 @@ const (
 	ControlTypeTextInput = "text_input"  // Text input field
 	ControlTypeSwitch    = "switch"      // On/off switch (HomeKit-style pill)
 	ControlTypePlug      = "plug"        // Alias for switch (backward compat)
-	ControlTypeDimmer    = "dimmer"      // Light dimmer
+	ControlTypeDimmer     = "dimmer"      // Light dimmer
+	ControlTypeGarageDoor = "garage_door" // Full-size animated garage door status
 	ControlTypeTileSwitch     = "tile_switch"      // Compact tile switch
 	ControlTypeTilePlug       = "tile_plug"        // Alias for tile_switch (backward compat)
 	ControlTypeTileDimmer     = "tile_dimmer"      // Compact tile dimmer
@@ -70,14 +71,18 @@ type CommandConfig struct {
 // DisplayConfig defines configuration for display components
 // @Description Configuration for non-chart visual components (cameras, iframes, etc.)
 type DisplayConfig struct {
-	DisplayType string `json:"display_type" bson:"display_type"` // "frigate_camera", "weather"
+	DisplayType string `json:"display_type" bson:"display_type"` // "frigate_camera", "frigate_alerts", "weather"
 
-	// Frigate-specific fields (only used when display_type = "frigate_camera")
+	// Frigate-specific fields (used by frigate_camera and frigate_alerts)
 	FrigateConnectionID string `json:"frigate_connection_id,omitempty" bson:"frigate_connection_id,omitempty"` // API connection to Frigate NVR
-	DefaultCamera       string `json:"default_camera,omitempty" bson:"default_camera,omitempty"`               // Pre-selected camera name
+	DefaultCamera       string `json:"default_camera,omitempty" bson:"default_camera,omitempty"`               // Pre-selected camera name (frigate_camera) or camera filter (frigate_alerts)
 	MqttConnectionID    string `json:"mqtt_connection_id,omitempty" bson:"mqtt_connection_id,omitempty"`       // MQTT connection for alert/weather subscription
 	AlertTopic          string `json:"alert_topic,omitempty" bson:"alert_topic,omitempty"`                     // MQTT topic for alerts (default: "frigate/reviews")
 	SnapshotInterval    int    `json:"snapshot_interval,omitempty" bson:"snapshot_interval,omitempty"`          // Polling interval in ms (default 10000)
+
+	// Frigate alerts grid fields (only used when display_type = "frigate_alerts")
+	MaxThumbnails  int    `json:"max_thumbnails,omitempty" bson:"max_thumbnails,omitempty"`   // Max number of alert thumbnails to display (default 8)
+	AlertSeverity  string `json:"alert_severity,omitempty" bson:"alert_severity,omitempty"`   // Filter by severity: "alert" (default), "detection", or "" for all
 
 	// Weather-specific fields (only used when display_type = "weather")
 	WeatherTopicPrefix string `json:"weather_topic_prefix,omitempty" bson:"weather_topic_prefix,omitempty"` // MQTT topic prefix (default: "weather")
@@ -163,14 +168,15 @@ type ChartListResponse struct {
 // ChartQueryParams defines query parameters for listing charts
 // @Description Query parameters for filtering and pagination
 type ChartQueryParams struct {
-	Name          string `form:"name"`
-	ChartType     string `form:"chart_type"`
-	ComponentType string `form:"component_type"` // "chart", "control", "display"
-	Status        string `form:"status"`         // "draft", "final"
-	DatasourceID  string `form:"connection_id"`  // Accept connection_id query param
-	Tag           string `form:"tag"`
-	Page          int    `form:"page"`
-	PageSize      int    `form:"page_size"`
+	Name          string   `form:"name"`
+	ChartType     string   `form:"chart_type"`
+	ComponentType string   `form:"component_type"` // "chart", "control", "display"
+	Status        string   `form:"status"`         // "draft", "final"
+	DatasourceID  string   `form:"connection_id"`  // Accept connection_id query param
+	Tags          []string `form:"tags"`           // Filter charts with any of the given tags (OR)
+	Tag           string   `form:"tag"`            // DEPRECATED: use tags; kept for back-compat
+	Page          int      `form:"page"`
+	PageSize      int      `form:"page_size"`
 }
 
 // ChartSummary is a lightweight chart representation for card listings

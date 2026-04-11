@@ -67,6 +67,23 @@ func (r *ChartRepository) CreateIndexes(ctx context.Context) error {
 		{
 			Keys: bson.D{{Key: "status", Value: 1}},
 		},
+		// Compound filter+sort indexes for FindAllLatest list-page queries.
+		// Covers the common "filter by component+chart type, sort by updated"
+		// pattern used by the components list page.
+		{
+			Keys: bson.D{
+				{Key: "component_type", Value: 1},
+				{Key: "chart_type", Value: 1},
+				{Key: "updated", Value: -1},
+			},
+		},
+		// Covers "charts using connection X" queries with recency sort.
+		{
+			Keys: bson.D{
+				{Key: "datasource_id", Value: 1},
+				{Key: "updated", Value: -1},
+			},
+		},
 	}
 
 	_, err := r.collection.Indexes().CreateMany(ctx, indexes)
@@ -188,6 +205,8 @@ func (r *ChartRepository) FindAllLatest(ctx context.Context, params models.Chart
 	// Build match filter
 	matchFilter := bson.M{}
 	if params.Name != "" {
+		// $regex does NOT respect collection collation (MongoDB limitation),
+		// so we must explicitly request case-insensitive matching.
 		matchFilter["name"] = bson.M{"$regex": params.Name, "$options": "i"}
 	}
 	if params.ChartType != "" {
@@ -196,8 +215,10 @@ func (r *ChartRepository) FindAllLatest(ctx context.Context, params models.Chart
 	if params.DatasourceID != "" {
 		matchFilter["datasource_id"] = params.DatasourceID
 	}
-	if params.Tag != "" {
-		matchFilter["tags"] = params.Tag
+	// Tags filter (OR semantics). The service layer backfills params.Tags
+	// from the deprecated single-value params.Tag for back-compat.
+	if len(params.Tags) > 0 {
+		matchFilter["tags"] = bson.M{"$in": params.Tags}
 	}
 	if params.ComponentType != "" {
 		matchFilter["component_type"] = params.ComponentType

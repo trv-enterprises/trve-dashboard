@@ -234,6 +234,116 @@ func (h *FrigateHandler) GetEvents(c *gin.Context) {
 	io.Copy(c.Writer, resp.Body)
 }
 
+// GetReviews returns recent review segments filtered to unreviewed items by default.
+// Frigate's /api/review endpoint returns review segments — the per-camera "alert"
+// and "detection" groupings that the Frigate UI uses as the review queue. The
+// `reviewed` query param maps directly to the upstream Frigate parameter:
+//
+//	reviewed=0 (default here) → only items not yet marked as reviewed
+//	reviewed=1                → include reviewed items too
+//
+// @Summary Get camera review segments
+// @Description Returns Frigate review segments, defaulted to unreviewed alerts. Used by the Frigate Alerts widget.
+// @Tags Frigate
+// @Produce json
+// @Param connection_id path string true "Connection ID"
+// @Param limit query int false "Max reviews to return" default(20)
+// @Param camera query string false "Filter by camera name"
+// @Param severity query string false "Filter by severity (alert, detection)"
+// @Param reviewed query int false "Include reviewed (1) or only unreviewed (0)" default(0)
+// @Success 200 {array} map[string]interface{}
+// @Router /api/frigate/{connection_id}/reviews [get]
+func (h *FrigateHandler) GetReviews(c *gin.Context) {
+	baseURL, err := h.getFrigateBaseURL(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Build the upstream query string. Only forward params the Frigate
+	// review API actually understands to avoid confusing the upstream.
+	params := []string{}
+	params = append(params, "limit="+c.DefaultQuery("limit", "20"))
+	params = append(params, "reviewed="+c.DefaultQuery("reviewed", "0"))
+	if camera := c.Query("camera"); camera != "" {
+		params = append(params, "cameras="+camera)
+	}
+	if severity := c.Query("severity"); severity != "" {
+		params = append(params, "severity="+severity)
+	}
+
+	frigateURL := fmt.Sprintf("%s/api/review?%s", baseURL, strings.Join(params, "&"))
+
+	resp, err := h.httpClient.Get(frigateURL)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to reach Frigate: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	c.Status(resp.StatusCode)
+	c.Header("Content-Type", "application/json")
+	io.Copy(c.Writer, resp.Body)
+}
+
+// GetReviewThumbnail proxies a JPEG thumbnail for a review segment.
+// Frigate stores review thumbnails at /api/review/{review_id}/preview/thumbnail.jpg.
+// Some older Frigate versions use /api/review/{id}/thumbnail.jpg — we try the
+// preview path first and fall through on 404.
+//
+// @Summary Get review thumbnail
+// @Description Returns the JPEG thumbnail for a review segment
+// @Tags Frigate
+// @Produce image/jpeg
+// @Param connection_id path string true "Connection ID"
+// @Param review_id path string true "Review segment ID"
+// @Success 200 {file} binary
+// @Router /api/frigate/{connection_id}/review/{review_id}/thumbnail [get]
+func (h *FrigateHandler) GetReviewThumbnail(c *gin.Context) {
+	baseURL, err := h.getFrigateBaseURL(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	reviewID := c.Param("review_id")
+	if reviewID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "review_id is required"})
+		return
+	}
+
+	frigateURL := fmt.Sprintf("%s/api/review/%s/preview/thumbnail.jpg", baseURL, reviewID)
+	h.proxyBinary(c, frigateURL, "image/jpeg")
+}
+
+// GetReviewClip proxies an MP4 clip for a review segment.
+// Frigate review segments expose their clip at /api/review/{id}/preview.mp4.
+//
+// @Summary Get review clip
+// @Description Returns the MP4 preview clip for a review segment
+// @Tags Frigate
+// @Produce video/mp4
+// @Param connection_id path string true "Connection ID"
+// @Param review_id path string true "Review segment ID"
+// @Success 200 {file} binary
+// @Router /api/frigate/{connection_id}/review/{review_id}/clip [get]
+func (h *FrigateHandler) GetReviewClip(c *gin.Context) {
+	baseURL, err := h.getFrigateBaseURL(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	reviewID := c.Param("review_id")
+	if reviewID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "review_id is required"})
+		return
+	}
+
+	frigateURL := fmt.Sprintf("%s/api/review/%s/preview.mp4", baseURL, reviewID)
+	h.proxyBinary(c, frigateURL, "video/mp4")
+}
+
 // GetEventClip proxies an event clip MP4 from Frigate
 // @Summary Get event clip
 // @Description Returns the MP4 clip for a detection event (supports Range headers)

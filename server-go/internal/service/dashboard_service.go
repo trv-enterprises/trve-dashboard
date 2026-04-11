@@ -38,6 +38,9 @@ func (s *DashboardService) CreateDashboard(ctx context.Context, req *models.Crea
 		return nil, fmt.Errorf("dashboard with name '%s' already exists", req.Name)
 	}
 
+	// Normalize tags before persistence.
+	req.Tags = models.NormalizeTags(req.Tags)
+
 	dashboard, err := s.repo.Create(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dashboard: %w", err)
@@ -60,6 +63,10 @@ func (s *DashboardService) GetDashboard(ctx context.Context, id string) (*models
 
 // ListDashboards retrieves dashboards with filtering and pagination
 func (s *DashboardService) ListDashboards(ctx context.Context, params models.DashboardQueryParams) (*models.DashboardListResponse, error) {
+	// Normalize filter tags to match how they're stored.
+	if len(params.Tags) > 0 {
+		params.Tags = models.NormalizeTags(params.Tags)
+	}
 	dashboards, total, err := s.repo.List(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list dashboards: %w", err)
@@ -85,6 +92,10 @@ func (s *DashboardService) ListDashboards(ctx context.Context, params models.Das
 
 // ListDashboardsWithDatasources retrieves dashboard summaries with data source names
 func (s *DashboardService) ListDashboardsWithDatasources(ctx context.Context, params models.DashboardQueryParams) (*models.DashboardSummaryListResponse, error) {
+	// Normalize filter tags to match how they're stored.
+	if len(params.Tags) > 0 {
+		params.Tags = models.NormalizeTags(params.Tags)
+	}
 	summaries, total, err := s.repo.ListWithDatasources(ctx, params, s.db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list dashboards with datasources: %w", err)
@@ -128,6 +139,12 @@ func (s *DashboardService) UpdateDashboard(ctx context.Context, id string, req *
 		if duplicate != nil {
 			return nil, fmt.Errorf("dashboard with name '%s' already exists", *req.Name)
 		}
+	}
+
+	// Normalize tags if provided.
+	if req.Tags != nil {
+		normalized := models.NormalizeTags(*req.Tags)
+		req.Tags = &normalized
 	}
 
 	dashboard, err := s.repo.Update(ctx, id, req)

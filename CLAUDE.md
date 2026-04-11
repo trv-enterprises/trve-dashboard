@@ -10,11 +10,7 @@ This file provides context and guidance for AI assistants working on this projec
 - Build number helps track changes and ensures proper cache busting
 - Format: `{ "buildNumber": N }` where N is an integer
 
-### 2. Code Commit Standards
-- Don't mention "Claude" or "AI" in commit messages
-- Never include AI mentions in commits
-
-### 3. Terminology
+### 2. Terminology
 - Use "connection" (not "data source" or "datasource") for external data connections in UI text
 - Internal code can use `datasource` for backwards compatibility with existing database records
 - API endpoints: `/api/connections` is preferred, `/api/datasources` kept as deprecated alias
@@ -23,7 +19,7 @@ This file provides context and guidance for AI assistants working on this projec
 - Internal code uses `component_type: 'chart'` in DB for displays (backward compatibility), but UI shows "Display"
 - "Component" is the umbrella term for both displays and controls
 
-### 4. Full-Stack Awareness
+### 3. Full-Stack Awareness
 - **Always consider frontend impact**: When making backend changes (API endpoints, models, response formats), identify and implement the corresponding frontend changes (API client, components, forms, types).
 - Backend model changes typically require updates to:
   - `client/src/api/client.js` - API client methods
@@ -32,7 +28,7 @@ This file provides context and guidance for AI assistants working on this projec
   - Any TypeScript types or PropTypes if used
 - Don't leave the frontend out of sync with backend changes.
 
-### 5. Testing Reminder
+### 4. Testing Reminder
 - **Triggers**: Session start, server restart, or daylog write
 - **Action**: Immediately remind the user to test:
   - "Don't forget to test! Test plan: [docs/TEST_PLAN.md](docs/TEST_PLAN.md)"

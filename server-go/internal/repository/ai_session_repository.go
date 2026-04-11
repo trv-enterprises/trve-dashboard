@@ -51,6 +51,10 @@ func (r *AISessionRepository) CreateIndexes(ctx context.Context) error {
 			// Filter by status
 			Keys: bson.D{{Key: "status", Value: 1}},
 		},
+		{
+			// Compound: FindByChartID filters on (chart_id + status) together.
+			Keys: bson.D{{Key: "chart_id", Value: 1}, {Key: "status", Value: 1}},
+		},
 	}
 
 	_, err := r.collection.Indexes().CreateMany(ctx, indexes)

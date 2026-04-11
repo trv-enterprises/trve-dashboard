@@ -72,30 +72,22 @@ func (h *DatasourceHandler) CreateDatasource(c *gin.Context) {
 
 // ListDatasources handles datasource listing
 // @Summary List all datasources
-// @Description Retrieve all datasources with pagination and optional type filter
+// @Description Retrieve all datasources with pagination and optional type/tag filters
 // @Tags datasources
 // @Produce json
 // @Param limit query int false "Number of items per page" default(20)
 // @Param offset query int false "Number of items to skip" default(0)
 // @Param type query string false "Filter by datasource type (api, websocket, file)"
+// @Param tags query []string false "Filter by tags (OR semantics, repeat param)"
 // @Success 200 {object} map[string]interface{}
 // @Router /datasources [get]
 func (h *DatasourceHandler) ListDatasources(c *gin.Context) {
 	limit, _ := strconv.ParseInt(c.DefaultQuery("limit", "20"), 10, 64)
 	offset, _ := strconv.ParseInt(c.DefaultQuery("offset", "0"), 10, 64)
 	typeFilter := c.Query("type")
+	tags := c.QueryArray("tags")
 
-	var datasources []*models.Datasource
-	var total int64
-	var err error
-
-	if typeFilter != "" {
-		dsType := models.DatasourceType(typeFilter)
-		datasources, total, err = h.service.ListDatasourcesByType(c.Request.Context(), dsType, limit, offset)
-	} else {
-		datasources, total, err = h.service.ListDatasources(c.Request.Context(), limit, offset)
-	}
-
+	datasources, total, err := h.service.ListDatasourcesFiltered(c.Request.Context(), typeFilter, tags, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

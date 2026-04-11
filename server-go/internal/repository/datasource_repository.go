@@ -104,6 +104,47 @@ func (r *DatasourceRepository) FindByType(ctx context.Context, dsType models.Dat
 	return datasources, nil
 }
 
+// List retrieves datasources with optional type and tag filters, sorted by
+// created_at descending, with pagination. Tags are matched with OR semantics
+// via $in. Pass empty typeFilter ("") and nil/empty tags to get all
+// datasources.
+//
+// This is the preferred list method for UI-driven filtering. FindAll,
+// FindByType, and FindByTags are kept for back-compat with existing call
+// sites that pass a single filter.
+func (r *DatasourceRepository) List(ctx context.Context, typeFilter string, tags []string, limit, offset int64) ([]*models.Datasource, int64, error) {
+	filter := bson.M{}
+	if typeFilter != "" {
+		filter["type"] = typeFilter
+	}
+	if len(tags) > 0 {
+		filter["tags"] = bson.M{"$in": tags}
+	}
+
+	total, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	opts := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetLimit(limit).
+		SetSkip(offset)
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	var datasources []*models.Datasource
+	if err := cursor.All(ctx, &datasources); err != nil {
+		return nil, 0, err
+	}
+
+	return datasources, total, nil
+}
+
 // FindByTags retrieves datasources with any of the given tags
 func (r *DatasourceRepository) FindByTags(ctx context.Context, tags []string, limit, offset int64) ([]*models.Datasource, error) {
 	opts := options.Find().

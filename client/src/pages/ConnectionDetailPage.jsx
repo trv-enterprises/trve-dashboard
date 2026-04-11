@@ -25,6 +25,8 @@ import {
 } from '@carbon/react';
 import { Save, Close, TrashCan, Play, ConnectionSignal, Checkmark, ErrorFilled, ArrowLeft } from '@carbon/icons-react';
 import apiClient, { API_BASE } from '../api/client';
+import TagInput from '../components/shared/TagInput';
+import { invalidateTagsCache } from '../components/shared/tagsApi';
 import './ConnectionDetailPage.scss';
 
 /**
@@ -321,6 +323,7 @@ function ConnectionDetailPage() {
         await apiClient.updateConnection(id, payload);
       }
 
+      invalidateTagsCache();
       setHasChanges(false);
       setShowSaveModal(false);
       navigate('/design/connections');
@@ -352,20 +355,9 @@ function ConnectionDetailPage() {
 
     try {
       let result;
-      if (isCreateMode) {
-        // For new connections, test with the provided config
-        result = await apiClient.testConnection(type, config);
-      } else {
-        // For existing connections, use health check which fetches credentials from DB
-        const healthResult = await apiClient.checkConnectionHealth(id);
-        // Convert health response to test response format
-        result = {
-          success: healthResult.status === 'healthy',
-          status: healthResult.status,
-          message: healthResult.error_message || (healthResult.status === 'healthy' ? 'Connection successful' : 'Connection failed'),
-          response_time: healthResult.response_time
-        };
-      }
+      // Always test with current form values so unsaved changes are tested
+      const testConfig = prepareConfigForSave(config);
+      result = await apiClient.testConnection(type, testConfig, isCreateMode ? null : id);
       setTestResult(result);
 
       // For SQL connections, schema is included in the test response data
@@ -1471,6 +1463,19 @@ function ConnectionDetailPage() {
               setHasChanges(true);
             }}
             placeholder="Enter connection description"
+          />
+        </div>
+
+        {/* Tags */}
+        <div className="form-row">
+          <TagInput
+            id="connection-tags"
+            label="Tags"
+            value={tags}
+            onChange={(next) => {
+              setTags(next);
+              setHasChanges(true);
+            }}
           />
         </div>
 

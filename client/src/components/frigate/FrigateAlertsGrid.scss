@@ -1,0 +1,196 @@
+// Copyright (c) 2026 TRV Enterprises LLC
+// Licensed under Apache 2.0
+// See LICENSE file for details.
+
+@use '@carbon/react/scss/spacing' as spacing;
+
+.frigate-alerts-grid {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: spacing.$spacing-03;
+  box-sizing: border-box;
+  overflow: hidden;
+
+  &__error {
+    margin-bottom: spacing.$spacing-03;
+    flex: 0 0 auto;
+  }
+
+  &__loading,
+  &__empty,
+  &__message {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--cds-text-secondary);
+    font-size: 0.875rem;
+    padding: spacing.$spacing-05;
+  }
+
+  &__empty {
+    flex-direction: column;
+    gap: spacing.$spacing-02;
+  }
+
+  &__empty-title {
+    font-size: 1rem;
+    color: var(--cds-text-primary);
+    font-weight: 500;
+  }
+
+  &__empty-subtitle {
+    font-size: 0.8125rem;
+    color: var(--cds-text-secondary);
+  }
+
+  // Responsive tile grid. Auto-fit packs as many tiles as will fit at the
+  // minimum width (140px), then evenly distributes remaining space.
+  &__tiles {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-auto-rows: minmax(100px, auto);
+    gap: spacing.$spacing-03;
+    overflow-y: auto;
+    align-content: start;
+
+    // Auto-hide scrollbar (matches the rest of the app's convention)
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    &:hover {
+      scrollbar-color: var(--cds-icon-secondary) transparent;
+    }
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: transparent;
+      border-radius: 4px;
+      transition: background 150ms;
+    }
+    &:hover::-webkit-scrollbar-thumb {
+      background: var(--cds-icon-secondary);
+    }
+  }
+
+  &__tile {
+    position: relative;
+    display: block;
+    padding: 0;
+    background: var(--cds-layer-01, #262626);
+    border: 1px solid var(--cds-border-subtle, #393939);
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    aspect-ratio: 16 / 9;
+    min-height: 0;
+    transition: border-color 150ms ease, transform 150ms ease;
+
+    &:hover,
+    &:focus-visible {
+      border-color: var(--cds-border-strong, #6f6f6f);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    &:focus-visible {
+      box-shadow: 0 0 0 2px var(--cds-focus, #4589ff);
+    }
+  }
+
+  &__thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  &__overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: spacing.$spacing-04 spacing.$spacing-03 spacing.$spacing-03;
+    background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.8) 0%,
+      rgba(0, 0, 0, 0.4) 60%,
+      rgba(0, 0, 0, 0) 100%
+    );
+    color: #ffffff;
+    font-size: 0.75rem;
+    pointer-events: none;
+  }
+
+  &__camera {
+    font-weight: 500;
+    text-transform: capitalize;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 60%;
+  }
+
+  &__time {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6875rem;
+    color: #c6c6c6;
+  }
+
+  &__tags {
+    position: absolute;
+    top: spacing.$spacing-02;
+    left: spacing.$spacing-02;
+    display: flex;
+    gap: spacing.$spacing-02;
+    pointer-events: none;
+
+    .cds--tag {
+      margin: 0;
+    }
+  }
+
+  &__modal {
+    .cds--modal-container {
+      max-width: 80vw;
+    }
+  }
+
+  &__player {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-04;
+    align-items: center;
+  }
+
+  &__video {
+    width: 100%;
+    max-width: 100%;
+    max-height: 60vh;
+    background: #000;
+    display: block;
+  }
+
+  &__modal-image {
+    width: 100%;
+    max-height: 60vh;
+    object-fit: contain;
+    background: #000;
+    display: block;
+  }
+
+  &__modal-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: spacing.$spacing-02;
+    justify-content: center;
+  }
+}

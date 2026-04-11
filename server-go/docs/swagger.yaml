@@ -170,6 +170,11 @@ definitions:
         type: integer
       created:
         type: string
+      dashboard_id:
+        description: Auto-attach to this dashboard on save
+        type: string
+      expires_at:
+        type: string
       id:
         description: UUID
         type: string
@@ -178,6 +183,9 @@ definitions:
         items:
           $ref: '#/definitions/models.AIMessage'
         type: array
+      panel_id:
+        description: Auto-attach to this panel on save
+        type: string
       status:
         description: '"active" | "completed" | "cancelled"'
         type: string
@@ -309,6 +317,10 @@ definitions:
         description: How to map data to chart (charts only)
       description:
         type: string
+      display_config:
+        allOf:
+        - $ref: '#/definitions/models.DisplayConfig'
+        description: Display configuration (displays only)
       id:
         description: UUID - same across versions
         type: string
@@ -554,86 +566,20 @@ definitions:
       command_config:
         allOf:
         - $ref: '#/definitions/models.CommandConfig'
-        description: Legacy command configuration (deprecated, use schema instead)
+        description: Legacy command configuration (deprecated, use device type instead)
       control_type:
         description: button, toggle, slider, text_input
         type: string
-      schema_id:
-        description: Schema-based control configuration (preferred - Phase 3)
+      device_type_id:
+        description: Device type-based control configuration (preferred)
         type: string
       target:
-        description: Device/endpoint identifier for schema interpolation
+        description: Device/endpoint identifier for template interpolation
         type: string
       ui_config:
         additionalProperties: true
         description: UI configuration
         type: object
-    type: object
-  models.ControlSchema:
-    description: Schema that defines how controls communicate with connections
-    properties:
-      commands:
-        additionalProperties:
-          $ref: '#/definitions/models.CommandDef'
-        description: Command definitions keyed by control type
-        type: object
-      created:
-        type: string
-      description:
-        description: Schema description
-        type: string
-      id:
-        description: Unique identifier (e.g., "json-rpc-switch")
-        type: string
-      is_built_in:
-        description: True for system default schemas (cannot modify/delete)
-        type: boolean
-      metadata:
-        additionalProperties: true
-        description: Additional custom metadata
-        type: object
-      name:
-        description: Human-readable name
-        type: string
-      protocol_type:
-        description: Connection type this works with (e.g., "websocket-json", "mqtt",
-          "tcp-json")
-        type: string
-      response:
-        allOf:
-        - $ref: '#/definitions/models.ResponseDef'
-        description: How to parse responses (optional)
-      state_query:
-        allOf:
-        - $ref: '#/definitions/models.StateQueryDef'
-        description: How to query current state (optional)
-      supported_types:
-        description: Control UI types this schema supports (toggle, scalar, button,
-          text)
-        items:
-          type: string
-        type: array
-      updated:
-        type: string
-      version:
-        description: Schema version (e.g., "1.0")
-        type: string
-    required:
-    - name
-    type: object
-  models.ControlSchemaListResponse:
-    description: Response containing a list of control schemas
-    properties:
-      page:
-        type: integer
-      page_size:
-        type: integer
-      schemas:
-        items:
-          $ref: '#/definitions/models.ControlSchema'
-        type: array
-      total:
-        type: integer
     type: object
   models.CreateAISessionRequest:
     description: Request body for creating a new AI session
@@ -641,8 +587,27 @@ definitions:
       chart_id:
         description: Existing chart ID to edit (optional, omit for new chart)
         type: string
+      chart_type:
+        description: 'For charts: bar, line, pie, etc.'
+        type: string
+      component_type:
+        description: Pre-flight context (optional) - sets fields on the draft directly
+        type: string
+      connection_id:
+        description: Pre-selected connection ID
+        type: string
+      control_type:
+        description: 'For controls: button, toggle, slider, etc.'
+        type: string
+      dashboard_id:
+        description: Dashboard panel context (optional) - if set, saved component
+          is auto-attached to this panel
+        type: string
       initial_message:
         description: First user message (optional)
+        type: string
+      panel_id:
+        description: Panel within the dashboard
         type: string
     type: object
   models.CreateChartRequest:
@@ -663,6 +628,8 @@ definitions:
         $ref: '#/definitions/models.ChartDataMapping'
       description:
         type: string
+      display_config:
+        $ref: '#/definitions/models.DisplayConfig'
       name:
         type: string
       options:
@@ -683,53 +650,6 @@ definitions:
     required:
     - name
     type: object
-  models.CreateControlSchemaRequest:
-    description: Request body for creating a new control schema
-    properties:
-      commands:
-        additionalProperties:
-          $ref: '#/definitions/models.CommandDef'
-        description: Command definitions
-        type: object
-      description:
-        description: Schema description
-        type: string
-      id:
-        description: Unique identifier
-        type: string
-      metadata:
-        additionalProperties: true
-        description: Custom metadata
-        type: object
-      name:
-        description: Human-readable name
-        type: string
-      protocol_type:
-        description: Connection protocol type
-        type: string
-      response:
-        allOf:
-        - $ref: '#/definitions/models.ResponseDef'
-        description: Response parsing config
-      state_query:
-        allOf:
-        - $ref: '#/definitions/models.StateQueryDef'
-        description: State query config
-      supported_types:
-        description: Supported control types
-        items:
-          type: string
-        type: array
-      version:
-        description: Schema version
-        type: string
-    required:
-    - commands
-    - id
-    - name
-    - protocol_type
-    - supported_types
-    type: object
   models.CreateDashboardRequest:
     description: Request body for creating a new dashboard
     properties:
@@ -747,6 +667,10 @@ definitions:
         type: array
       settings:
         $ref: '#/definitions/models.DashboardSettings'
+      tags:
+        items:
+          type: string
+        type: array
     required:
     - name
     type: object
@@ -781,6 +705,76 @@ definitions:
         type: string
     required:
     - name
+    type: object
+  models.CreateDeviceRequest:
+    description: Request body for creating a new device
+    properties:
+      connection_id:
+        type: string
+      device_type_id:
+        type: string
+      enabled:
+        type: boolean
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      room:
+        type: string
+      state_topic:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      target:
+        type: string
+    required:
+    - connection_id
+    - device_type_id
+    - name
+    - target
+    type: object
+  models.CreateDeviceTypeRequest:
+    description: Request body for creating a new device type
+    properties:
+      capabilities:
+        items:
+          $ref: '#/definitions/models.DeviceCapability'
+        type: array
+      category:
+        type: string
+      commands:
+        additionalProperties:
+          $ref: '#/definitions/models.CommandDef'
+        type: object
+      description:
+        type: string
+      id:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      protocol:
+        type: string
+      response:
+        $ref: '#/definitions/models.ResponseDef'
+      state_query:
+        $ref: '#/definitions/models.StateQueryDef'
+      subtype:
+        type: string
+      supported_types:
+        items:
+          type: string
+        type: array
+    required:
+    - category
+    - id
+    - name
+    - protocol
     type: object
   models.CreateUserRequest:
     description: Request body for creating a new user
@@ -817,6 +811,11 @@ definitions:
         type: array
       settings:
         $ref: '#/definitions/models.DashboardSettings'
+      tags:
+        description: User-defined tags for filtering/grouping
+        items:
+          type: string
+        type: array
       thumbnail:
         description: Base64 encoded thumbnail image
         type: string
@@ -841,14 +840,19 @@ definitions:
     type: object
   models.DashboardPanel:
     description: Panel position and size in the grid with optional chart reference
+      or text config
     properties:
       chart_id:
-        description: Reference to chart
+        description: Reference to chart component
         type: string
       h:
         type: integer
       id:
         type: string
+      text_config:
+        allOf:
+        - $ref: '#/definitions/models.PanelTextConfig'
+        description: Native text panel config
       w:
         type: integer
       x:
@@ -897,6 +901,10 @@ definitions:
         type: integer
       settings:
         $ref: '#/definitions/models.DashboardSettings'
+      tags:
+        items:
+          type: string
+        type: array
       thumbnail:
         type: string
       updated:
@@ -998,6 +1006,10 @@ definitions:
         $ref: '#/definitions/models.CSVConfig'
       edgelake:
         $ref: '#/definitions/models.EdgeLakeConfig'
+      frigate:
+        $ref: '#/definitions/models.FrigateConfig'
+      mqtt:
+        $ref: '#/definitions/models.MQTTConfig'
       prometheus:
         $ref: '#/definitions/models.PrometheusConfig'
       socket:
@@ -1016,6 +1028,8 @@ definitions:
     - tsstore
     - prometheus
     - edgelake
+    - mqtt
+    - frigate
     type: string
     x-enum-varnames:
     - DatasourceTypeSQL
@@ -1025,6 +1039,201 @@ definitions:
     - DatasourceTypeTSStore
     - DatasourceTypePrometheus
     - DatasourceTypeEdgeLake
+    - DatasourceTypeMQTT
+    - DatasourceTypeFrigate
+  models.Device:
+    description: A specific device instance with connection and topic bindings
+    properties:
+      connection_id:
+        type: string
+      created:
+        type: string
+      device_type_id:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      room:
+        type: string
+      state_topic:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      target:
+        type: string
+      updated:
+        type: string
+    required:
+    - name
+    type: object
+  models.DeviceCapability:
+    description: A capability that a device type supports (e.g., state, brightness)
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      state_path:
+        description: JSONPath in state message
+        type: string
+      type:
+        description: '"binary", "numeric", "enum", "text"'
+        type: string
+      unit:
+        type: string
+      value_max:
+        type: number
+      value_min:
+        type: number
+      value_step:
+        type: number
+      values:
+        description: For enum type
+        items:
+          type: string
+        type: array
+    type: object
+  models.DeviceListResponse:
+    description: Response containing a list of devices
+    properties:
+      devices:
+        items:
+          $ref: '#/definitions/models.Device'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  models.DeviceType:
+    description: Template that defines a class of IoT device, its capabilities, and
+      command protocol
+    properties:
+      capabilities:
+        items:
+          $ref: '#/definitions/models.DeviceCapability'
+        type: array
+      category:
+        type: string
+      commands:
+        additionalProperties:
+          $ref: '#/definitions/models.CommandDef'
+        type: object
+      created:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_built_in:
+        type: boolean
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      protocol:
+        type: string
+      response:
+        $ref: '#/definitions/models.ResponseDef'
+      state_query:
+        $ref: '#/definitions/models.StateQueryDef'
+      subtype:
+        type: string
+      supported_types:
+        items:
+          type: string
+        type: array
+      updated:
+        type: string
+    required:
+    - name
+    type: object
+  models.DeviceTypeListResponse:
+    description: Response containing a list of device types
+    properties:
+      device_types:
+        items:
+          $ref: '#/definitions/models.DeviceType'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  models.DiscoverDevicesResponse:
+    description: Response from device discovery on a connection
+    properties:
+      devices:
+        items:
+          $ref: '#/definitions/models.DiscoveredDevice'
+        type: array
+      source:
+        type: string
+    type: object
+  models.DiscoveredDevice:
+    description: A device discovered from a bridge (e.g., Zigbee2MQTT)
+    properties:
+      already_imported:
+        type: boolean
+      capabilities:
+        items:
+          $ref: '#/definitions/models.DeviceCapability'
+        type: array
+      description:
+        type: string
+      friendly_name:
+        type: string
+      ieee_address:
+        type: string
+      model:
+        type: string
+      suggested_type_id:
+        type: string
+      vendor:
+        type: string
+    type: object
+  models.DisplayConfig:
+    description: Configuration for non-chart visual components (cameras, iframes,
+      etc.)
+    properties:
+      alert_topic:
+        description: 'MQTT topic for alerts (default: "frigate/reviews")'
+        type: string
+      default_camera:
+        description: Pre-selected camera name
+        type: string
+      display_type:
+        description: '"frigate_camera", "weather"'
+        type: string
+      frigate_connection_id:
+        description: Frigate-specific fields (only used when display_type = "frigate_camera")
+        type: string
+      mqtt_connection_id:
+        description: MQTT connection for alert/weather subscription
+        type: string
+      snapshot_interval:
+        description: Polling interval in ms (default 10000)
+        type: integer
+      weather_location:
+        description: Display label (e.g., "Spring, TX")
+        type: string
+      weather_topic_prefix:
+        description: Weather-specific fields (only used when display_type = "weather")
+        type: string
+    type: object
   models.EdgeLakeConfig:
     properties:
       host:
@@ -1042,6 +1251,26 @@ definitions:
     required:
     - host
     - port
+    type: object
+  models.FrigateConfig:
+    properties:
+      go2rtc_port:
+        description: 'go2rtc port (default: 1984)'
+        type: integer
+      host:
+        description: Frigate hostname or IP
+        type: string
+      password:
+        description: Basic auth password (optional)
+        type: string
+      port:
+        description: 'Frigate API port (default: 5000)'
+        type: integer
+      username:
+        description: Basic auth username (optional)
+        type: string
+    required:
+    - host
     type: object
   models.HealthInfo:
     properties:
@@ -1069,6 +1298,34 @@ definitions:
     - HealthStatusHealthy
     - HealthStatusUnhealthy
     - HealthStatusDegraded
+  models.ImportDeviceEntry:
+    properties:
+      device_type_id:
+        type: string
+      friendly_name:
+        type: string
+      name:
+        type: string
+      room:
+        type: string
+    required:
+    - device_type_id
+    - friendly_name
+    - name
+    type: object
+  models.ImportDevicesRequest:
+    description: Request to bulk import discovered devices
+    properties:
+      connection_id:
+        type: string
+      devices:
+        items:
+          $ref: '#/definitions/models.ImportDeviceEntry'
+        type: array
+    required:
+    - connection_id
+    - devices
+    type: object
   models.LayoutDimensionDTO:
     properties:
       max_height:
@@ -1077,6 +1334,54 @@ definitions:
         type: integer
       name:
         type: string
+    type: object
+  models.MQTTConfig:
+    properties:
+      broker_url:
+        description: mqtt://host:1883 or mqtts://host:8883
+        type: string
+      buffer_size:
+        description: Message buffer size (default 100)
+        type: integer
+      clean_start:
+        description: Clean session on connect
+        type: boolean
+      client_id:
+        description: MQTT client identifier (auto-generated if empty)
+        type: string
+      keep_alive:
+        description: Seconds (default 60)
+        type: integer
+      password:
+        description: Auth password (optional)
+        type: string
+      qos:
+        description: Default Quality of Service (0, 1, or 2)
+        type: integer
+      tls:
+        description: Use TLS (mqtts://)
+        type: boolean
+      username:
+        description: Auth username (optional)
+        type: string
+    required:
+    - broker_url
+    type: object
+  models.PanelTextConfig:
+    description: Configuration for native text panels — section headers, date/time,
+      titles
+    properties:
+      align:
+        description: '"left", "center", "right"'
+        type: string
+      content:
+        description: Static text (used when display_content="title")
+        type: string
+      display_content:
+        description: '"title", "date_short", "time_12", etc.'
+        type: string
+      size:
+        description: Font size in pixels (int) or legacy name (string)
     type: object
   models.PrometheusConfig:
     properties:
@@ -1167,6 +1472,7 @@ definitions:
     - tsstore
     - prometheus
     - edgelake
+    - mqtt
     type: string
     x-enum-varnames:
     - QueryTypeSQL
@@ -1176,6 +1482,7 @@ definitions:
     - QueryTypeTSStore
     - QueryTypePrometheus
     - QueryTypeEdgeLake
+    - QueryTypeMQTT
   models.ResponseDef:
     description: Configuration for parsing connection responses
     properties:
@@ -1515,10 +1822,35 @@ definitions:
         description: Schema/namespace (e.g., "public" for PostgreSQL)
         type: string
     type: object
+  models.TagListResponse:
+    properties:
+      tags:
+        items:
+          $ref: '#/definitions/models.TagUsage'
+        type: array
+    type: object
+  models.TagUsage:
+    properties:
+      components:
+        type: integer
+      connections:
+        type: integer
+      count:
+        description: total across all entity types
+        type: integer
+      dashboards:
+        type: integer
+      name:
+        type: string
+    type: object
   models.TestDatasourceRequest:
     properties:
       config:
         $ref: '#/definitions/models.DatasourceConfig'
+      id:
+        description: 'Optional: existing connection ID to resolve masked secrets from
+          DB'
+        type: string
       type:
         allOf:
         - $ref: '#/definitions/models.DatasourceType'
@@ -1576,7 +1908,7 @@ definitions:
         type: string
     type: object
   models.UpdateChartRequest:
-    description: Request body for updating an existing chart or control
+    description: Request body for updating an existing chart, control, or display
     properties:
       chart_type:
         type: string
@@ -1592,6 +1924,8 @@ definitions:
         $ref: '#/definitions/models.ChartDataMapping'
       description:
         type: string
+      display_config:
+        $ref: '#/definitions/models.DisplayConfig'
       name:
         type: string
       options:
@@ -1618,33 +1952,6 @@ definitions:
     required:
     - settings
     type: object
-  models.UpdateControlSchemaRequest:
-    description: Request body for updating an existing control schema
-    properties:
-      commands:
-        additionalProperties:
-          $ref: '#/definitions/models.CommandDef'
-        type: object
-      description:
-        type: string
-      metadata:
-        additionalProperties: true
-        type: object
-      name:
-        type: string
-      protocol_type:
-        type: string
-      response:
-        $ref: '#/definitions/models.ResponseDef'
-      state_query:
-        $ref: '#/definitions/models.StateQueryDef'
-      supported_types:
-        items:
-          type: string
-        type: array
-      version:
-        type: string
-    type: object
   models.UpdateDashboardRequest:
     description: Request body for updating an existing dashboard
     properties:
@@ -1662,6 +1969,10 @@ definitions:
         type: array
       settings:
         $ref: '#/definitions/models.DashboardSettings'
+      tags:
+        items:
+          type: string
+        type: array
       thumbnail:
         type: string
     type: object
@@ -1692,6 +2003,64 @@ definitions:
       type_id:
         description: 'NEW: Registry-based type system'
         type: string
+    type: object
+  models.UpdateDeviceRequest:
+    description: Request body for updating an existing device
+    properties:
+      connection_id:
+        type: string
+      device_type_id:
+        type: string
+      enabled:
+        type: boolean
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      room:
+        type: string
+      state_topic:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      target:
+        type: string
+    type: object
+  models.UpdateDeviceTypeRequest:
+    description: Request body for updating an existing device type
+    properties:
+      capabilities:
+        items:
+          $ref: '#/definitions/models.DeviceCapability'
+        type: array
+      category:
+        type: string
+      commands:
+        additionalProperties:
+          $ref: '#/definitions/models.CommandDef'
+        type: object
+      description:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      protocol:
+        type: string
+      response:
+        $ref: '#/definitions/models.ResponseDef'
+      state_query:
+        $ref: '#/definitions/models.StateQueryDef'
+      subtype:
+        type: string
+      supported_types:
+        items:
+          type: string
+        type: array
     type: object
   models.UpdateSettingRequest:
     properties:
@@ -2067,6 +2436,37 @@ paths:
       summary: Get debug status
       tags:
       - debug
+  /api/connections/{id}/discover-devices:
+    post:
+      description: Discover devices on an MQTT connection (e.g., via Zigbee2MQTT bridge)
+      parameters:
+      - description: Connection ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.DiscoverDevicesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Discover devices
+      tags:
+      - devices
   /api/controls/{id}/execute:
     post:
       consumes:
@@ -2153,6 +2553,593 @@ paths:
       summary: Execute a command on a bidirectional datasource
       tags:
       - datasources
+  /api/device-types:
+    get:
+      description: List device types with optional filtering and pagination
+      parameters:
+      - description: Filter by category
+        in: query
+        name: category
+        type: string
+      - description: Filter by protocol
+        in: query
+        name: protocol
+        type: string
+      - description: Show only built-in types
+        in: query
+        name: built_in_only
+        type: boolean
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.DeviceTypeListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List device types
+      tags:
+      - device-types
+    post:
+      consumes:
+      - application/json
+      description: Create a new device type template
+      parameters:
+      - description: Device type to create
+        in: body
+        name: device_type
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateDeviceTypeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.DeviceType'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a device type
+      tags:
+      - device-types
+  /api/device-types/{id}:
+    delete:
+      description: Delete a device type by ID
+      parameters:
+      - description: Device type ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete a device type
+      tags:
+      - device-types
+    get:
+      description: Get a device type by ID
+      parameters:
+      - description: Device type ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.DeviceType'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a device type
+      tags:
+      - device-types
+    put:
+      consumes:
+      - application/json
+      description: Update an existing device type
+      parameters:
+      - description: Device type ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: device_type
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateDeviceTypeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.DeviceType'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update a device type
+      tags:
+      - device-types
+  /api/device-types/categories:
+    get:
+      description: Get the list of valid device categories
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+      summary: Get valid device categories
+      tags:
+      - device-types
+  /api/device-types/control-types:
+    get:
+      description: Get the list of valid control UI types (toggle, scalar, button,
+        text, plug, dimmer)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get valid control types
+      tags:
+      - device-types
+  /api/devices:
+    get:
+      description: List devices with optional filtering and pagination
+      parameters:
+      - description: Filter by device type ID
+        in: query
+        name: device_type_id
+        type: string
+      - description: Filter by connection ID
+        in: query
+        name: connection_id
+        type: string
+      - description: Filter by room
+        in: query
+        name: room
+        type: string
+      - description: Filter by enabled status
+        in: query
+        name: enabled
+        type: boolean
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.DeviceListResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List devices
+      tags:
+      - devices
+    post:
+      consumes:
+      - application/json
+      description: Create a new device instance
+      parameters:
+      - description: Device to create
+        in: body
+        name: device
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateDeviceRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Device'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a device
+      tags:
+      - devices
+  /api/devices/{id}:
+    delete:
+      description: Delete a device by ID
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete a device
+      tags:
+      - devices
+    get:
+      description: Get a device by ID
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Device'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a device
+      tags:
+      - devices
+    put:
+      consumes:
+      - application/json
+      description: Update an existing device
+      parameters:
+      - description: Device ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: device
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateDeviceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Device'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update a device
+      tags:
+      - devices
+  /api/devices/import:
+    post:
+      consumes:
+      - application/json
+      description: Bulk import devices from discovery
+      parameters:
+      - description: Devices to import
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ImportDevicesRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            items:
+              $ref: '#/definitions/models.Device'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Import devices
+      tags:
+      - devices
+  /api/frigate/{connection_id}/cameras:
+    get:
+      description: Returns camera names from a Frigate NVR connection
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connection_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get Frigate camera list
+      tags:
+      - Frigate
+  /api/frigate/{connection_id}/event/{event_id}/clip:
+    get:
+      description: Returns the MP4 clip for a detection event (supports Range headers)
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connection_id
+        required: true
+        type: string
+      - description: Event ID
+        in: path
+        name: event_id
+        required: true
+        type: string
+      produces:
+      - video/mp4
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: Get event clip
+      tags:
+      - Frigate
+  /api/frigate/{connection_id}/event/{event_id}/snapshot:
+    get:
+      description: Returns the JPEG snapshot for a detection event
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connection_id
+        required: true
+        type: string
+      - description: Event ID
+        in: path
+        name: event_id
+        required: true
+        type: string
+      produces:
+      - image/jpeg
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: Get event snapshot
+      tags:
+      - Frigate
+  /api/frigate/{connection_id}/events/{camera}:
+    get:
+      description: Returns recent detection events for a camera
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connection_id
+        required: true
+        type: string
+      - description: Camera name
+        in: path
+        name: camera
+        required: true
+        type: string
+      - default: 10
+        description: Max events to return
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+      summary: Get camera events
+      tags:
+      - Frigate
+  /api/frigate/{connection_id}/info:
+    get:
+      description: Returns connection metadata needed for direct WebSocket access
+        (go2rtc MSE)
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connection_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get Frigate connection info
+      tags:
+      - Frigate
+  /api/frigate/{connection_id}/live/{camera}:
+    get:
+      description: Proxies the JSMPEG WebSocket stream for a camera through the backend
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connection_id
+        required: true
+        type: string
+      - description: Camera name
+        in: path
+        name: camera
+        required: true
+        type: string
+      responses: {}
+      summary: Proxy Frigate JSMPEG live stream
+      tags:
+      - Frigate
+  /api/frigate/{connection_id}/snapshot/{camera}:
+    get:
+      description: Returns the latest JPEG snapshot for a camera
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connection_id
+        required: true
+        type: string
+      - description: Camera name
+        in: path
+        name: camera
+        required: true
+        type: string
+      produces:
+      - image/jpeg
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: Get camera snapshot
+      tags:
+      - Frigate
   /api/registry/categories:
     get:
       description: Get all available categories with their type counts
@@ -2308,6 +3295,23 @@ paths:
       summary: Update a setting
       tags:
       - settings
+  /api/ws/status:
+    get:
+      description: WebSocket endpoint that pushes server status at specified intervals
+      parameters:
+      - description: 'Update interval (e.g., ''5s'', ''1s''). Default: 5s, Min: 1s,
+          0 means one-shot'
+        in: query
+        name: interval
+        type: string
+      responses:
+        "101":
+          description: Switching Protocols
+          schema:
+            type: string
+      summary: Subscribe to server status via WebSocket
+      tags:
+      - system
   /auth/login:
     post:
       consumes:
@@ -2373,6 +3377,14 @@ paths:
       - description: Filter by chart type
         in: query
         name: chart_type
+        type: string
+      - description: Filter by component type (chart, control, display)
+        in: query
+        name: component_type
+        type: string
+      - description: Filter by status (draft, final)
+        in: query
+        name: status
         type: string
       - description: Filter by data source ID
         in: query
@@ -2854,191 +3866,19 @@ paths:
       summary: Update user configuration
       tags:
       - config
-  /control-schemas:
+  /connections/{id}/mqtt/sample:
     get:
-      description: List control schemas with optional filtering by protocol type or
-        control type
+      description: Subscribe to a topic and return the first message's schema (columns
+        and sample values)
       parameters:
-      - description: Filter by protocol type
-        in: query
-        name: protocol_type
-        type: string
-      - description: Filter by supported control type
-        in: query
-        name: control_type
-        type: string
-      - description: Show only built-in schemas
-        in: query
-        name: built_in_only
-        type: boolean
-      - description: Page number (default 1)
-        in: query
-        name: page
-        type: integer
-      - description: Page size (default 50, max 100)
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.ControlSchemaListResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: List control schemas
-      tags:
-      - control-schemas
-    post:
-      consumes:
-      - application/json
-      description: Create a new control schema defining how controls communicate with
-        connections
-      parameters:
-      - description: Schema data
-        in: body
-        name: schema
-        required: true
-        schema:
-          $ref: '#/definitions/models.CreateControlSchemaRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/models.ControlSchema'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Create a new control schema
-      tags:
-      - control-schemas
-  /control-schemas/{id}:
-    delete:
-      description: Delete a control schema. Built-in schemas cannot be deleted.
-      parameters:
-      - description: Schema ID
+      - description: Datasource ID
         in: path
         name: id
         required: true
         type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "403":
-          description: Forbidden
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Delete a control schema
-      tags:
-      - control-schemas
-    get:
-      description: Get a control schema by its ID
-      parameters:
-      - description: Schema ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.ControlSchema'
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Get a control schema
-      tags:
-      - control-schemas
-    put:
-      consumes:
-      - application/json
-      description: Update an existing control schema. Built-in schemas cannot be modified.
-      parameters:
-      - description: Schema ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Schema updates
-        in: body
-        name: schema
-        required: true
-        schema:
-          $ref: '#/definitions/models.UpdateControlSchemaRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.ControlSchema'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: Forbidden
-          schema:
-            additionalProperties: true
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Update a control schema
-      tags:
-      - control-schemas
-  /control-schemas/by-control-type/{control_type}:
-    get:
-      description: Get all control schemas that support a specific control type
-      parameters:
-      - description: Control type (toggle, scalar, button, text)
-        in: path
-        name: control_type
+      - description: MQTT topic to sample
+        in: query
+        name: topic
         required: true
         type: string
       produces:
@@ -3054,21 +3894,21 @@ paths:
           schema:
             additionalProperties: true
             type: object
-        "500":
-          description: Internal Server Error
+        "404":
+          description: Not Found
           schema:
             additionalProperties: true
             type: object
-      summary: Get schemas for control type
+      summary: Sample a single MQTT topic
       tags:
-      - control-schemas
-  /control-schemas/by-protocol/{protocol_type}:
+      - datasources
+  /connections/{id}/mqtt/topics:
     get:
-      description: Get all control schemas compatible with a specific protocol type
+      description: Subscribe briefly to discover available topics on an MQTT broker
       parameters:
-      - description: Protocol type (e.g., websocket-json)
+      - description: Datasource ID
         in: path
-        name: protocol_type
+        name: id
         required: true
         type: string
       produces:
@@ -3079,29 +3919,19 @@ paths:
           schema:
             additionalProperties: true
             type: object
-        "500":
-          description: Internal Server Error
+        "400":
+          description: Bad Request
           schema:
             additionalProperties: true
             type: object
-      summary: Get schemas for protocol
-      tags:
-      - control-schemas
-  /control-schemas/types:
-    get:
-      description: Get the list of valid control UI types (toggle, scalar, button,
-        text)
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
+        "404":
+          description: Not Found
           schema:
             additionalProperties: true
             type: object
-      summary: Get valid control types
+      summary: Get topics from an MQTT broker
       tags:
-      - control-schemas
+      - datasources
   /dashboards:
     get:
       description: Get a paginated list of dashboards with optional filtering. Use
@@ -3276,7 +4106,8 @@ paths:
       - dashboards
   /datasources:
     get:
-      description: Retrieve all datasources with pagination and optional type filter
+      description: Retrieve all datasources with pagination and optional type/tag
+        filters
       parameters:
       - default: 20
         description: Number of items per page
@@ -3292,6 +4123,13 @@ paths:
         in: query
         name: type
         type: string
+      - collectionFormat: csv
+        description: Filter by tags (OR semantics, repeat param)
+        in: query
+        items:
+          type: string
+        name: tags
+        type: array
       produces:
       - application/json
       responses:
@@ -3885,6 +4723,20 @@ paths:
       summary: MCP SSE Connection
       tags:
       - MCP
+  /tags:
+    get:
+      description: Returns a merged list of tags across connections, components, and
+        dashboards with per-entity-type counts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.TagListResponse'
+      summary: List all tags with usage counts
+      tags:
+      - tags
   /users:
     get:
       description: Returns a paginated list of all users

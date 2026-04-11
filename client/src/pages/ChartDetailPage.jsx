@@ -8,6 +8,7 @@ import { Button, Loading, Modal } from '@carbon/react';
 import { Save, Close, ArrowLeft } from '@carbon/icons-react';
 import ChartEditor from '../components/ChartEditor';
 import apiClient from '../api/client';
+import { invalidateTagsCache } from '../components/shared/tagsApi';
 import './ChartDetailPage.scss';
 
 /**
@@ -74,6 +75,7 @@ function ChartDetailPage() {
         await apiClient.updateChart(id, pendingPayload);
       }
 
+      invalidateTagsCache();
       setShowSaveModal(false);
       navigate('/design/charts');
     } catch (err) {

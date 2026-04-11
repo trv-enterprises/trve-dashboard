@@ -15,6 +15,7 @@ import apiClient from '../api/client';
 // Available display types
 const DISPLAY_TYPES = [
   { id: 'frigate_camera', label: 'Frigate Camera' },
+  { id: 'frigate_alerts', label: 'Frigate Alerts' },
   { id: 'weather', label: 'Weather' }
 ];
 
@@ -46,9 +47,13 @@ function DisplayEditor({ displayConfig, onDisplayConfigChange }) {
     fetchConnections();
   }, []);
 
-  // Fetch cameras when Frigate connection is selected
+  // Fetch cameras when a Frigate-backed display type is selected.
+  // Both frigate_camera and frigate_alerts use the camera list — the
+  // camera picker is a "default camera" for the viewer and an optional
+  // "camera filter" for the alerts grid.
   useEffect(() => {
-    if (displayType !== 'frigate_camera' || !config.frigate_connection_id) {
+    const usesCameras = displayType === 'frigate_camera' || displayType === 'frigate_alerts';
+    if (!usesCameras || !config.frigate_connection_id) {
       setCameras([]);
       return;
     }
@@ -125,6 +130,76 @@ function DisplayEditor({ displayConfig, onDisplayConfigChange }) {
             onChange={(e) => updateConfig({ weather_topic_prefix: e.target.value })}
             helperText="MQTT topic prefix (subscribes to prefix/#). Default: weather"
             size="md"
+          />
+        </div>
+      )}
+
+      {/* Frigate Alerts fields */}
+      {displayType === 'frigate_alerts' && (
+        <div className="display-editor__section">
+          <Dropdown
+            id="frigate-alerts-connection"
+            titleText="Frigate Connection"
+            label="Select Frigate connection"
+            items={frigateConnections}
+            itemToString={(item) => item?.name || ''}
+            selectedItem={frigateConnections.find(c => c.id === config.frigate_connection_id) || null}
+            onChange={({ selectedItem }) => {
+              updateConfig({
+                frigate_connection_id: selectedItem?.id || '',
+                default_camera: '' // Reset camera filter when connection changes
+              });
+            }}
+          />
+
+          {config.frigate_connection_id && (
+            <Dropdown
+              id="frigate-alerts-camera-filter"
+              titleText="Camera Filter (optional)"
+              label={loadingCameras ? 'Loading cameras...' : 'All cameras'}
+              items={[null, ...cameras]}
+              itemToString={(item) => item || 'All cameras'}
+              selectedItem={config.default_camera || null}
+              onChange={({ selectedItem }) => {
+                updateConfig({ default_camera: selectedItem || '' });
+              }}
+              disabled={loadingCameras || cameras.length === 0}
+              helperText="Leave unset to show alerts from all cameras"
+            />
+          )}
+
+          <Select
+            id="frigate-alerts-severity"
+            labelText="Severity"
+            value={config.alert_severity || 'alert'}
+            onChange={(e) => updateConfig({ alert_severity: e.target.value })}
+            helperText="alert = review-required events; detection = all detections"
+          >
+            <SelectItem value="alert" text="Alert" />
+            <SelectItem value="detection" text="Detection" />
+            <SelectItem value="" text="All" />
+          </Select>
+
+          <NumberInput
+            id="frigate-alerts-max"
+            label="Max thumbnails"
+            value={config.max_thumbnails || 8}
+            min={1}
+            max={50}
+            step={1}
+            onChange={(e, { value }) => updateConfig({ max_thumbnails: value })}
+            helperText="Maximum number of alert thumbnails to display (1–50)"
+          />
+
+          <NumberInput
+            id="frigate-alerts-interval"
+            label="Refresh Interval (ms)"
+            value={config.snapshot_interval || 10000}
+            min={2000}
+            max={60000}
+            step={1000}
+            onChange={(e, { value }) => updateConfig({ snapshot_interval: value })}
+            helperText="How often to poll Frigate for new alerts"
           />
         </div>
       )}

@@ -29,6 +29,7 @@ import {
 } from '@carbon/react';
 import { TrashCan, Dashboard, List, Grid, Edit, DataBase, Information, ChartMultitype } from '@carbon/icons-react';
 import apiClient from '../api/client';
+import TagFilter from '../components/shared/TagFilter';
 import './DashboardsListPage.scss';
 
 /**
@@ -55,6 +56,7 @@ function DashboardsListPage() {
   const [sortKey, setSortKey] = useState(savedFilters.sortKey || 'name');
   const [sortDirection, setSortDirection] = useState(savedFilters.sortDir || 'asc');
   const [viewMode, setViewMode] = useState(savedFilters.view || 'list'); // 'list' or 'tile'
+  const [tagFilter, setTagFilter] = useState(savedFilters.tags || []); // array of tag names
 
   // Save filters to session store when they change
   useEffect(() => {
@@ -62,9 +64,10 @@ function DashboardsListPage() {
       search: searchTerm,
       sortKey,
       sortDir: sortDirection,
-      view: viewMode
+      view: viewMode,
+      tags: tagFilter
     });
-  }, [searchTerm, sortKey, sortDirection, viewMode]);
+  }, [searchTerm, sortKey, sortDirection, viewMode, tagFilter]);
 
   // Fetch dashboards, charts, and datasources from API
   useEffect(() => {
@@ -178,6 +181,14 @@ function DashboardsListPage() {
   const filteredAndSortedDashboards = useMemo(() => {
     let result = [...dashboards];
 
+    // Filter by tags (OR semantics)
+    if (tagFilter.length > 0) {
+      result = result.filter(dashboard => {
+        const dTags = dashboard.tags || [];
+        return tagFilter.some(t => dTags.includes(t));
+      });
+    }
+
     // Filter by search term (matches name, description, or datasource names)
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -218,13 +229,14 @@ function DashboardsListPage() {
     });
 
     return result;
-  }, [dashboards, searchTerm, sortKey, sortDirection, charts, datasources]);
+  }, [dashboards, searchTerm, sortKey, sortDirection, charts, datasources, tagFilter]);
 
   const headers = [
     { key: 'name', header: 'Name', isSortable: true },
     { key: 'description', header: 'Description', isSortable: false },
     { key: 'panels', header: 'Panels', isSortable: true },
     { key: 'datasources', header: 'Data Sources', isSortable: false },
+    { key: 'tags', header: 'Tags', isSortable: false },
     { key: 'updated', header: 'Last modified', isSortable: true },
     { key: 'actions', header: '', isSortable: false }
   ];
@@ -254,6 +266,7 @@ function DashboardsListPage() {
     description: dashboard.description || '',
     panels: getPanelCount(dashboard),
     datasources: getDatasourceNames(dashboard),
+    tags: dashboard.tags || [],
     updated: formatDate(dashboard.updated)
   }));
 
@@ -294,6 +307,11 @@ function DashboardsListPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search"
             persistent
+          />
+          <TagFilter
+            entityType="dashboards"
+            selected={tagFilter}
+            onChange={setTagFilter}
           />
           <ContentSwitcher
             onChange={(e) => setViewMode(e.name)}
@@ -368,6 +386,21 @@ function DashboardsListPage() {
                       <Tag type="blue" size="sm">
                         {getPanelCount(dashboard)}
                       </Tag>
+                      {(dashboard.tags || []).map((t) => (
+                        <Tag
+                          key={`dt-${t}`}
+                          type="cyan"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!tagFilter.includes(t)) setTagFilter([...tagFilter, t]);
+                          }}
+                          title={`Filter by ${t}`}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {t}
+                        </Tag>
+                      ))}
                     </div>
 
                     {getDatasourceNames(dashboard) !== '-' && (
@@ -456,6 +489,28 @@ function DashboardsListPage() {
                           className="clickable-row"
                         >
                           {row.cells.map((cell) => {
+                            if (cell.info.header === 'tags') {
+                              const cellTags = Array.isArray(cell.value) ? cell.value : [];
+                              return (
+                                <TableCell key={cell.id} className="tags-cell">
+                                  {cellTags.map((t) => (
+                                    <Tag
+                                      key={t}
+                                      type="cyan"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!tagFilter.includes(t)) setTagFilter([...tagFilter, t]);
+                                      }}
+                                      title={`Filter by ${t}`}
+                                      style={{ cursor: 'pointer' }}
+                                    >
+                                      {t}
+                                    </Tag>
+                                  ))}
+                                </TableCell>
+                              );
+                            }
                             if (cell.info.header === 'actions') {
                               return (
                                 <TableCell key={cell.id} className="actions-cell">

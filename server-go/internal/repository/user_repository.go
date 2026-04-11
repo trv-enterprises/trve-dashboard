@@ -42,6 +42,12 @@ func (r *UserRepository) CreateIndexes(ctx context.Context) error {
 		{
 			Keys: bson.D{{Key: "active", Value: 1}},
 		},
+		// Auth path: GetByGUID filters on both guid and active together.
+		// Compound supplements the single-field unique `guid` index for this
+		// specific lookup pattern.
+		{
+			Keys: bson.D{{Key: "guid", Value: 1}, {Key: "active", Value: 1}},
+		},
 	}
 
 	_, err := r.collection.Indexes().CreateMany(ctx, indexes)

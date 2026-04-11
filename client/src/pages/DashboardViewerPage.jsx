@@ -27,7 +27,9 @@ import {
   Time,
   OverflowMenuVertical,
   FitToScreen,
+  FitToWidth,
   CenterToFit,
+  Information,
   StarFilled,
   Edit,
   Save,
@@ -43,6 +45,7 @@ import DynamicComponentLoader from '../components/DynamicComponentLoader';
 import ChartDataModal from '../components/ChartDataModal';
 import { ControlRenderer } from '../components/controls';
 import FrigateCameraViewer from '../components/frigate/FrigateCameraViewer';
+import FrigateAlertsGrid from '../components/frigate/FrigateAlertsGrid';
 import WeatherDisplay from '../components/weather/WeatherDisplay';
 import PanelEditMenu from '../components/PanelEditMenu';
 import PanelText from '../components/PanelText';
@@ -51,9 +54,45 @@ import ChartEditorModal from '../components/ChartEditorModal';
 import ComponentPickerModal from '../components/ComponentPickerModal';
 import AIPreflightModal from '../components/AIPreflightModal';
 import apiClient from '../api/client';
+import TagInput from '../components/shared/TagInput';
+import { invalidateTagsCache } from '../components/shared/tagsApi';
 import StreamConnectionManager from '../utils/streamConnectionManager';
 import { getComponentMinSize } from '../config/layoutConfig';
 import './DashboardViewerPage.scss';
+
+// Icon wrapper components for Carbon's OverflowMenu `renderIcon` prop.
+// Carbon calls `React.createElement(renderIcon, { className, aria-label })`
+// without passing a size, and the raw Carbon icons default to size=16.
+// These wrappers lock the size at 20 to match the surrounding toolbar
+// controls. They are defined at module scope so the component identity is
+// stable across re-renders — passing an inline function to `renderIcon`
+// causes Carbon to unmount/remount the trigger icon every render, which
+// produced a visible "revert to old icon" flicker when the fit mode changed.
+const FitModeActualIcon = (props) => <CenterToFit size={20} {...props} />;
+const FitModeWindowIcon = (props) => <FitToScreen size={20} {...props} />;
+const FitModeWidthIcon = (props) => <FitToWidth size={20} {...props} />;
+
+// "Stretch to fill" uses a custom SVG because Carbon's `Maximize` (four
+// corner arrows) is already used by the adjacent fullscreen button, and
+// having two identical icons side-by-side was confusing. This SVG shows
+// a double-headed horizontal arrow crossed with a double-headed vertical
+// arrow — the "stretch both axes" metaphor — visually distinct from
+// `Maximize`'s corner arrows.
+const FitModeStretchIcon = ({ size = 20, ...rest }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 32 32"
+    width={size}
+    height={size}
+    fill="currentColor"
+    {...rest}
+  >
+    {/* Horizontal double-headed arrow: left arrowhead + bar + right arrowhead */}
+    <path d="M3 16 L8 11 L8 15 L24 15 L24 11 L29 16 L24 21 L24 17 L8 17 L8 21 Z" />
+    {/* Vertical double-headed arrow: top arrowhead + bar + bottom arrowhead */}
+    <path d="M16 3 L21 8 L17 8 L17 24 L21 24 L16 29 L11 24 L15 24 L15 8 L11 8 Z" />
+  </svg>
+);
 
 /**
  * DashboardViewerPage Component
@@ -77,9 +116,24 @@ function DashboardViewerPage({ canDesign = false }) {
   const [error, setError] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date());
-  const [reduceToFit, setReduceToFit] = useState(() => {
-    const stored = localStorage.getItem('dashboard_reduceToFit');
-    return stored !== null ? stored === 'true' : true;
+  // Dashboard fit mode: "actual" | "window" | "width" | "stretch".
+  // Migrated from the legacy `dashboard_reduceToFit` boolean:
+  //   true  → "stretch" (the current behavior before the four-mode work)
+  //   false → "actual"
+  // New key is `dashboard_fit_mode`. See the user preference migration in
+  // the useEffect below that reads from /api/config/user/:user_id.
+  const [fitMode, setFitMode] = useState(() => {
+    const stored = localStorage.getItem('dashboard_fit_mode');
+    if (stored && ['actual', 'window', 'width', 'stretch'].includes(stored)) {
+      return stored;
+    }
+    // Legacy fallback: migrate the old boolean so returning users get the
+    // behavior they already had.
+    const legacy = localStorage.getItem('dashboard_reduceToFit');
+    if (legacy === 'true') return 'stretch';
+    if (legacy === 'false') return 'actual';
+    // First-time default: safe uniform fit.
+    return 'window';
   });
   const [dataModalOpen, setDataModalOpen] = useState(false);
   const [selectedChart, setSelectedChart] = useState(null);
@@ -102,6 +156,7 @@ function DashboardViewerPage({ canDesign = false }) {
 
   // Dashboard settings (editable in settings modal)
   const [editableDescription, setEditableDescription] = useState('');
+  const [editableTags, setEditableTags] = useState([]);
   const [editableTheme, setEditableTheme] = useState('dark');
   const [editableRefreshInterval, setEditableRefreshInterval] = useState(0);
   const [editableTitleScale, setEditableTitleScale] = useState(100);
@@ -189,7 +244,7 @@ function DashboardViewerPage({ canDesign = false }) {
     return dimensions.find(d => d.name === currentDimension) || null;
   }, [dimensions, currentDimension]);
 
-  // Grid bounds from layout dimension (matches DashboardDetailPage formula)
+  // Grid bounds from layout dimension
   const VIEWER_CHROME_V = 109; // 48px app header + 57px toolbar + 4px padding
   const VIEWER_CHROME_H = 4;
   const VIEWER_GAP = 4;
@@ -206,32 +261,50 @@ function DashboardViewerPage({ canDesign = false }) {
     return Math.floor((availableHeight + VIEWER_GAP) / (CELL_HEIGHT + VIEWER_GAP));
   }, [layoutDimension]);
 
-  // Load user preference for reduceToFit from server
+  // Load user fit-mode preference from server. Prefer the new
+  // `dashboard_fit_mode` key; fall back to the legacy boolean
+  // `dashboard_reduceToFit` so returning users see their previous behavior
+  // before the four-mode work landed.
   useEffect(() => {
     const userGuid = apiClient.getCurrentUserGuid();
     if (!userGuid) return;
     apiClient.getUserConfig(userGuid)
       .then(res => {
-        const pref = res?.settings?.dashboard_reduceToFit;
-        if (pref !== undefined) {
-          setReduceToFit(pref);
-          localStorage.setItem('dashboard_reduceToFit', String(pref));
+        const settings = res?.settings || {};
+        const modePref = settings.dashboard_fit_mode;
+        if (modePref && ['actual', 'window', 'width', 'stretch'].includes(modePref)) {
+          setFitMode(modePref);
+          localStorage.setItem('dashboard_fit_mode', modePref);
+          return;
+        }
+        const legacyPref = settings.dashboard_reduceToFit;
+        if (legacyPref !== undefined) {
+          const migrated = legacyPref ? 'stretch' : 'actual';
+          setFitMode(migrated);
+          localStorage.setItem('dashboard_fit_mode', migrated);
         }
       })
       .catch(() => {});
   }, []);
 
-  // Save reduceToFit preference
-  const toggleReduceToFit = useCallback(() => {
-    setReduceToFit(prev => {
-      const next = !prev;
-      localStorage.setItem('dashboard_reduceToFit', String(next));
-      const userGuid = apiClient.getCurrentUserGuid();
-      if (userGuid) {
-        apiClient.updateUserConfig(userGuid, { dashboard_reduceToFit: next }).catch(() => {});
-      }
-      return next;
-    });
+  // Save a new fit-mode selection. Writes both the new key and the legacy
+  // boolean so any lingering code that still reads `dashboard_reduceToFit`
+  // continues to see a sensible value. The legacy writes can be dropped in
+  // a follow-up once all callers are migrated.
+  const selectFitMode = useCallback((next) => {
+    if (!['actual', 'window', 'width', 'stretch'].includes(next)) return;
+    setFitMode(next);
+    localStorage.setItem('dashboard_fit_mode', next);
+    // Legacy back-compat: true for stretch (same visual behavior), false otherwise.
+    const legacyBool = next === 'stretch';
+    localStorage.setItem('dashboard_reduceToFit', String(legacyBool));
+    const userGuid = apiClient.getCurrentUserGuid();
+    if (userGuid) {
+      apiClient.updateUserConfig(userGuid, {
+        dashboard_fit_mode: next,
+        dashboard_reduceToFit: legacyBool,
+      }).catch(() => {});
+    }
   }, []);
 
   // Calculate grid dimensions
@@ -281,25 +354,53 @@ function DashboardViewerPage({ canDesign = false }) {
       cancelAnimationFrame(raf2);
       window.removeEventListener('resize', measure);
     };
-  }, [hasPanels, isFullscreen, reduceToFit]);
+  }, [hasPanels, isFullscreen, fitMode]);
 
-  // Calculate fit-to-screen scale factor
+  // Calculate fit-to-screen transform based on the active fit mode.
+  //
+  //   actual  → no transform (native pixel size, may overflow viewport)
+  //   window  → scale(min(sx, sy)) — uniform, centered, nothing clipped
+  //   width   → scale(sx)           — fill width exactly, vertical scroll if needed
+  //   stretch → scale(sx, sy)       — fill both axes, may distort round charts
+  //
+  // All modes use `transform-origin: top left`. Centering for `window` is
+  // handled by the container via flexbox (see DashboardViewerPage.scss).
   const GAP = 4; // spacing.$spacing-02
-  // The container has 8px padding on all sides. The grid starts inside the padding
-  // (top-left offset), but clientWidth/clientHeight include padding on both sides.
-  // Subtract the right/bottom padding so the scaled grid doesn't overflow into it.
   const CONTAINER_PADDING = 4;
-  const fitScaleX = useMemo(() => {
-    if (!reduceToFit || !containerSize.width) return 1;
+  const fitTransform = useMemo(() => {
+    // Skip fit transform entirely in edit mode (edit mode uses its own zoom).
+    if (isEditMode || fitMode === 'actual' || !containerSize.width || !containerSize.height) {
+      return { transform: '', scaledW: 0, scaledH: 0 };
+    }
     const gridNativeW = maxGridCol * CELL_WIDTH + (maxGridCol - 1) * GAP;
-    return (containerSize.width - 2 * CONTAINER_PADDING) / gridNativeW;
-  }, [reduceToFit, containerSize.width, maxGridCol, CELL_WIDTH]);
-
-  const fitScaleY = useMemo(() => {
-    if (!reduceToFit || !containerSize.height) return 1;
     const gridNativeH = maxGridRow * CELL_HEIGHT + (maxGridRow - 1) * GAP;
-    return (containerSize.height - 2 * CONTAINER_PADDING) / gridNativeH;
-  }, [reduceToFit, containerSize.height, maxGridRow, CELL_HEIGHT]);
+    const availW = containerSize.width - 2 * CONTAINER_PADDING;
+    const availH = containerSize.height - 2 * CONTAINER_PADDING;
+    const sx = availW / gridNativeW;
+    const sy = availH / gridNativeH;
+
+    if (fitMode === 'stretch') {
+      return {
+        transform: `scale(${sx}, ${sy})`,
+        scaledW: gridNativeW * sx,
+        scaledH: gridNativeH * sy,
+      };
+    }
+    if (fitMode === 'width') {
+      return {
+        transform: `scale(${sx})`,
+        scaledW: gridNativeW * sx,
+        scaledH: gridNativeH * sx,
+      };
+    }
+    // "window" — uniform, both axes fit
+    const s = Math.min(sx, sy);
+    return {
+      transform: `scale(${s})`,
+      scaledW: gridNativeW * s,
+      scaledH: gridNativeH * s,
+    };
+  }, [isEditMode, fitMode, containerSize.width, containerSize.height, maxGridCol, maxGridRow, CELL_WIDTH, CELL_HEIGHT]);
 
   // Fetch dashboard data and referenced charts
   const fetchDashboard = useCallback(async () => {
@@ -589,6 +690,7 @@ function DashboardViewerPage({ canDesign = false }) {
     setOriginalPanels(panelsCopy.map(p => ({ ...p })));
     setEditableName(dashboard?.name || '');
     setEditableDescription(dashboard?.description || '');
+    setEditableTags(dashboard?.tags || []);
     setEditableTheme(dashboard?.settings?.theme || 'dark');
     setEditableRefreshInterval(dashboard?.settings?.refresh_interval || 0);
     setEditableTitleScale(dashboard?.settings?.title_scale || 100);
@@ -647,15 +749,18 @@ function DashboardViewerPage({ canDesign = false }) {
       const payload = {
         name: editableName,
         description: editableDescription,
+        tags: editableTags,
         panels: editablePanels,
         settings: updatedSettings
       };
 
       if (isNewDashboard) {
         const created = await apiClient.createDashboard(payload);
+        invalidateTagsCache();
         navigate(`/view/dashboards/${created.id}`, { replace: true });
       } else {
         await apiClient.updateDashboard(id, { ...dashboard, ...payload });
+        invalidateTagsCache();
         setIsEditMode(false);
         setEditHasChanges(false);
         fetchDashboard();
@@ -1164,14 +1269,56 @@ function DashboardViewerPage({ canDesign = false }) {
               >
                 {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
               </IconButton>
-              <IconButton
-                kind="ghost"
-                label={reduceToFit ? 'Actual size' : 'Fit to screen'}
-                onClick={toggleReduceToFit}
-                align="bottom"
+              <OverflowMenu
+                size="lg"
+                renderIcon={
+                  fitMode === 'window' ? FitModeWindowIcon
+                  : fitMode === 'width' ? FitModeWidthIcon
+                  : fitMode === 'stretch' ? FitModeStretchIcon
+                  : FitModeActualIcon
+                }
+                iconDescription={
+                  fitMode === 'window' ? 'Fit to window'
+                  : fitMode === 'width' ? 'Fit to width'
+                  : fitMode === 'stretch' ? 'Stretch to fill'
+                  : 'Actual size'
+                }
+                flipped
+                direction="bottom"
+                className="fit-mode-menu"
               >
-                {reduceToFit ? <CenterToFit size={20} /> : <FitToScreen size={20} />}
-              </IconButton>
+                <OverflowMenuItem
+                  itemText="Actual size"
+                  onClick={() => selectFitMode('actual')}
+                  isDelete={false}
+                />
+                <OverflowMenuItem
+                  itemText="Fit to window"
+                  onClick={() => selectFitMode('window')}
+                />
+                <OverflowMenuItem
+                  itemText="Fit to width"
+                  onClick={() => selectFitMode('width')}
+                />
+                <OverflowMenuItem
+                  itemText={
+                    <span className="fit-mode-item-with-info">
+                      Stretch to fill
+                      <Information
+                        size={16}
+                        className="fit-mode-info-icon"
+                        // Native browser tooltip via the title attribute.
+                        // Full Carbon Tooltip here would nest inside Carbon's
+                        // menu popover and fight its focus management.
+                      >
+                        <title>May distort round chart elements like gauges and pies.</title>
+                      </Information>
+                    </span>
+                  }
+                  onClick={() => selectFitMode('stretch')}
+                  hasDivider
+                />
+              </OverflowMenu>
               {canDesign && (
                 <IconButton
                   kind="ghost"
@@ -1215,8 +1362,23 @@ function DashboardViewerPage({ canDesign = false }) {
       {(panels && panels.length > 0) || isEditMode ? (
         <div
           ref={containerRef}
-          className={`dashboard-grid-container ${reduceToFit ? 'fit-to-screen' : ''}`}
+          className={`dashboard-grid-container fit-mode-${isEditMode ? 'edit' : fitMode}`}
         >
+          {/*
+            Wrapper around the grid: reserves the post-scale size so the
+            container can flex-center the grid in "window" mode and
+            measure scroll height correctly in "width" mode. In "actual"
+            and "edit" modes the wrapper has no explicit dimensions — the
+            grid flows at native size.
+          */}
+          <div
+            className="dashboard-grid-scale-wrapper"
+            style={
+              !isEditMode && fitMode !== 'actual' && fitTransform.scaledW > 0
+                ? { width: fitTransform.scaledW, height: fitTransform.scaledH }
+                : undefined
+            }
+          >
           <div
             ref={gridRef}
             className={`dashboard-grid ${isEditMode ? 'edit-active' : ''}`}
@@ -1225,12 +1387,13 @@ function DashboardViewerPage({ canDesign = false }) {
               gridTemplateColumns: `repeat(${maxGridCol}, ${CELL_WIDTH}px)`,
               gridTemplateRows: `repeat(${maxGridRow}, ${CELL_HEIGHT}px)`,
               '--title-scale': (isEditMode ? editableTitleScale : (dashboard?.settings?.title_scale || 100)) / 100,
-              // Fit-to-screen: scale the grid to fit the viewport
-              ...(reduceToFit && !isEditMode ? {
-                transform: `scale(${fitScaleX}, ${fitScaleY})`,
+              // Fit-mode transform: varies by mode. See `fitTransform` useMemo.
+              ...(!isEditMode && fitTransform.transform ? {
+                transform: fitTransform.transform,
                 transformOrigin: 'top left'
               } : {}),
-              // Edit mode: manual zoom
+              // Edit mode: manual zoom (mutually exclusive with fit-mode transform
+              // because fitTransform returns empty string when isEditMode is true).
               ...(isEditMode && zoom !== 100 ? {
                 transform: `scale(${zoom / 100})`,
                 transformOrigin: 'top left'
@@ -1328,6 +1491,8 @@ function DashboardViewerPage({ canDesign = false }) {
                             <WeatherDisplay config={chart.display_config} />
                           ) : chart.display_config?.display_type === 'frigate_camera' ? (
                             <FrigateCameraViewer config={chart.display_config} />
+                          ) : chart.display_config?.display_type === 'frigate_alerts' ? (
+                            <FrigateAlertsGrid config={chart.display_config} />
                           ) : (
                             <div className="display-empty">Unknown display type</div>
                           )}
@@ -1424,6 +1589,7 @@ function DashboardViewerPage({ canDesign = false }) {
               </>
             )}
           </div>
+          </div>
         </div>
       ) : (
         <div className="no-layout">
@@ -1498,6 +1664,12 @@ function DashboardViewerPage({ canDesign = false }) {
             value={editableDescription}
             onChange={(e) => setEditableDescription(e.target.value)}
             placeholder="Enter dashboard description"
+          />
+          <TagInput
+            id="settings-tags"
+            label="Tags"
+            value={editableTags}
+            onChange={setEditableTags}
           />
           <Select
             id="settings-theme"

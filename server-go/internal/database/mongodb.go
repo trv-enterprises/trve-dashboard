@@ -123,33 +123,49 @@ func createIndexes(ctx context.Context, collection *mongo.Collection, models []m
 }
 
 // Index model helpers
+//
+// All collections managed here have case-insensitive collation (see
+// migrateCollationCaseInsensitive). Indexes created on these collections
+// inherit the collation automatically, so unique constraints on `name`
+// reject case-variant duplicates.
+//
+// `bson.D` is used instead of map[string]interface{} to guarantee field
+// ordering for compound indexes.
+
 func datasourceIndexes() []mongo.IndexModel {
 	return []mongo.IndexModel{
 		{
-			Keys:    map[string]interface{}{"name": 1},
+			Keys:    bson.D{{Key: "name", Value: 1}},
 			Options: options.Index().SetUnique(true),
 		},
-		{
-			Keys: map[string]interface{}{"type": 1},
-		},
-		{
-			Keys: map[string]interface{}{"created_at": -1},
-		},
+		// Hot path: list by type with newest-first sort.
+		{Keys: bson.D{{Key: "type", Value: 1}, {Key: "created_at", Value: -1}}},
+		// Tag filtering (Part 3) with newest-first sort.
+		{Keys: bson.D{{Key: "tags", Value: 1}, {Key: "created_at", Value: -1}}},
+		// FindAll fallback sort.
+		{Keys: bson.D{{Key: "created_at", Value: -1}}},
+		// Health-monitoring background jobs.
+		{Keys: bson.D{{Key: "health.status", Value: 1}}},
+		{Keys: bson.D{{Key: "health.last_check", Value: 1}}},
 	}
 }
 
 func dashboardIndexes() []mongo.IndexModel {
 	return []mongo.IndexModel{
 		{
-			Keys:    map[string]interface{}{"name": 1},
+			Keys:    bson.D{{Key: "name", Value: 1}},
 			Options: options.Index().SetUnique(true),
 		},
-		{
-			Keys: map[string]interface{}{"panels.chart_id": 1},
-		},
-		{
-			Keys: map[string]interface{}{"created_at": -1},
-		},
+		// "Dashboards using chart X" lookups + newest-first sort.
+		{Keys: bson.D{{Key: "panels.chart_id", Value: 1}, {Key: "updated", Value: -1}}},
+		// Public-dashboard listing with newest-first sort.
+		{Keys: bson.D{{Key: "settings.is_public", Value: 1}, {Key: "updated", Value: -1}}},
+		// Tag filtering (Part 3) with newest-first sort.
+		{Keys: bson.D{{Key: "tags", Value: 1}, {Key: "updated", Value: -1}}},
+		// General recency sort.
+		{Keys: bson.D{{Key: "updated", Value: -1}}},
+		// Legacy: kept for queries that sort by created_at.
+		{Keys: bson.D{{Key: "created_at", Value: -1}}},
 	}
 }
 

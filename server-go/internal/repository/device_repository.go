@@ -36,6 +36,16 @@ func (r *DeviceRepository) CreateIndexes(ctx context.Context) error {
 		{Keys: bson.D{{Key: "enabled", Value: 1}}},
 		{Keys: bson.D{{Key: "name", Value: 1}}},
 		{Keys: bson.D{{Key: "updated", Value: -1}}},
+		// Device lookup by connection + target (MQTT topic / WS address).
+		// Previously `target` was unindexed, forcing a scan on every command
+		// dispatch.
+		{Keys: bson.D{{Key: "connection_id", Value: 1}, {Key: "target", Value: 1}}},
+		// List page compound: filter by enabled/room, sort by name.
+		{Keys: bson.D{
+			{Key: "enabled", Value: 1},
+			{Key: "room", Value: 1},
+			{Key: "name", Value: 1},
+		}},
 	}
 
 	_, err := r.collection.Indexes().CreateMany(ctx, indexes)

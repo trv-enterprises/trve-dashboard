@@ -389,4 +389,12 @@
       }
     }
   }
+
+  // Tags column in list view — chips wrap within the cell
+  .tags-cell {
+    vertical-align: top;
+    .cds--tag {
+      margin: 2px;
+    }
+  }
 }

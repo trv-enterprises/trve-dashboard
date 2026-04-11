@@ -36,13 +36,14 @@ Control types and their UI config:
 - text_input: { label, placeholder, submitLabel }
 - switch: { label, onLabel, offLabel } — on/off switch with HomeKit-style pill
 - dimmer: { label, min, max, step }
+- garage_door: { label, state_field (default: "contact") } — full-size animated read-only garage door status
 - tile_garage_door: { label, state_field (default: "contact") } — read-only garage door status tile`),
 			InputSchema: anthropic.ToolInputSchemaParam{
 				Properties: map[string]interface{}{
 					"control_type": map[string]interface{}{
 						"type":        "string",
 						"description": "Type of control",
-						"enum":        []string{"button", "toggle", "slider", "text_input", "switch", "dimmer", "tile_switch", "tile_dimmer", "tile_garage_door", "text_label"},
+						"enum":        []string{"button", "toggle", "slider", "text_input", "switch", "dimmer", "garage_door", "tile_switch", "tile_dimmer", "tile_garage_door", "text_label"},
 					},
 					"connection_id": map[string]interface{}{"type": "string", "description": "ID of the connection to send commands through (e.g., MQTT, WebSocket)"},
 					"target": map[string]interface{}{"type": "string", "description": "Device or endpoint identifier for command targeting"},

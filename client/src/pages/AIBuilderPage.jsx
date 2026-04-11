@@ -177,7 +177,7 @@ function AIBuilderPage() {
     try {
       const savedComponent = await saveSession(componentName.trim());
       // If launched from a dashboard panel, pass back the component ID so
-      // DashboardDetailPage can attach it to the panel in its unsaved state
+      // the dashboard page can attach it to the panel in its unsaved state
       if (panelId && savedComponent?.id) {
         navigate(returnPath, {
           state: { attachComponentId: savedComponent.id, attachPanelId: panelId }
