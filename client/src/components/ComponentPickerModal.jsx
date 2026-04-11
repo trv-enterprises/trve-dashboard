@@ -14,6 +14,7 @@ import {
 import MdiIcon from '@mdi/react';
 import { CONTROL_TYPE_INFO } from './controls/controlTypes';
 import apiClient from '../api/client';
+import TagFilter from './shared/TagFilter';
 import './ComponentPickerModal.scss';
 
 // Chart type icon mapping
@@ -61,6 +62,7 @@ function ComponentPickerModal({ open, onClose, onSelect, category: initialCatego
   const [searchTerm, setSearchTerm] = useState('');
   const [selected, setSelected] = useState(null);
   const [activeCategory, setActiveCategory] = useState(initialCategory || 'all');
+  const [tagFilter, setTagFilter] = useState([]);
 
   useEffect(() => {
     if (open) {
@@ -68,6 +70,7 @@ function ComponentPickerModal({ open, onClose, onSelect, category: initialCatego
       setSelected(null);
       setSearchTerm('');
       setActiveCategory(initialCategory || 'all');
+      setTagFilter([]);
     }
   }, [open, initialCategory]);
 
@@ -98,6 +101,14 @@ function ComponentPickerModal({ open, onClose, onSelect, category: initialCatego
       });
     }
 
+    // Tag filter (OR semantics — matches the behavior on the list pages)
+    if (tagFilter.length > 0) {
+      result = result.filter(item => {
+        const itemTags = item.tags || [];
+        return tagFilter.some(t => itemTags.includes(t));
+      });
+    }
+
     // Search filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -110,7 +121,7 @@ function ComponentPickerModal({ open, onClose, onSelect, category: initialCatego
     }
 
     return result;
-  }, [items, activeCategory, searchTerm]);
+  }, [items, activeCategory, tagFilter, searchTerm]);
 
   // Category counts for dropdown labels
   const categoryCounts = useMemo(() => {
@@ -196,6 +207,11 @@ function ComponentPickerModal({ open, onClose, onSelect, category: initialCatego
             onChange={({ selectedItem }) => setActiveCategory(selectedItem?.id || 'all')}
             size="md"
           />
+          <TagFilter
+            entityType="components"
+            selected={tagFilter}
+            onChange={setTagFilter}
+          />
           <Search
             labelText="Search"
             placeholder="Search components..."
@@ -215,26 +231,48 @@ function ComponentPickerModal({ open, onClose, onSelect, category: initialCatego
           </div>
         ) : (
           <div className="picker-grid">
-            {filtered.map(item => (
-              <Tile
-                key={item.id}
-                className={`picker-tile ${selected?.id === item.id ? 'selected' : ''}`}
-                onClick={() => setSelected(item)}
-              >
-                <div className="picker-tile-header">
-                  <div className={`picker-tile-icon picker-tile-icon--${getCategoryTagColor(item)}`}>
-                    {renderIcon(item)}
+            {filtered.map(item => {
+              const itemTags = item.tags || [];
+              return (
+                <Tile
+                  key={item.id}
+                  className={`picker-tile ${selected?.id === item.id ? 'selected' : ''}`}
+                  onClick={() => setSelected(item)}
+                >
+                  <div className="picker-tile-header">
+                    <div className={`picker-tile-icon picker-tile-icon--${getCategoryTagColor(item)}`}>
+                      {renderIcon(item)}
+                    </div>
+                    <Tag size="sm" type={getTypeTagColor(item)}>
+                      {getTypeLabel(item)}
+                    </Tag>
                   </div>
-                  <Tag size="sm" type={getTypeTagColor(item)}>
-                    {getTypeLabel(item)}
-                  </Tag>
-                </div>
-                <div className="picker-tile-content">
-                  <h4>{item.name}</h4>
-                  {item.description && <p>{item.description}</p>}
-                </div>
-              </Tile>
-            ))}
+                  <div className="picker-tile-content">
+                    <h4>{item.title || item.name}</h4>
+                    {item.description && <p>{item.description}</p>}
+                    {itemTags.length > 0 && (
+                      <div className="picker-tile-tags">
+                        {itemTags.map(t => (
+                          <Tag
+                            key={t}
+                            type="cyan"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!tagFilter.includes(t)) setTagFilter([...tagFilter, t]);
+                            }}
+                            title={`Filter by ${t}`}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            {t}
+                          </Tag>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Tile>
+              );
+            })}
           </div>
         )}
       </div>

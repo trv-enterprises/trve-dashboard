@@ -555,6 +555,27 @@ Controls are interactive UI elements (buttons, toggles, sliders, plugs, dimmers)
 
 Controls with `canWrite: false` in `CONTROL_TYPE_INFO` are automatically passed `readOnly={true}` by `ControlRenderer`. Use this for state indicators (garage door status, temperature sensors, door/window contacts) that subscribe to MQTT but don't send commands. The `useControlCommand` hook is not needed for read-only controls.
 
+### Custom Control Layout
+
+**Don't render a title inside a custom control** between the icon/visual and the state text. `ControlRenderer` already renders a `.control-title` at the top of the panel for every non-tile, non-text_label control when the control has a `title` set. Putting another title inside the control body creates a duplicate (one on top, one stacked above the state) that users will ask you to remove.
+
+The canonical layout for a read-only status control is:
+
+```
+┌────────────────────┐
+│   Control Title    │  ← rendered by ControlRenderer (.control-title)
+├────────────────────┤
+│                    │
+│    [icon/SVG]      │  ← your component's primary visual
+│                    │
+│      STATE         │  ← your component's state readout
+└────────────────────┘
+```
+
+**Title vs name**: `control.name` is the unique internal identifier and tends to be long/contextual ("Home Front Garage Door Sensor - Contact"). `control.title` is the user-facing display label and is usually shorter ("Front Garage"). The rule across the whole app (charts, displays, controls) is **use `title` when set, fall back to `name` when not**: `control.title || control.name`. Users should set an explicit title when they want a concise label, but when they don't, the name is still better than showing nothing.
+
+Tiles (`tile_*`) and `text_label` skip the top `.control-title` entirely — they manage their own layout inside `ControlRenderer`'s tile-mode wrapper and apply the same `title || name` fallback inside their own inline labels.
+
 ## Grid System
 
 12-column grid with 32px row height (based on Carbon $spacing-08):

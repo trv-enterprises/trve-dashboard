@@ -36,7 +36,6 @@ const ANIMATION_MS = 1500;
 
 function ControlGarageDoor({ control }) {
   const uiConfig = control.control_config?.ui_config || {};
-  const displayName = control.title || control.name || uiConfig.label || 'Garage';
 
   const { value: contact } = useControlState({
     connectionId: control.connection_id,
@@ -128,7 +127,12 @@ function ControlGarageDoor({ control }) {
         />
       </div>
       <div className="control-garage-door__footer">
-        <span className="control-garage-door__name">{displayName}</span>
+        {/*
+          The panel title is rendered by ControlRenderer as a `.control-title`
+          above this component. Don't duplicate it here — convention:
+          a custom control never places its own title between the icon/visual
+          and the state text. See CLAUDE.md → "Custom Control Layout".
+        */}
         <span
           className="control-garage-door__state"
           style={{ color: stateColor }}

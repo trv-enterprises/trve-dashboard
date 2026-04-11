@@ -35,6 +35,13 @@ function ControlRenderer({ control, onSuccess, onError }) {
     );
   }
 
+  // Prefer the user-facing display title; fall back to the internal name
+  // if no title was set. The `name` field is the control's unique
+  // identifier and tends to be long/contextual ("Home Front Garage Door
+  // Sensor - Contact"), whereas `title` is the user-facing display name
+  // shown on dashboards and is usually short ("Front Garage"). When a
+  // title is provided it wins; when it isn't, the name is still better
+  // than showing nothing.
   const title = control.title || control.name;
   const typeInfo = CONTROL_TYPE_INFO[controlType];
   const readOnly = typeInfo && !typeInfo.canWrite;

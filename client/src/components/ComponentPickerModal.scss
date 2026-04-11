@@ -135,3 +135,16 @@
     -webkit-box-orient: vertical;
   }
 }
+
+// Tag row below the title/description. Clickable chips add the tag to
+// the active tag filter — same behavior as the list pages.
+.picker-tile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: spacing.$spacing-02;
+  margin-top: spacing.$spacing-02;
+
+  .cds--tag {
+    margin: 0;
+  }
+}
