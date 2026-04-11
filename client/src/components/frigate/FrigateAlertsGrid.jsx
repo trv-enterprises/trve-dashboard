@@ -43,6 +43,8 @@ function FrigateAlertsGrid({ config }) {
   const [error, setError] = useState(null);
   const [selectedReview, setSelectedReview] = useState(null);
   const [clipError, setClipError] = useState(false);
+  const [marking, setMarking] = useState(false);
+  const [markError, setMarkError] = useState(null);
   const intervalRef = useRef(null);
   const mountedRef = useRef(true);
 
@@ -86,12 +88,38 @@ function FrigateAlertsGrid({ config }) {
 
   const handleThumbClick = (review) => {
     setClipError(false);
+    setMarkError(null);
     setSelectedReview(review);
   };
 
   const handleClose = () => {
     setSelectedReview(null);
     setClipError(false);
+    setMarkError(null);
+  };
+
+  // Mark the currently-open review as viewed in Frigate, then optimistically
+  // drop it from the local list and close the modal. If the API call fails,
+  // leave the review in place and surface the error inside the modal.
+  const handleMarkReviewed = async () => {
+    if (!selectedReview || marking) return;
+    const id = selectedReview.id;
+    setMarking(true);
+    setMarkError(null);
+    try {
+      await apiClient.markFrigateReviewsViewed(connectionId, [id]);
+      if (!mountedRef.current) return;
+      // Optimistic local update so the grid reflects the change
+      // immediately without waiting for the next poll.
+      setReviews((prev) => prev.filter((r) => r.id !== id));
+      setSelectedReview(null);
+      setClipError(false);
+    } catch (err) {
+      if (!mountedRef.current) return;
+      setMarkError(err?.message || 'Failed to mark reviewed');
+    } finally {
+      if (mountedRef.current) setMarking(false);
+    }
   };
 
   const formatTime = (epochSec) => {
@@ -160,7 +188,7 @@ function FrigateAlertsGrid({ config }) {
                 aria-label={`Alert on ${review.camera}: ${label}`}
               >
                 <img
-                  src={apiClient.getFrigateReviewThumbnailUrl(connectionId, review.id)}
+                  src={apiClient.getFrigateReviewThumbnailUrl(connectionId, review.id, review.camera)}
                   alt={label}
                   className="frigate-alerts-grid__thumb"
                   loading="lazy"
@@ -187,46 +215,66 @@ function FrigateAlertsGrid({ config }) {
         </div>
       )}
 
-      {/* Modal: plays the review clip, falls back to the thumbnail on error */}
+      {/* Modal: plays the review clip, falls back to the thumbnail on error.
+          Primary action marks the review as viewed in Frigate (removing it
+          from the unreviewed queue); secondary just closes. */}
       <Modal
         open={!!selectedReview}
         onRequestClose={handleClose}
-        onRequestSubmit={handleClose}
+        onRequestSubmit={handleMarkReviewed}
         modalHeading={selectedReview ? `${selectedReview.camera} — ${formatTime(selectedReview.start_time)}` : ''}
-        primaryButtonText="Close"
-        passiveModal={false}
+        primaryButtonText={marking ? 'Marking…' : 'Mark Reviewed'}
+        secondaryButtonText="Close"
+        primaryButtonDisabled={marking}
         size="lg"
         className="frigate-alerts-grid__modal"
       >
-        {selectedReview && (
-          <div className="frigate-alerts-grid__player">
-            {!clipError ? (
-              <video
-                key={selectedReview.id}
-                src={apiClient.getFrigateReviewClipUrl(connectionId, selectedReview.id)}
-                controls
-                autoPlay
-                muted
-                playsInline
-                onError={() => setClipError(true)}
-                className="frigate-alerts-grid__video"
-              />
-            ) : (
-              <img
-                src={apiClient.getFrigateReviewThumbnailUrl(connectionId, selectedReview.id)}
-                alt="Review thumbnail"
-                className="frigate-alerts-grid__modal-image"
-              />
-            )}
-            {selectedReview?.data?.objects?.length > 0 && (
-              <div className="frigate-alerts-grid__modal-tags">
-                {selectedReview.data.objects.map((obj) => (
-                  <Tag key={obj} type="red" size="md">{obj}</Tag>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {selectedReview && (() => {
+          // A review segment's clip lives on its first detection event.
+          // If the review has no linked detection (edge case), fall back
+          // to the thumbnail.
+          const clipUrl = apiClient.getFrigateReviewClipUrl(connectionId, selectedReview);
+          const hasClip = !!clipUrl && !clipError;
+          return (
+            <div className="frigate-alerts-grid__player">
+              {hasClip ? (
+                <video
+                  key={selectedReview.id}
+                  src={clipUrl}
+                  controls
+                  autoPlay
+                  muted
+                  playsInline
+                  onError={() => setClipError(true)}
+                  className="frigate-alerts-grid__video"
+                />
+              ) : (
+                <img
+                  src={apiClient.getFrigateReviewThumbnailUrl(connectionId, selectedReview.id, selectedReview.camera)}
+                  alt="Review thumbnail"
+                  className="frigate-alerts-grid__modal-image"
+                />
+              )}
+              {selectedReview?.data?.objects?.length > 0 && (
+                <div className="frigate-alerts-grid__modal-tags">
+                  {selectedReview.data.objects.map((obj) => (
+                    <Tag key={obj} type="red" size="md">{obj}</Tag>
+                  ))}
+                </div>
+              )}
+              {markError && (
+                <InlineNotification
+                  kind="error"
+                  title="Couldn't mark as reviewed"
+                  subtitle={markError}
+                  hideCloseButton
+                  lowContrast
+                  className="frigate-alerts-grid__mark-error"
+                />
+              )}
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );

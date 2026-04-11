@@ -381,8 +381,8 @@ func main() {
 			frigate.GET("/event/:event_id/clip", frigateHandler.GetEventClip)
 			frigate.GET("/event/:event_id/snapshot", frigateHandler.GetEventSnapshot)
 			frigate.GET("/reviews", frigateHandler.GetReviews)
+			frigate.POST("/reviews/viewed", frigateHandler.MarkReviewsViewed)
 			frigate.GET("/review/:review_id/thumbnail", frigateHandler.GetReviewThumbnail)
-			frigate.GET("/review/:review_id/clip", frigateHandler.GetReviewClip)
 			frigate.GET("/info", frigateHandler.GetInfo)
 			frigate.GET("/live/:camera", frigateHandler.ProxyLiveStream)
 		}

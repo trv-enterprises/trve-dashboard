@@ -286,17 +286,22 @@ func (h *FrigateHandler) GetReviews(c *gin.Context) {
 	io.Copy(c.Writer, resp.Body)
 }
 
-// GetReviewThumbnail proxies a JPEG thumbnail for a review segment.
-// Frigate stores review thumbnails at /api/review/{review_id}/preview/thumbnail.jpg.
-// Some older Frigate versions use /api/review/{id}/thumbnail.jpg — we try the
-// preview path first and fall through on 404.
+// GetReviewThumbnail proxies a WebP thumbnail for a review segment.
+//
+// Frigate stores review thumbnails under /clips/review/thumb-{camera}-{id}.webp
+// (served by Frigate's built-in nginx at `/clips/*`, not via its `/api/*`
+// routes). The review JSON returned by /api/review includes a `thumb_path`
+// field like "/media/frigate/clips/review/thumb-{camera}-{id}.webp" but
+// that's the container filesystem path, not an HTTP URL. We reconstruct
+// the HTTP URL from the camera + review ID the client sends.
 //
 // @Summary Get review thumbnail
-// @Description Returns the JPEG thumbnail for a review segment
+// @Description Returns the WebP thumbnail for a review segment
 // @Tags Frigate
-// @Produce image/jpeg
+// @Produce image/webp
 // @Param connection_id path string true "Connection ID"
 // @Param review_id path string true "Review segment ID"
+// @Param camera query string true "Camera name (required — encoded into the thumbnail filename)"
 // @Success 200 {file} binary
 // @Router /api/frigate/{connection_id}/review/{review_id}/thumbnail [get]
 func (h *FrigateHandler) GetReviewThumbnail(c *gin.Context) {
@@ -312,36 +317,79 @@ func (h *FrigateHandler) GetReviewThumbnail(c *gin.Context) {
 		return
 	}
 
-	frigateURL := fmt.Sprintf("%s/api/review/%s/preview/thumbnail.jpg", baseURL, reviewID)
-	h.proxyBinary(c, frigateURL, "image/jpeg")
+	camera := c.Query("camera")
+	if camera == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "camera query param is required"})
+		return
+	}
+
+	frigateURL := fmt.Sprintf("%s/clips/review/thumb-%s-%s.webp", baseURL, camera, reviewID)
+	h.proxyBinary(c, frigateURL, "image/webp")
 }
 
-// GetReviewClip proxies an MP4 clip for a review segment.
-// Frigate review segments expose their clip at /api/review/{id}/preview.mp4.
+// MarkReviewsViewed marks one or more review segments as reviewed (viewed)
+// in Frigate. Proxies POST /api/reviews/viewed with the body:
 //
-// @Summary Get review clip
-// @Description Returns the MP4 preview clip for a review segment
+//	{ "ids": ["review_id_1", "review_id_2", ...] }
+//
+// Frigate responds with { "success": true, "message": ... } on success or
+// a 422 validation error if the body is malformed.
+//
+// @Summary Mark review segments as reviewed
+// @Description Marks one or more Frigate review segments as reviewed (viewed), removing them from unreviewed listings
 // @Tags Frigate
-// @Produce video/mp4
+// @Accept json
+// @Produce json
 // @Param connection_id path string true "Connection ID"
-// @Param review_id path string true "Review segment ID"
-// @Success 200 {file} binary
-// @Router /api/frigate/{connection_id}/review/{review_id}/clip [get]
-func (h *FrigateHandler) GetReviewClip(c *gin.Context) {
+// @Param body body object true "Review IDs to mark: { ids: string[] }"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/frigate/{connection_id}/reviews/viewed [post]
+func (h *FrigateHandler) MarkReviewsViewed(c *gin.Context) {
 	baseURL, err := h.getFrigateBaseURL(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	reviewID := c.Param("review_id")
-	if reviewID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "review_id is required"})
+	// Read and re-encode the body so we control exactly what hits Frigate
+	// (and so a malformed client request surfaces as a 400 here instead of
+	// a confusing 422 from upstream).
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid request body: %v", err)})
+		return
+	}
+	if len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ids must be a non-empty array"})
 		return
 	}
 
-	frigateURL := fmt.Sprintf("%s/api/review/%s/preview.mp4", baseURL, reviewID)
-	h.proxyBinary(c, frigateURL, "video/mp4")
+	bodyBytes, err := json.Marshal(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to encode request: %v", err)})
+		return
+	}
+
+	frigateURL := fmt.Sprintf("%s/api/reviews/viewed", baseURL)
+	upstreamReq, err := http.NewRequestWithContext(c.Request.Context(), "POST", frigateURL, strings.NewReader(string(bodyBytes)))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to build upstream request: %v", err)})
+		return
+	}
+	upstreamReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := h.httpClient.Do(upstreamReq)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to reach Frigate: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	c.Status(resp.StatusCode)
+	c.Header("Content-Type", "application/json")
+	io.Copy(c.Writer, resp.Body)
 }
 
 // GetEventClip proxies an event clip MP4 from Frigate

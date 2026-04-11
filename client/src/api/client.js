@@ -458,12 +458,42 @@ class APIClient {
     return this.request(`/api/frigate/${connectionId}/reviews?${params}`);
   }
 
-  getFrigateReviewThumbnailUrl(connectionId, reviewId) {
-    return `${this.baseURL}/api/frigate/${connectionId}/review/${encodeURIComponent(reviewId)}/thumbnail`;
+  /**
+   * Mark one or more Frigate review segments as reviewed (viewed).
+   * Removes them from the unreviewed queue.
+   *
+   * @param {string} connectionId Frigate connection
+   * @param {string[]} ids Review segment IDs to mark
+   */
+  async markFrigateReviewsViewed(connectionId, ids) {
+    return this.request(`/api/frigate/${connectionId}/reviews/viewed`, {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    });
   }
 
-  getFrigateReviewClipUrl(connectionId, reviewId) {
-    return `${this.baseURL}/api/frigate/${connectionId}/review/${encodeURIComponent(reviewId)}/clip`;
+  /**
+   * Frigate review thumbnail URL.
+   * Review thumbnails are WebP files under /clips/review/thumb-{camera}-{id}.webp
+   * on the Frigate host. The backend proxy constructs the final path from
+   * the camera + review id, so both must be passed in.
+   */
+  getFrigateReviewThumbnailUrl(connectionId, reviewId, camera) {
+    const params = new URLSearchParams({ camera });
+    return `${this.baseURL}/api/frigate/${connectionId}/review/${encodeURIComponent(reviewId)}/thumbnail?${params}`;
+  }
+
+  /**
+   * Frigate review clip URL. A review segment is a group of detection
+   * events; the review JSON's `data.detections` array holds those event
+   * IDs. There's no dedicated review clip endpoint, so we fetch the clip
+   * for the first detection event (reusing the existing event clip
+   * endpoint that's already proxied and Range-aware).
+   */
+  getFrigateReviewClipUrl(connectionId, review) {
+    const eventId = review?.data?.detections?.[0];
+    if (!eventId) return null;
+    return this.getFrigateEventClipUrl(connectionId, eventId);
   }
 
   getFrigateEventClipUrl(connectionId, eventId) {

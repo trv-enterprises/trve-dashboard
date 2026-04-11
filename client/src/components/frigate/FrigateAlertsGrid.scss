@@ -193,4 +193,9 @@
     gap: spacing.$spacing-02;
     justify-content: center;
   }
+
+  &__mark-error {
+    width: 100%;
+    margin-top: spacing.$spacing-02;
+  }
 }
