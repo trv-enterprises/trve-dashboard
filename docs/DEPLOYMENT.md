@@ -192,6 +192,19 @@ git pull
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
+### Database migrations
+
+Database migrations run automatically at server startup via
+`database.RunMigrations`. Each migration is tracked in the
+`migrations` collection and is idempotent — safe to re-run. In
+particular, the first startup after upgrading to a build that
+introduced case-insensitive collation will rebuild each affected
+collection (copy + drop + rename under the hood). This is normal
+and takes a few seconds on a homelab-scale deployment. Back up the
+database first if you're worried. See
+[`docs/architecture/database.md`](architecture/database.md) for
+migration details.
+
 ---
 
 ## Backup & Restore
