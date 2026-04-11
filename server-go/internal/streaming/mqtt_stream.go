@@ -98,11 +98,19 @@ type MQTTStream struct {
 	subscribers  []*mqttSubscriber
 	topicRefs    map[string]int // ref count: topic filter -> number of subscribers using it
 	buffer       *RingBuffer
-	mu           sync.RWMutex
-	cancelFunc   context.CancelFunc
-	streamCtx    context.Context
-	connected    bool
-	lastError    error
+	// latestByTopic holds the most recent record received per topic key.
+	// Updated on every incoming broker message in handleMessage; snapshotted
+	// into new subscriber channels on SubscribeWithTopics so late subscribers
+	// see retained state immediately, regardless of ring-buffer eviction or
+	// broker ref-count reuse. This is the "retained state" cache that lets
+	// Weather / garage-door sensors / any retained-message topic repopulate
+	// instantly after a dashboard switch.
+	latestByTopic map[string]models.Record
+	mu            sync.RWMutex
+	cancelFunc    context.CancelFunc
+	streamCtx     context.Context
+	connected     bool
+	lastError     error
 }
 
 // NewMQTTStream creates a new MQTT stream
@@ -113,11 +121,12 @@ func NewMQTTStream(datasourceID string, config *models.MQTTConfig, streamConfig 
 	}
 
 	return &MQTTStream{
-		datasourceID: datasourceID,
-		config:       config,
-		subscribers:  make([]*mqttSubscriber, 0),
-		topicRefs:    make(map[string]int),
-		buffer:       NewRingBuffer(bufferSize),
+		datasourceID:  datasourceID,
+		config:        config,
+		subscribers:   make([]*mqttSubscriber, 0),
+		topicRefs:     make(map[string]int),
+		buffer:        NewRingBuffer(bufferSize),
+		latestByTopic: make(map[string]models.Record),
 	}
 }
 
@@ -308,8 +317,12 @@ func (s *MQTTStream) handleMessage(m *paho.Publish) {
 	aggRegistry := GetRegistry()
 	aggRegistry.FeedRecord(s.datasourceID, record)
 
-	// Route to matching subscribers only (non-blocking)
-	s.mu.RLock()
+	// Update the per-topic latest-state cache and route to matching
+	// subscribers under a single write-lock acquisition. Fan-out is
+	// non-blocking (select with default) so holding the write lock
+	// for the loop is still bounded.
+	s.mu.Lock()
+	s.latestByTopic[m.Topic] = record
 	for _, sub := range s.subscribers {
 		if MQTTTopicMatchAny(m.Topic, sub.topics) {
 			select {
@@ -319,7 +332,7 @@ func (s *MQTTStream) handleMessage(m *paho.Publish) {
 			}
 		}
 	}
-	s.mu.RUnlock()
+	s.mu.Unlock()
 }
 
 // Subscribe satisfies the Streamer interface. For MQTT, this subscribes to all topics (#).
@@ -330,6 +343,16 @@ func (s *MQTTStream) Subscribe() chan models.Record {
 
 // SubscribeWithTopics adds a new subscriber with specific topic filters.
 // Dynamically subscribes to new topics at the broker if needed.
+//
+// On subscribe the latest-per-topic cache is snapshotted under the same
+// write lock that registers the subscriber, and matching records are
+// pre-loaded into the new channel. This is how retained-state topics
+// (Weather, garage door contact sensors, etc.) repopulate instantly on
+// dashboard re-entry — without this the caller would wait until the
+// next MQTT publish, because (a) when topicRefs was already > 0 we
+// skip the broker subscribe entirely and never re-request the retained
+// message, and (b) even when we do re-subscribe the ring buffer may
+// have evicted the retained message.
 func (s *MQTTStream) SubscribeWithTopics(topics []string) chan models.Record {
 	ch := make(chan models.Record, 100)
 
@@ -341,6 +364,10 @@ func (s *MQTTStream) SubscribeWithTopics(topics []string) chan models.Record {
 	// Track which topics are new and need broker subscription
 	var newTopics []string
 
+	// Snapshot of cached latest-per-topic records to pre-load into the
+	// new subscriber's channel once we're outside the lock.
+	var preload []models.Record
+
 	s.mu.Lock()
 	s.subscribers = append(s.subscribers, sub)
 
@@ -351,14 +378,34 @@ func (s *MQTTStream) SubscribeWithTopics(topics []string) chan models.Record {
 		}
 	}
 	totalSubs := len(s.subscribers)
+
+	// Snapshot matching cache entries atomically with subscriber
+	// registration so we don't race handleMessage writes.
+	for topic, rec := range s.latestByTopic {
+		if MQTTTopicMatchAny(topic, topics) {
+			preload = append(preload, rec)
+		}
+	}
 	s.mu.Unlock()
+
+	// Pre-load cached state into the new channel. The channel is fresh
+	// (capacity 100, empty), so the non-blocking send is a formality —
+	// a homelab won't have 100+ distinct topics in the cache — but keep
+	// the select to stay defensive.
+	for _, rec := range preload {
+		select {
+		case ch <- rec:
+		default:
+			log.Printf("[MQTTStream %s] preload channel full, skipping record", s.datasourceID)
+		}
+	}
 
 	// Subscribe to new topics at broker level (outside lock)
 	if len(newTopics) > 0 && s.connected {
 		s.subscribeBrokerTopics(newTopics)
 	}
 
-	log.Printf("[MQTTStream %s] Subscriber added for topics %v (total subscribers: %d)", s.datasourceID, topics, totalSubs)
+	log.Printf("[MQTTStream %s] Subscriber added for topics %v (total subscribers: %d, preloaded: %d)", s.datasourceID, topics, totalSubs, len(preload))
 	return ch
 }
 
