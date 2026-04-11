@@ -1209,18 +1209,25 @@ definitions:
     description: Configuration for non-chart visual components (cameras, iframes,
       etc.)
     properties:
+      alert_severity:
+        description: 'Filter by severity: "alert" (default), "detection", or "" for
+          all'
+        type: string
       alert_topic:
         description: 'MQTT topic for alerts (default: "frigate/reviews")'
         type: string
       default_camera:
-        description: Pre-selected camera name
+        description: Pre-selected camera name (frigate_camera) or camera filter (frigate_alerts)
         type: string
       display_type:
-        description: '"frigate_camera", "weather"'
+        description: '"frigate_camera", "frigate_alerts", "weather"'
         type: string
       frigate_connection_id:
-        description: Frigate-specific fields (only used when display_type = "frigate_camera")
+        description: Frigate-specific fields (used by frigate_camera and frigate_alerts)
         type: string
+      max_thumbnails:
+        description: Frigate alerts grid fields (only used when display_type = "frigate_alerts")
+        type: integer
       mqtt_connection_id:
         description: MQTT connection for alert/weather subscription
         type: string
@@ -3114,6 +3121,105 @@ paths:
         type: string
       responses: {}
       summary: Proxy Frigate JSMPEG live stream
+      tags:
+      - Frigate
+  /api/frigate/{connection_id}/review/{review_id}/thumbnail:
+    get:
+      description: Returns the WebP thumbnail for a review segment
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connection_id
+        required: true
+        type: string
+      - description: Review segment ID
+        in: path
+        name: review_id
+        required: true
+        type: string
+      - description: Camera name (required — encoded into the thumbnail filename)
+        in: query
+        name: camera
+        required: true
+        type: string
+      produces:
+      - image/webp
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      summary: Get review thumbnail
+      tags:
+      - Frigate
+  /api/frigate/{connection_id}/reviews:
+    get:
+      description: Returns Frigate review segments, defaulted to unreviewed alerts.
+        Used by the Frigate Alerts widget.
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connection_id
+        required: true
+        type: string
+      - default: 20
+        description: Max reviews to return
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by camera name
+        in: query
+        name: camera
+        type: string
+      - description: Filter by severity (alert, detection)
+        in: query
+        name: severity
+        type: string
+      - default: 0
+        description: Include reviewed (1) or only unreviewed (0)
+        in: query
+        name: reviewed
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+      summary: Get camera review segments
+      tags:
+      - Frigate
+  /api/frigate/{connection_id}/reviews/viewed:
+    post:
+      consumes:
+      - application/json
+      description: Marks one or more Frigate review segments as reviewed (viewed),
+        removing them from unreviewed listings
+      parameters:
+      - description: Connection ID
+        in: path
+        name: connection_id
+        required: true
+        type: string
+      - description: 'Review IDs to mark: { ids: string[] }'
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Mark review segments as reviewed
       tags:
       - Frigate
   /api/frigate/{connection_id}/snapshot/{camera}:

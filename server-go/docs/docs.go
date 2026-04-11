@@ -1360,6 +1360,150 @@ const docTemplate = `{
                 "responses": {}
             }
         },
+        "/api/frigate/{connection_id}/review/{review_id}/thumbnail": {
+            "get": {
+                "description": "Returns the WebP thumbnail for a review segment",
+                "produces": [
+                    "image/webp"
+                ],
+                "tags": [
+                    "Frigate"
+                ],
+                "summary": "Get review thumbnail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection ID",
+                        "name": "connection_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Review segment ID",
+                        "name": "review_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Camera name (required — encoded into the thumbnail filename)",
+                        "name": "camera",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/frigate/{connection_id}/reviews": {
+            "get": {
+                "description": "Returns Frigate review segments, defaulted to unreviewed alerts. Used by the Frigate Alerts widget.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Frigate"
+                ],
+                "summary": "Get camera review segments",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection ID",
+                        "name": "connection_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Max reviews to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by camera name",
+                        "name": "camera",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by severity (alert, detection)",
+                        "name": "severity",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Include reviewed (1) or only unreviewed (0)",
+                        "name": "reviewed",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/frigate/{connection_id}/reviews/viewed": {
+            "post": {
+                "description": "Marks one or more Frigate review segments as reviewed (viewed), removing them from unreviewed listings",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Frigate"
+                ],
+                "summary": "Mark review segments as reviewed",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection ID",
+                        "name": "connection_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Review IDs to mark: { ids: string[] }",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/frigate/{connection_id}/snapshot/{camera}": {
             "get": {
                 "description": "Returns the latest JPEG snapshot for a camera",
@@ -5706,21 +5850,29 @@ const docTemplate = `{
             "description": "Configuration for non-chart visual components (cameras, iframes, etc.)",
             "type": "object",
             "properties": {
+                "alert_severity": {
+                    "description": "Filter by severity: \"alert\" (default), \"detection\", or \"\" for all",
+                    "type": "string"
+                },
                 "alert_topic": {
                     "description": "MQTT topic for alerts (default: \"frigate/reviews\")",
                     "type": "string"
                 },
                 "default_camera": {
-                    "description": "Pre-selected camera name",
+                    "description": "Pre-selected camera name (frigate_camera) or camera filter (frigate_alerts)",
                     "type": "string"
                 },
                 "display_type": {
-                    "description": "\"frigate_camera\", \"weather\"",
+                    "description": "\"frigate_camera\", \"frigate_alerts\", \"weather\"",
                     "type": "string"
                 },
                 "frigate_connection_id": {
-                    "description": "Frigate-specific fields (only used when display_type = \"frigate_camera\")",
+                    "description": "Frigate-specific fields (used by frigate_camera and frigate_alerts)",
                     "type": "string"
+                },
+                "max_thumbnails": {
+                    "description": "Frigate alerts grid fields (only used when display_type = \"frigate_alerts\")",
+                    "type": "integer"
                 },
                 "mqtt_connection_id": {
                     "description": "MQTT connection for alert/weather subscription",
