@@ -9,37 +9,53 @@ import (
 	"fmt"
 
 	"github.com/trv-enterprises/trve-dashboard/internal/models"
+	"github.com/trv-enterprises/trve-dashboard/internal/registry"
 	"github.com/trv-enterprises/trve-dashboard/internal/service"
 )
 
-// ToolRegistry manages MCP tool definitions and handlers
+// ToolRegistry manages MCP tool definitions and their handlers. The
+// registry is built once at server startup and reads its type metadata
+// from the unified registry package — there are no hardcoded enums in
+// this file. Adding a new connection type, chart type, or control type
+// only requires touching the registry package; the MCP tools update
+// automatically.
 type ToolRegistry struct {
 	tools    map[string]Tool
 	handlers map[string]ToolHandler
 
-	datasourceService *service.DatasourceService
+	connectionService *service.DatasourceService
 	dashboardService  *service.DashboardService
 	chartService      *service.ChartService
+	deviceTypeService *service.DeviceTypeService
 }
 
-// NewToolRegistry creates a new tool registry with the given services
-func NewToolRegistry(datasourceSvc *service.DatasourceService, dashboardSvc *service.DashboardService, chartSvc *service.ChartService) *ToolRegistry {
+// NewToolRegistry wires services into a fresh tool registry and registers
+// every tool the MCP server exposes.
+func NewToolRegistry(
+	connectionSvc *service.DatasourceService,
+	dashboardSvc *service.DashboardService,
+	chartSvc *service.ChartService,
+	deviceTypeSvc *service.DeviceTypeService,
+) *ToolRegistry {
 	r := &ToolRegistry{
 		tools:             make(map[string]Tool),
 		handlers:          make(map[string]ToolHandler),
-		datasourceService: datasourceSvc,
+		connectionService: connectionSvc,
 		dashboardService:  dashboardSvc,
 		chartService:      chartSvc,
+		deviceTypeService: deviceTypeSvc,
 	}
 
-	r.registerDatasourceTools()
+	r.registerCatalogTools()
+	r.registerConnectionTools()
+	r.registerDiscoveryTools()
+	r.registerComponentTools()
 	r.registerDashboardTools()
-	r.registerChartTools()
 
 	return r
 }
 
-// GetTools returns all registered tools
+// GetTools returns all registered tools.
 func (r *ToolRegistry) GetTools() []Tool {
 	tools := make([]Tool, 0, len(r.tools))
 	for _, tool := range r.tools {
@@ -48,7 +64,7 @@ func (r *ToolRegistry) GetTools() []Tool {
 	return tools
 }
 
-// CallTool executes a tool by name with the given arguments
+// CallTool executes a tool by name.
 func (r *ToolRegistry) CallTool(name string, args map[string]interface{}) (interface{}, error) {
 	handler, ok := r.handlers[name]
 	if !ok {
@@ -57,383 +73,812 @@ func (r *ToolRegistry) CallTool(name string, args map[string]interface{}) (inter
 	return handler(args)
 }
 
-// registerTool registers a tool definition and handler
 func (r *ToolRegistry) registerTool(tool Tool, handler ToolHandler) {
 	r.tools[tool.Name] = tool
 	r.handlers[tool.Name] = handler
 }
 
-// registerDatasourceTools registers all data source-related tools
-func (r *ToolRegistry) registerDatasourceTools() {
-	// list_datasources
+// deviceTypeLister adapts the device type service for the catalog builder.
+type deviceTypeListerAdapter struct {
+	svc *service.DeviceTypeService
+}
+
+func (a *deviceTypeListerAdapter) ListDeviceTypesForCatalog(ctx context.Context) ([]registry.DeviceTypeSummary, error) {
+	if a.svc == nil {
+		return nil, nil
+	}
+	resp, err := a.svc.ListDeviceTypes(ctx, &models.DeviceTypeQueryParams{Page: 1, PageSize: 500})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]registry.DeviceTypeSummary, 0, len(resp.DeviceTypes))
+	for _, dt := range resp.DeviceTypes {
+		out = append(out, registry.DeviceTypeSummary{
+			ID:             dt.ID,
+			Name:           dt.Name,
+			Description:    dt.Description,
+			Category:       dt.Category,
+			Protocol:       dt.Protocol,
+			SupportedTypes: dt.SupportedTypes,
+			IsBuiltIn:      dt.IsBuiltIn,
+		})
+	}
+	return out, nil
+}
+
+func (r *ToolRegistry) deviceTypeLister() registry.DeviceTypeLister {
+	if r.deviceTypeService == nil {
+		return nil
+	}
+	return &deviceTypeListerAdapter{svc: r.deviceTypeService}
+}
+
+// ============================================================================
+// Catalog tools — start here. The first thing an external agent should call
+// is `get_type_catalog` to discover what kinds of connections, charts,
+// controls, displays, and device types this server supports.
+// ============================================================================
+
+func (r *ToolRegistry) registerCatalogTools() {
 	r.registerTool(
 		Tool{
-			Name:        "list_datasources",
-			Description: "List all configured data sources",
+			Name:        "get_type_catalog",
+			Description: "Returns the unified catalog of every type the dashboard knows about: connection types (with required config fields), chart subtypes (bar/line/pie/etc with their data requirements), control subtypes (button/toggle/slider/etc with capabilities), display subtypes, and user-defined device types. Call this first when planning to build a dashboard so you understand what's available.",
 			InputSchema: InputSchema{
 				Type:       "object",
 				Properties: map[string]PropertySchema{},
-				Required:   []string{},
 			},
 		},
 		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-			datasources, total, err := r.datasourceService.ListDatasources(ctx, 100, 0)
+			return registry.BuildCatalog(context.Background(), r.deviceTypeLister())
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "list_connection_types",
+			Description: "List the connection (datasource) types this server supports. Each entry includes the type ID, capabilities (read/write/stream), and required configuration fields. Use this before calling create_connection.",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertySchema{},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			return map[string]interface{}{"types": registry.List()}, nil
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "list_chart_types",
+			Description: "List supported chart subtypes (bar, line, pie, scatter, gauge, dataview, custom, etc) with their data requirements (does it need x_axis, multiple y_axis values, etc). Use this before calling create_component with component_type=chart.",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertySchema{},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			return map[string]interface{}{"types": registry.ListComponentTypes(registry.CategoryChart)}, nil
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "list_control_types",
+			Description: "List supported control subtypes (button, toggle, slider, switch, dimmer, garage_door, tile_*, etc) with their capabilities. Writable controls require a device_type_id when bound to a connection — see list_device_types.",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertySchema{},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			return map[string]interface{}{"types": registry.ListComponentTypes(registry.CategoryControl)}, nil
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "list_display_types",
+			Description: "List supported display subtypes (frigate_camera, frigate_alerts, weather, etc). Displays are non-chart visual components bundled with the frontend.",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertySchema{},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			return map[string]interface{}{"types": registry.ListComponentTypes(registry.CategoryDisplay)}, nil
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "list_device_types",
+			Description: "List user-defined device types from MongoDB. Each device type carries a command schema and a list of supported control subtypes — required when creating a writable control bound to a connection.",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertySchema{},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			if r.deviceTypeService == nil {
+				return map[string]interface{}{"device_types": []interface{}{}, "count": 0}, nil
+			}
+			resp, err := r.deviceTypeService.ListDeviceTypes(context.Background(), &models.DeviceTypeQueryParams{Page: 1, PageSize: 500})
 			if err != nil {
 				return nil, err
 			}
 			return map[string]interface{}{
-				"datasources": datasources,
+				"device_types": resp.DeviceTypes,
+				"count":        resp.Total,
+			}, nil
+		},
+	)
+}
+
+// ============================================================================
+// Connection tools — CRUD over the datasources collection. We use
+// "connection" terminology in tool names and descriptions even though the
+// underlying model and collection are still called datasource.
+// ============================================================================
+
+func (r *ToolRegistry) registerConnectionTools() {
+	r.registerTool(
+		Tool{
+			Name:        "list_connections",
+			Description: "List all configured connections (datasources). Returns name, type, health status, and ID for each.",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertySchema{},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			ctx := context.Background()
+			conns, total, err := r.connectionService.ListDatasources(ctx, 100, 0)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{
+				"connections": conns,
 				"count":       total,
 			}, nil
 		},
 	)
 
-	// get_datasource
 	r.registerTool(
 		Tool{
-			Name:        "get_datasource",
-			Description: "Get a specific data source by ID",
+			Name:        "get_connection",
+			Description: "Get the full configuration for a single connection by ID.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
-					"id": {
-						Type:        "string",
-						Description: "Data source ID",
-					},
+					"id": {Type: "string", Description: "Connection ID"},
 				},
 				Required: []string{"id"},
 			},
 		},
 		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
 			id, ok := args["id"].(string)
 			if !ok {
 				return nil, fmt.Errorf("id must be a string")
 			}
-			return r.datasourceService.GetDatasource(ctx, id)
+			return r.connectionService.GetDatasource(context.Background(), id)
 		},
 	)
 
-	// create_datasource
 	r.registerTool(
 		Tool{
-			Name:        "create_datasource",
-			Description: "Create a new data source configuration",
+			Name:        "create_connection",
+			Description: "Create a new connection. Call list_connection_types first to see what `type` values are supported and what fields each requires in `config`. The `config` object must contain a sub-object matching the type (e.g. `config.mqtt`, `config.sql`, `config.api`).",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
-					"name": {
-						Type:        "string",
-						Description: "Data source name",
-					},
-					"type": {
-						Type:        "string",
-						Description: "Data source type",
-						Enum:        []string{"api", "sql", "csv", "socket"},
-					},
-					"description": {
-						Type:        "string",
-						Description: "Optional description",
-					},
-					"config": {
-						Type:        "object",
-						Description: "Data source configuration (api, sql, csv, or socket config)",
-					},
+					"name":        {Type: "string", Description: "Connection name (must be unique)"},
+					"type":        {Type: "string", Description: "Connection type — call list_connection_types for valid values"},
+					"description": {Type: "string", Description: "Optional human-readable description"},
+					"config":      {Type: "object", Description: "Type-specific configuration. Shape depends on `type`."},
+					"tags":        {Type: "array", Description: "Optional tags for organization"},
 				},
 				Required: []string{"name", "type", "config"},
 			},
 		},
 		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-
 			req := &models.CreateDatasourceRequest{
 				Name:        getString(args, "name"),
 				Description: getString(args, "description"),
 				Type:        models.DatasourceType(getString(args, "type")),
 			}
-
-			// Parse config based on type
-			if configMap, ok := args["config"].(map[string]interface{}); ok {
-				req.Config = parseDatasourceConfig(req.Type, configMap)
+			if cfg, ok := args["config"].(map[string]interface{}); ok {
+				req.Config = parseDatasourceConfig(req.Type, cfg)
 			}
-
-			return r.datasourceService.CreateDatasource(ctx, req)
+			if tagsRaw, ok := args["tags"].([]interface{}); ok {
+				req.Tags = parseStringArray(tagsRaw)
+			}
+			return r.connectionService.CreateDatasource(context.Background(), req)
 		},
 	)
 
-	// update_datasource
 	r.registerTool(
 		Tool{
-			Name:        "update_datasource",
-			Description: "Update an existing data source",
+			Name:        "update_connection",
+			Description: "Update an existing connection. Provide only the fields you want to change.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
-					"id": {
-						Type:        "string",
-						Description: "Data source ID",
-					},
-					"name": {
-						Type:        "string",
-						Description: "New name (optional)",
-					},
-					"description": {
-						Type:        "string",
-						Description: "New description (optional)",
-					},
-					"config": {
-						Type:        "object",
-						Description: "Updated configuration (optional)",
-					},
+					"id":          {Type: "string", Description: "Connection ID"},
+					"name":        {Type: "string", Description: "New name (optional)"},
+					"description": {Type: "string", Description: "New description (optional)"},
 				},
 				Required: []string{"id"},
 			},
 		},
 		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
 			id := getString(args, "id")
-
 			req := &models.UpdateDatasourceRequest{
 				Name:        getString(args, "name"),
 				Description: getString(args, "description"),
 			}
-
-			return r.datasourceService.UpdateDatasource(ctx, id, req)
+			return r.connectionService.UpdateDatasource(context.Background(), id, req)
 		},
 	)
 
-	// delete_datasource
 	r.registerTool(
 		Tool{
-			Name:        "delete_datasource",
-			Description: "Delete a data source",
+			Name:        "delete_connection",
+			Description: "Delete a connection by ID. Components referencing it will lose their data binding — consider listing dashboards/charts that depend on it first.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
-					"id": {
-						Type:        "string",
-						Description: "Data source ID",
-					},
+					"id": {Type: "string", Description: "Connection ID"},
 				},
 				Required: []string{"id"},
 			},
 		},
 		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
 			id := getString(args, "id")
-			err := r.datasourceService.DeleteDatasource(ctx, id)
-			if err != nil {
+			if err := r.connectionService.DeleteDatasource(context.Background(), id); err != nil {
 				return nil, err
 			}
-			return map[string]interface{}{
-				"success": true,
-				"message": fmt.Sprintf("Data source %s deleted", id),
-			}, nil
+			return map[string]interface{}{"success": true, "message": fmt.Sprintf("Connection %s deleted", id)}, nil
 		},
 	)
 
-	// query_datasource
 	r.registerTool(
 		Tool{
-			Name:        "query_datasource",
-			Description: "Query data from a data source",
+			Name:        "test_connection",
+			Description: "Health-check an existing connection. Returns whether the connection is reachable and any error details.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
-					"datasource_id": {
-						Type:        "string",
-						Description: "ID of the data source to query",
-					},
-					"query": {
-						Type:        "object",
-						Description: "Query parameters (raw query, type, params)",
-					},
-				},
-				Required: []string{"datasource_id", "query"},
-			},
-		},
-		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-			dsID := getString(args, "datasource_id")
-
-			queryMap, _ := args["query"].(map[string]interface{})
-			query := models.Query{
-				Raw:    getString(queryMap, "raw"),
-				Type:   models.QueryType(getString(queryMap, "type")),
-				Params: getMap(queryMap, "params"),
-			}
-
-			req := &models.QueryRequest{Query: query}
-			return r.datasourceService.QueryDatasource(ctx, dsID, req)
-		},
-	)
-
-	// test_datasource
-	r.registerTool(
-		Tool{
-			Name:        "test_datasource",
-			Description: "Test a data source connection",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]PropertySchema{
-					"id": {
-						Type:        "string",
-						Description: "Data source ID to test",
-					},
+					"id": {Type: "string", Description: "Connection ID"},
 				},
 				Required: []string{"id"},
 			},
 		},
 		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-			id := getString(args, "id")
-			return r.datasourceService.CheckHealth(ctx, id)
+			return r.connectionService.CheckHealth(context.Background(), getString(args, "id"))
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "query_connection",
+			Description: "Execute an ad-hoc query against a connection. The `query` object takes `raw` (the query string), `type` (sql / api / csv_filter / stream_filter), and optional `params`. Returns columns and rows.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"connection_id": {Type: "string", Description: "Connection ID to query"},
+					"query":         {Type: "object", Description: "Query object with `raw`, `type`, and optional `params`"},
+				},
+				Required: []string{"connection_id", "query"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			id := getString(args, "connection_id")
+			queryMap, _ := args["query"].(map[string]interface{})
+			req := &models.QueryRequest{
+				Query: models.Query{
+					Raw:    getString(queryMap, "raw"),
+					Type:   models.QueryType(getString(queryMap, "type")),
+					Params: getMap(queryMap, "params"),
+				},
+			}
+			return r.connectionService.QueryDatasource(context.Background(), id, req)
 		},
 	)
 }
 
-// registerDashboardTools registers all dashboard-related tools
-func (r *ToolRegistry) registerDashboardTools() {
-	// list_dashboards
-	r.registerTool(
-		Tool{
-			Name:        "list_dashboards",
-			Description: "List all dashboards",
-			InputSchema: InputSchema{
-				Type:       "object",
-				Properties: map[string]PropertySchema{},
-				Required:   []string{},
-			},
-		},
-		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-			params := models.DashboardQueryParams{
-				Page:     1,
-				PageSize: 100,
-			}
-			result, err := r.dashboardService.ListDashboards(ctx, params)
-			if err != nil {
-				return nil, err
-			}
-			return map[string]interface{}{
-				"dashboards": result.Dashboards,
-				"count":      result.Total,
-			}, nil
-		},
-	)
+// ============================================================================
+// Discovery tools — let an agent introspect the data shape of an existing
+// connection (database schema, MQTT topics, EdgeLake tables, Prometheus
+// labels, etc) before generating queries or building components.
+// ============================================================================
 
-	// get_dashboard
+func (r *ToolRegistry) registerDiscoveryTools() {
 	r.registerTool(
 		Tool{
-			Name:        "get_dashboard",
-			Description: "Get a specific dashboard by ID",
+			Name:        "get_connection_schema",
+			Description: "Discover the schema of a connection. SQL connections return tables and columns. Prometheus connections return available metrics and labels. Returns a not-supported error for connection types that don't expose schema (CSV, raw socket, etc).",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
-					"id": {
-						Type:        "string",
-						Description: "Dashboard ID",
-					},
+					"connection_id": {Type: "string", Description: "Connection ID"},
+				},
+				Required: []string{"connection_id"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			return r.connectionService.GetSchema(context.Background(), getString(args, "connection_id"))
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "list_mqtt_topics",
+			Description: "List topics observed on an MQTT connection. The MQTT adapter snoops the broker for a short window and returns whatever it sees. MQTT-only.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"connection_id": {Type: "string", Description: "MQTT connection ID"},
+				},
+				Required: []string{"connection_id"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			topics, err := r.connectionService.GetMQTTTopics(context.Background(), getString(args, "connection_id"))
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{"topics": topics, "count": len(topics)}, nil
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "sample_mqtt_topic",
+			Description: "Subscribe briefly to an MQTT topic and return one sample payload. Useful for inferring the JSON shape so you know what `state_field` to set on a control.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"connection_id": {Type: "string", Description: "MQTT connection ID"},
+					"topic":         {Type: "string", Description: "Topic name to sample"},
+				},
+				Required: []string{"connection_id", "topic"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			return r.connectionService.SampleMQTTTopic(context.Background(), getString(args, "connection_id"), getString(args, "topic"))
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "list_edgelake_databases",
+			Description: "List databases available on an EdgeLake connection.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"connection_id": {Type: "string", Description: "EdgeLake connection ID"},
+				},
+				Required: []string{"connection_id"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			dbs, err := r.connectionService.GetEdgeLakeDatabases(context.Background(), getString(args, "connection_id"))
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{"databases": dbs, "count": len(dbs)}, nil
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "list_edgelake_tables",
+			Description: "List tables in an EdgeLake database.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"connection_id": {Type: "string", Description: "EdgeLake connection ID"},
+					"database":      {Type: "string", Description: "Database name"},
+				},
+				Required: []string{"connection_id", "database"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			tables, err := r.connectionService.GetEdgeLakeTables(context.Background(), getString(args, "connection_id"), getString(args, "database"))
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{"tables": tables, "count": len(tables)}, nil
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "get_edgelake_table_schema",
+			Description: "Get column information for an EdgeLake table.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"connection_id": {Type: "string", Description: "EdgeLake connection ID"},
+					"database":      {Type: "string", Description: "Database name"},
+					"table":         {Type: "string", Description: "Table name"},
+				},
+				Required: []string{"connection_id", "database", "table"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			cols, err := r.connectionService.GetEdgeLakeSchema(context.Background(), getString(args, "connection_id"), getString(args, "database"), getString(args, "table"))
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{"columns": cols, "count": len(cols)}, nil
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "list_prometheus_label_values",
+			Description: "Return all known values for a Prometheus label across the indexed series.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"connection_id": {Type: "string", Description: "Prometheus connection ID"},
+					"label":         {Type: "string", Description: "Label name"},
+				},
+				Required: []string{"connection_id", "label"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			values, err := r.connectionService.GetPrometheusLabelValues(context.Background(), getString(args, "connection_id"), getString(args, "label"))
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{"values": values, "count": len(values)}, nil
+		},
+	)
+}
+
+// ============================================================================
+// Component tools — covers chart, control, and display components. They all
+// live in the same `charts` collection, distinguished by `component_type`.
+// ============================================================================
+
+func (r *ToolRegistry) registerComponentTools() {
+	r.registerTool(
+		Tool{
+			Name:        "list_components",
+			Description: "List components (charts/controls/displays). Optionally filter by chart_type, connection ID, or tag. Components are stored in one collection and discriminated by `component_type`.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"chart_type":    {Type: "string", Description: "Filter by chart subtype (bar, line, etc)"},
+					"connection_id": {Type: "string", Description: "Filter by connection ID"},
+					"tag":           {Type: "string", Description: "Filter by tag"},
+				},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			params := models.ChartQueryParams{
+				Page:         1,
+				PageSize:     100,
+				ChartType:    getString(args, "chart_type"),
+				DatasourceID: getString(args, "connection_id"),
+				Tag:          getString(args, "tag"),
+			}
+			result, err := r.chartService.ListCharts(context.Background(), params)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{"components": result.Charts, "count": result.Total}, nil
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "get_component",
+			Description: "Get a single component by ID. Returns the full chart/control/display record including query_config, data_mapping, control_config, etc.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"id": {Type: "string", Description: "Component ID"},
 				},
 				Required: []string{"id"},
 			},
 		},
 		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-			id := getString(args, "id")
-			return r.dashboardService.GetDashboard(ctx, id)
+			return r.chartService.GetChart(context.Background(), getString(args, "id"))
 		},
 	)
 
-	// create_dashboard
 	r.registerTool(
 		Tool{
-			Name:        "create_dashboard",
-			Description: "Create a new dashboard with panels that reference charts",
+			Name:        "list_component_summaries",
+			Description: "Lightweight component summary list (id + name + type + thumbnail) for selection UIs. Cheaper than list_components when you don't need the full record.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
-					"name": {
-						Type:        "string",
-						Description: "Dashboard name",
-					},
-					"description": {
-						Type:        "string",
-						Description: "Dashboard description",
-					},
-					"panels": {
-						Type:        "array",
-						Description: "Array of panel configurations (id, x, y, w, h, chart_id)",
-					},
-					"settings": {
-						Type:        "object",
-						Description: "Dashboard settings (theme, refresh_interval, etc.)",
-					},
+					"limit": {Type: "number", Description: "Maximum summaries (default 50)"},
+				},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			limit := int64(50)
+			if l := getInt(args, "limit"); l > 0 {
+				limit = int64(l)
+			}
+			return r.chartService.GetChartSummaries(context.Background(), limit)
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "create_component",
+			Description: "Create a new component. Set `component_type` to chart, control, or display. Charts need `chart_type`, `connection_id`, `query_config`, and `data_mapping` (call list_chart_types first). Controls need `control_config` with `control_type` (call list_control_types). Displays need `display_config` with `display_type` (call list_display_types).",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"name":            {Type: "string", Description: "Unique component name"},
+					"description":     {Type: "string", Description: "Description"},
+					"component_type":  {Type: "string", Description: "chart | control | display", Enum: []string{"chart", "control", "display"}},
+					"chart_type":      {Type: "string", Description: "Chart subtype (bar, line, pie, etc) — for chart components"},
+					"connection_id":   {Type: "string", Description: "Connection ID for data binding"},
+					"query_config":    {Type: "object", Description: "Query: {raw, type, params}"},
+					"data_mapping":    {Type: "object", Description: "Data mapping: {x_axis, y_axis, group_by, filters, aggregation, ...}"},
+					"control_config":  {Type: "object", Description: "Control config: {control_type, device_type_id, target, ui_config}"},
+					"display_config":  {Type: "object", Description: "Display config: {display_type, ...display-specific fields}"},
+					"component_code":  {Type: "string", Description: "React component code (for chart_type=custom or use_custom_code=true)"},
+					"use_custom_code": {Type: "boolean", Description: "Render via custom React code instead of ECharts options"},
+					"options":         {Type: "object", Description: "ECharts options overrides"},
+					"tags":            {Type: "array", Description: "Tags"},
 				},
 				Required: []string{"name"},
 			},
 		},
 		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-
-			req := &models.CreateDashboardRequest{
-				Name:        getString(args, "name"),
-				Description: getString(args, "description"),
+			req := &models.CreateChartRequest{
+				Name:          getString(args, "name"),
+				Description:   getString(args, "description"),
+				ComponentType: getString(args, "component_type"),
+				ChartType:     getString(args, "chart_type"),
+				DatasourceID:  getString(args, "connection_id"),
+				ComponentCode: getString(args, "component_code"),
+				UseCustomCode: getBool(args, "use_custom_code"),
 			}
-
-			// Parse panels
-			if panelsRaw, ok := args["panels"].([]interface{}); ok {
-				req.Panels = parsePanels(panelsRaw)
+			if qc, ok := args["query_config"].(map[string]interface{}); ok {
+				req.QueryConfig = parseQueryConfig(qc)
 			}
-
-			// Parse settings
-			if settingsRaw, ok := args["settings"].(map[string]interface{}); ok {
-				req.Settings = parseSettings(settingsRaw)
+			if dm, ok := args["data_mapping"].(map[string]interface{}); ok {
+				req.DataMapping = parseDataMapping(dm)
 			}
-
-			return r.dashboardService.CreateDashboard(ctx, req)
+			if cc, ok := args["control_config"].(map[string]interface{}); ok {
+				req.ControlConfig = parseControlConfig(cc)
+			}
+			if dc, ok := args["display_config"].(map[string]interface{}); ok {
+				req.DisplayConfig = parseDisplayConfig(dc)
+			}
+			if opts, ok := args["options"].(map[string]interface{}); ok {
+				req.Options = opts
+			}
+			if tagsRaw, ok := args["tags"].([]interface{}); ok {
+				req.Tags = parseStringArray(tagsRaw)
+			}
+			return r.chartService.CreateChart(context.Background(), req)
 		},
 	)
 
-	// update_dashboard
 	r.registerTool(
 		Tool{
-			Name:        "update_dashboard",
-			Description: "Update an existing dashboard",
+			Name:        "update_component",
+			Description: "Update an existing component. Only provided fields are changed.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
-					"id": {
-						Type:        "string",
-						Description: "Dashboard ID",
-					},
-					"name": {
-						Type:        "string",
-						Description: "New name (optional)",
-					},
-					"description": {
-						Type:        "string",
-						Description: "New description (optional)",
-					},
-					"panels": {
-						Type:        "array",
-						Description: "Updated panels with chart_id references (optional)",
-					},
-					"settings": {
-						Type:        "object",
-						Description: "Updated settings (optional)",
-					},
+					"id":              {Type: "string", Description: "Component ID"},
+					"name":            {Type: "string", Description: "New name"},
+					"description":     {Type: "string", Description: "New description"},
+					"chart_type":      {Type: "string", Description: "New chart subtype"},
+					"connection_id":   {Type: "string", Description: "New connection ID"},
+					"query_config":    {Type: "object", Description: "New query config"},
+					"data_mapping":    {Type: "object", Description: "New data mapping"},
+					"control_config":  {Type: "object", Description: "New control config"},
+					"display_config":  {Type: "object", Description: "New display config"},
+					"component_code":  {Type: "string", Description: "New component code"},
+					"use_custom_code": {Type: "boolean", Description: "New custom-code flag"},
+					"options":         {Type: "object", Description: "New options"},
+					"tags":            {Type: "array", Description: "New tags"},
 				},
 				Required: []string{"id"},
 			},
 		},
 		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
 			id := getString(args, "id")
+			req := &models.UpdateChartRequest{}
+			if name := getString(args, "name"); name != "" {
+				req.Name = &name
+			}
+			if desc := getString(args, "description"); desc != "" {
+				req.Description = &desc
+			}
+			if ct := getString(args, "chart_type"); ct != "" {
+				req.ChartType = &ct
+			}
+			if cid := getString(args, "connection_id"); cid != "" {
+				req.DatasourceID = &cid
+			}
+			if code := getString(args, "component_code"); code != "" {
+				req.ComponentCode = &code
+			}
+			if _, ok := args["use_custom_code"]; ok {
+				v := getBool(args, "use_custom_code")
+				req.UseCustomCode = &v
+			}
+			if qc, ok := args["query_config"].(map[string]interface{}); ok {
+				req.QueryConfig = parseQueryConfig(qc)
+			}
+			if dm, ok := args["data_mapping"].(map[string]interface{}); ok {
+				req.DataMapping = parseDataMapping(dm)
+			}
+			if cc, ok := args["control_config"].(map[string]interface{}); ok {
+				req.ControlConfig = parseControlConfig(cc)
+			}
+			if dc, ok := args["display_config"].(map[string]interface{}); ok {
+				req.DisplayConfig = parseDisplayConfig(dc)
+			}
+			if opts, ok := args["options"].(map[string]interface{}); ok {
+				req.Options = &opts
+			}
+			if tagsRaw, ok := args["tags"].([]interface{}); ok {
+				tags := parseStringArray(tagsRaw)
+				req.Tags = &tags
+			}
+			return r.chartService.UpdateChart(context.Background(), id, req)
+		},
+	)
 
+	r.registerTool(
+		Tool{
+			Name:        "delete_component",
+			Description: "Delete a component by ID. Dashboards referencing it will show an empty panel.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"id": {Type: "string", Description: "Component ID"},
+				},
+				Required: []string{"id"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			id := getString(args, "id")
+			if err := r.chartService.DeleteChart(context.Background(), id); err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{"success": true, "message": fmt.Sprintf("Component %s deleted", id)}, nil
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "list_dashboards_using_component",
+			Description: "Find every dashboard that references a specific component. Useful before deleting a component to see what would break.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"component_id": {Type: "string", Description: "Component ID"},
+				},
+				Required: []string{"component_id"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			params := models.DashboardQueryParams{
+				ChartID:  getString(args, "component_id"),
+				Page:     1,
+				PageSize: 100,
+			}
+			result, err := r.dashboardService.ListDashboards(context.Background(), params)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{"dashboards": result.Dashboards, "count": result.Total}, nil
+		},
+	)
+}
+
+// ============================================================================
+// Dashboard tools. Dashboards are a name + grid panels. Each panel either
+// references a component (chart_id) or carries inline text (text_config).
+// ============================================================================
+
+func (r *ToolRegistry) registerDashboardTools() {
+	r.registerTool(
+		Tool{
+			Name:        "list_dashboards",
+			Description: "List all dashboards.",
+			InputSchema: InputSchema{
+				Type:       "object",
+				Properties: map[string]PropertySchema{},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			result, err := r.dashboardService.ListDashboards(context.Background(), models.DashboardQueryParams{Page: 1, PageSize: 100})
+			if err != nil {
+				return nil, err
+			}
+			return map[string]interface{}{"dashboards": result.Dashboards, "count": result.Total}, nil
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "get_dashboard",
+			Description: "Get a single dashboard by ID, including its panel layout.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"id": {Type: "string", Description: "Dashboard ID"},
+				},
+				Required: []string{"id"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			return r.dashboardService.GetDashboard(context.Background(), getString(args, "id"))
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "create_dashboard",
+			Description: "Create a new dashboard. Panels live directly on the dashboard (there is no separate Layout entity). Each panel is `{id, x, y, w, h, chart_id?, text_config?}`. Grid is 12 columns wide. Use chart_id to reference an existing component, or text_config for native inline text. Empty panels (no chart_id and no text_config) are valid placeholders.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"name":        {Type: "string", Description: "Unique dashboard name"},
+					"description": {Type: "string", Description: "Description"},
+					"panels":      {Type: "array", Description: "Array of panel objects {id, x, y, w, h, chart_id?, text_config?}"},
+					"settings":    {Type: "object", Description: "Dashboard settings (theme, refresh_interval, layout_dimension, etc)"},
+					"tags":        {Type: "array", Description: "Tags"},
+				},
+				Required: []string{"name"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			req := &models.CreateDashboardRequest{
+				Name:        getString(args, "name"),
+				Description: getString(args, "description"),
+			}
+			if panelsRaw, ok := args["panels"].([]interface{}); ok {
+				req.Panels = parsePanels(panelsRaw)
+			}
+			if settingsRaw, ok := args["settings"].(map[string]interface{}); ok {
+				req.Settings = parseSettings(settingsRaw)
+			}
+			if tagsRaw, ok := args["tags"].([]interface{}); ok {
+				req.Tags = parseStringArray(tagsRaw)
+			}
+			return r.dashboardService.CreateDashboard(context.Background(), req)
+		},
+	)
+
+	r.registerTool(
+		Tool{
+			Name:        "update_dashboard",
+			Description: "Update an existing dashboard. Only provided fields are changed.",
+			InputSchema: InputSchema{
+				Type: "object",
+				Properties: map[string]PropertySchema{
+					"id":          {Type: "string", Description: "Dashboard ID"},
+					"name":        {Type: "string", Description: "New name"},
+					"description": {Type: "string", Description: "New description"},
+					"panels":      {Type: "array", Description: "New panel array"},
+					"settings":    {Type: "object", Description: "New settings"},
+					"tags":        {Type: "array", Description: "New tags"},
+				},
+				Required: []string{"id"},
+			},
+		},
+		func(args map[string]interface{}) (interface{}, error) {
+			id := getString(args, "id")
 			req := &models.UpdateDashboardRequest{}
-
 			if name := getString(args, "name"); name != "" {
 				req.Name = &name
 			}
@@ -448,393 +893,40 @@ func (r *ToolRegistry) registerDashboardTools() {
 				settings := parseSettings(settingsRaw)
 				req.Settings = &settings
 			}
-
-			return r.dashboardService.UpdateDashboard(ctx, id, req)
-		},
-	)
-
-	// delete_dashboard
-	r.registerTool(
-		Tool{
-			Name:        "delete_dashboard",
-			Description: "Delete a dashboard",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]PropertySchema{
-					"id": {
-						Type:        "string",
-						Description: "Dashboard ID",
-					},
-				},
-				Required: []string{"id"},
-			},
-		},
-		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-			id := getString(args, "id")
-			err := r.dashboardService.DeleteDashboard(ctx, id)
-			if err != nil {
-				return nil, err
-			}
-			return map[string]interface{}{
-				"success": true,
-				"message": fmt.Sprintf("Dashboard %s deleted", id),
-			}, nil
-		},
-	)
-}
-
-// registerChartTools registers all chart-related tools
-func (r *ToolRegistry) registerChartTools() {
-	// list_charts
-	r.registerTool(
-		Tool{
-			Name:        "list_charts",
-			Description: "List all charts with optional filtering",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]PropertySchema{
-					"chart_type": {
-						Type:        "string",
-						Description: "Filter by chart type (bar, line, pie, etc.)",
-					},
-					"datasource_id": {
-						Type:        "string",
-						Description: "Filter by data source ID",
-					},
-					"tag": {
-						Type:        "string",
-						Description: "Filter by tag",
-					},
-				},
-				Required: []string{},
-			},
-		},
-		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-			params := models.ChartQueryParams{
-				Page:         1,
-				PageSize:     100,
-				ChartType:    getString(args, "chart_type"),
-				DatasourceID: getString(args, "datasource_id"),
-				Tag:          getString(args, "tag"),
-			}
-			result, err := r.chartService.ListCharts(ctx, params)
-			if err != nil {
-				return nil, err
-			}
-			return map[string]interface{}{
-				"charts": result.Charts,
-				"count":  result.Total,
-			}, nil
-		},
-	)
-
-	// get_chart
-	r.registerTool(
-		Tool{
-			Name:        "get_chart",
-			Description: "Get a specific chart by ID",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]PropertySchema{
-					"id": {
-						Type:        "string",
-						Description: "Chart ID",
-					},
-				},
-				Required: []string{"id"},
-			},
-		},
-		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-			id := getString(args, "id")
-			return r.chartService.GetChart(ctx, id)
-		},
-	)
-
-	// create_chart
-	r.registerTool(
-		Tool{
-			Name:        "create_chart",
-			Description: "Create a new chart with visualization configuration",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]PropertySchema{
-					"name": {
-						Type:        "string",
-						Description: "Chart name",
-					},
-					"description": {
-						Type:        "string",
-						Description: "Chart description",
-					},
-					"chart_type": {
-						Type:        "string",
-						Description: "Chart type (bar, line, pie, scatter, etc.)",
-					},
-					"datasource_id": {
-						Type:        "string",
-						Description: "Data source ID to bind to",
-					},
-					"query_config": {
-						Type:        "object",
-						Description: "Query configuration (raw, type, params)",
-					},
-					"data_mapping": {
-						Type:        "object",
-						Description: "Data mapping (x_axis, y_axis, group_by, etc.)",
-					},
-					"component_code": {
-						Type:        "string",
-						Description: "Custom React component code",
-					},
-					"use_custom_code": {
-						Type:        "boolean",
-						Description: "Whether to use custom code mode",
-					},
-					"options": {
-						Type:        "object",
-						Description: "ECharts options overrides",
-					},
-					"tags": {
-						Type:        "array",
-						Description: "Tags for categorization",
-					},
-				},
-				Required: []string{"name", "chart_type"},
-			},
-		},
-		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-
-			req := &models.CreateChartRequest{
-				Name:          getString(args, "name"),
-				Description:   getString(args, "description"),
-				ChartType:     getString(args, "chart_type"),
-				DatasourceID:  getString(args, "datasource_id"),
-				ComponentCode: getString(args, "component_code"),
-				UseCustomCode: getBool(args, "use_custom_code"),
-			}
-
-			// Parse query_config
-			if qc, ok := args["query_config"].(map[string]interface{}); ok {
-				req.QueryConfig = parseQueryConfig(qc)
-			}
-
-			// Parse data_mapping
-			if dm, ok := args["data_mapping"].(map[string]interface{}); ok {
-				req.DataMapping = parseDataMapping(dm)
-			}
-
-			// Parse options
-			if opts, ok := args["options"].(map[string]interface{}); ok {
-				req.Options = opts
-			}
-
-			// Parse tags
-			if tagsRaw, ok := args["tags"].([]interface{}); ok {
-				req.Tags = parseStringArray(tagsRaw)
-			}
-
-			return r.chartService.CreateChart(ctx, req)
-		},
-	)
-
-	// update_chart
-	r.registerTool(
-		Tool{
-			Name:        "update_chart",
-			Description: "Update an existing chart",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]PropertySchema{
-					"id": {
-						Type:        "string",
-						Description: "Chart ID",
-					},
-					"name": {
-						Type:        "string",
-						Description: "New name (optional)",
-					},
-					"description": {
-						Type:        "string",
-						Description: "New description (optional)",
-					},
-					"chart_type": {
-						Type:        "string",
-						Description: "New chart type (optional)",
-					},
-					"datasource_id": {
-						Type:        "string",
-						Description: "New data source ID (optional)",
-					},
-					"query_config": {
-						Type:        "object",
-						Description: "Updated query configuration (optional)",
-					},
-					"data_mapping": {
-						Type:        "object",
-						Description: "Updated data mapping (optional)",
-					},
-					"component_code": {
-						Type:        "string",
-						Description: "Updated custom component code (optional)",
-					},
-					"use_custom_code": {
-						Type:        "boolean",
-						Description: "Updated custom code mode (optional)",
-					},
-					"options": {
-						Type:        "object",
-						Description: "Updated ECharts options (optional)",
-					},
-					"tags": {
-						Type:        "array",
-						Description: "Updated tags (optional)",
-					},
-				},
-				Required: []string{"id"},
-			},
-		},
-		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-			id := getString(args, "id")
-
-			req := &models.UpdateChartRequest{}
-
-			if name := getString(args, "name"); name != "" {
-				req.Name = &name
-			}
-			if desc := getString(args, "description"); desc != "" {
-				req.Description = &desc
-			}
-			if chartType := getString(args, "chart_type"); chartType != "" {
-				req.ChartType = &chartType
-			}
-			if dsID := getString(args, "datasource_id"); dsID != "" {
-				req.DatasourceID = &dsID
-			}
-			if code := getString(args, "component_code"); code != "" {
-				req.ComponentCode = &code
-			}
-			if _, ok := args["use_custom_code"]; ok {
-				useCustom := getBool(args, "use_custom_code")
-				req.UseCustomCode = &useCustom
-			}
-			if qc, ok := args["query_config"].(map[string]interface{}); ok {
-				queryConfig := parseQueryConfig(qc)
-				req.QueryConfig = queryConfig
-			}
-			if dm, ok := args["data_mapping"].(map[string]interface{}); ok {
-				dataMapping := parseDataMapping(dm)
-				req.DataMapping = dataMapping
-			}
-			if opts, ok := args["options"].(map[string]interface{}); ok {
-				req.Options = &opts
-			}
 			if tagsRaw, ok := args["tags"].([]interface{}); ok {
 				tags := parseStringArray(tagsRaw)
 				req.Tags = &tags
 			}
-
-			return r.chartService.UpdateChart(ctx, id, req)
+			return r.dashboardService.UpdateDashboard(context.Background(), id, req)
 		},
 	)
 
-	// delete_chart
 	r.registerTool(
 		Tool{
-			Name:        "delete_chart",
-			Description: "Delete a chart",
+			Name:        "delete_dashboard",
+			Description: "Delete a dashboard by ID.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]PropertySchema{
-					"id": {
-						Type:        "string",
-						Description: "Chart ID",
-					},
+					"id": {Type: "string", Description: "Dashboard ID"},
 				},
 				Required: []string{"id"},
 			},
 		},
 		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
 			id := getString(args, "id")
-			err := r.chartService.DeleteChart(ctx, id)
-			if err != nil {
+			if err := r.dashboardService.DeleteDashboard(context.Background(), id); err != nil {
 				return nil, err
 			}
-			return map[string]interface{}{
-				"success": true,
-				"message": fmt.Sprintf("Chart %s deleted", id),
-			}, nil
-		},
-	)
-
-	// get_chart_summaries
-	r.registerTool(
-		Tool{
-			Name:        "get_chart_summaries",
-			Description: "Get lightweight chart summaries for selection UI",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]PropertySchema{
-					"limit": {
-						Type:        "number",
-						Description: "Maximum number of summaries to return",
-					},
-				},
-				Required: []string{},
-			},
-		},
-		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-			limit := int64(50)
-			if l := getInt(args, "limit"); l > 0 {
-				limit = int64(l)
-			}
-			return r.chartService.GetChartSummaries(ctx, limit)
-		},
-	)
-
-	// get_dashboards_using_chart
-	r.registerTool(
-		Tool{
-			Name:        "get_dashboards_using_chart",
-			Description: "Get all dashboards that use a specific chart (useful for notifications)",
-			InputSchema: InputSchema{
-				Type: "object",
-				Properties: map[string]PropertySchema{
-					"chart_id": {
-						Type:        "string",
-						Description: "Chart ID to search for",
-					},
-				},
-				Required: []string{"chart_id"},
-			},
-		},
-		func(args map[string]interface{}) (interface{}, error) {
-			ctx := context.Background()
-			chartID := getString(args, "chart_id")
-			params := models.DashboardQueryParams{
-				ChartID:  chartID,
-				Page:     1,
-				PageSize: 100,
-			}
-			result, err := r.dashboardService.ListDashboards(ctx, params)
-			if err != nil {
-				return nil, err
-			}
-			return map[string]interface{}{
-				"dashboards": result.Dashboards,
-				"count":      result.Total,
-			}, nil
+			return map[string]interface{}{"success": true, "message": fmt.Sprintf("Dashboard %s deleted", id)}, nil
 		},
 	)
 }
 
-// Helper functions for parsing arguments
+// ============================================================================
+// Helper functions for parsing JSON-RPC arguments. Most of these are
+// preserved from the previous tools.go implementation.
+// ============================================================================
 
 func getString(m map[string]interface{}, key string) string {
 	if v, ok := m[key].(string); ok {
@@ -869,7 +961,6 @@ func getMap(m map[string]interface{}, key string) map[string]interface{} {
 
 func parseDatasourceConfig(dsType models.DatasourceType, configMap map[string]interface{}) models.DatasourceConfig {
 	config := models.DatasourceConfig{}
-
 	switch dsType {
 	case models.DatasourceTypeAPI:
 		config.API = &models.APIConfig{
@@ -880,8 +971,8 @@ func parseDatasourceConfig(dsType models.DatasourceType, configMap map[string]in
 		if headers, ok := configMap["headers"].(map[string]interface{}); ok {
 			config.API.Headers = make(map[string]string)
 			for k, v := range headers {
-				if str, ok := v.(string); ok {
-					config.API.Headers[k] = str
+				if s, ok := v.(string); ok {
+					config.API.Headers[k] = s
 				}
 			}
 		}
@@ -908,7 +999,6 @@ func parseDatasourceConfig(dsType models.DatasourceType, configMap map[string]in
 			Protocol: getString(configMap, "protocol"),
 		}
 	}
-
 	return config
 }
 
@@ -916,14 +1006,23 @@ func parsePanels(panelsRaw []interface{}) []models.DashboardPanel {
 	panels := make([]models.DashboardPanel, 0, len(panelsRaw))
 	for _, p := range panelsRaw {
 		if pm, ok := p.(map[string]interface{}); ok {
-			panels = append(panels, models.DashboardPanel{
+			panel := models.DashboardPanel{
 				ID:      getString(pm, "id"),
 				X:       getInt(pm, "x"),
 				Y:       getInt(pm, "y"),
 				W:       getInt(pm, "w"),
 				H:       getInt(pm, "h"),
 				ChartID: getString(pm, "chart_id"),
-			})
+			}
+			if tc, ok := pm["text_config"].(map[string]interface{}); ok {
+				panel.TextConfig = &models.PanelTextConfig{
+					Content:        getString(tc, "content"),
+					DisplayContent: getString(tc, "display_content"),
+					Size:           tc["size"],
+					Align:          getString(tc, "align"),
+				}
+			}
+			panels = append(panels, panel)
 		}
 	}
 	return panels
@@ -957,13 +1056,9 @@ func parseDataMapping(dm map[string]interface{}) *models.ChartDataMapping {
 		SortOrder: getString(dm, "sort_order"),
 		Limit:     getInt(dm, "limit"),
 	}
-
-	// Parse y_axis array
 	if yAxisRaw, ok := dm["y_axis"].([]interface{}); ok {
 		mapping.YAxis = parseStringArray(yAxisRaw)
 	}
-
-	// Parse filters array
 	if filtersRaw, ok := dm["filters"].([]interface{}); ok {
 		filters := make([]models.DataFilter, 0, len(filtersRaw))
 		for _, f := range filtersRaw {
@@ -977,8 +1072,6 @@ func parseDataMapping(dm map[string]interface{}) *models.ChartDataMapping {
 		}
 		mapping.Filters = filters
 	}
-
-	// Parse aggregation
 	if aggRaw, ok := dm["aggregation"].(map[string]interface{}); ok {
 		mapping.Aggregation = &models.DataAggregation{
 			Type:   getString(aggRaw, "type"),
@@ -987,15 +1080,41 @@ func parseDataMapping(dm map[string]interface{}) *models.ChartDataMapping {
 			Count:  getInt(aggRaw, "count"),
 		}
 	}
-
 	return mapping
+}
+
+func parseControlConfig(cc map[string]interface{}) *models.ControlConfig {
+	out := &models.ControlConfig{
+		ControlType:  getString(cc, "control_type"),
+		DeviceTypeID: getString(cc, "device_type_id"),
+		Target:       getString(cc, "target"),
+	}
+	if ui, ok := cc["ui_config"].(map[string]interface{}); ok {
+		out.UIConfig = ui
+	}
+	return out
+}
+
+func parseDisplayConfig(dc map[string]interface{}) *models.DisplayConfig {
+	return &models.DisplayConfig{
+		DisplayType:         getString(dc, "display_type"),
+		FrigateConnectionID: getString(dc, "frigate_connection_id"),
+		DefaultCamera:       getString(dc, "default_camera"),
+		MqttConnectionID:    getString(dc, "mqtt_connection_id"),
+		AlertTopic:          getString(dc, "alert_topic"),
+		SnapshotInterval:    getInt(dc, "snapshot_interval"),
+		MaxThumbnails:       getInt(dc, "max_thumbnails"),
+		AlertSeverity:       getString(dc, "alert_severity"),
+		WeatherTopicPrefix:  getString(dc, "weather_topic_prefix"),
+		WeatherLocation:     getString(dc, "weather_location"),
+	}
 }
 
 func parseStringArray(arr []interface{}) []string {
 	result := make([]string, 0, len(arr))
 	for _, item := range arr {
-		if str, ok := item.(string); ok {
-			result = append(result, str)
+		if s, ok := item.(string); ok {
+			result = append(result, s)
 		}
 	}
 	return result

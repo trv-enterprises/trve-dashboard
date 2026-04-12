@@ -3,6 +3,7 @@
 // See LICENSE file for details.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import { Modal, Loading, InlineNotification, Tag } from '@carbon/react';
 import apiClient from '../../api/client';
@@ -215,67 +216,70 @@ function FrigateAlertsGrid({ config }) {
         </div>
       )}
 
-      {/* Modal: plays the review clip, falls back to the thumbnail on error.
-          Primary action marks the review as viewed in Frigate (removing it
-          from the unreviewed queue); secondary just closes. */}
-      <Modal
-        open={!!selectedReview}
-        onRequestClose={handleClose}
-        onRequestSubmit={handleMarkReviewed}
-        modalHeading={selectedReview ? `${selectedReview.camera} — ${formatTime(selectedReview.start_time)}` : ''}
-        primaryButtonText={marking ? 'Marking…' : 'Mark Reviewed'}
-        secondaryButtonText="Close"
-        primaryButtonDisabled={marking}
-        size="lg"
-        className="frigate-alerts-grid__modal"
-      >
-        {selectedReview && (() => {
-          // A review segment's clip lives on its first detection event.
-          // If the review has no linked detection (edge case), fall back
-          // to the thumbnail.
-          const clipUrl = apiClient.getFrigateReviewClipUrl(connectionId, selectedReview);
-          const hasClip = !!clipUrl && !clipError;
-          return (
-            <div className="frigate-alerts-grid__player">
-              {hasClip ? (
-                <video
-                  key={selectedReview.id}
-                  src={clipUrl}
-                  controls
-                  autoPlay
-                  muted
-                  playsInline
-                  onError={() => setClipError(true)}
-                  className="frigate-alerts-grid__video"
-                />
-              ) : (
-                <img
-                  src={apiClient.getFrigateReviewThumbnailUrl(connectionId, selectedReview.id, selectedReview.camera)}
-                  alt="Review thumbnail"
-                  className="frigate-alerts-grid__modal-image"
-                />
-              )}
-              {selectedReview?.data?.objects?.length > 0 && (
-                <div className="frigate-alerts-grid__modal-tags">
-                  {selectedReview.data.objects.map((obj) => (
-                    <Tag key={obj} type="red" size="md">{obj}</Tag>
-                  ))}
-                </div>
-              )}
-              {markError && (
-                <InlineNotification
-                  kind="error"
-                  title="Couldn't mark as reviewed"
-                  subtitle={markError}
-                  hideCloseButton
-                  lowContrast
-                  className="frigate-alerts-grid__mark-error"
-                />
-              )}
-            </div>
-          );
-        })()}
-      </Modal>
+      {/* Portal the modal to <body> so its DOM node doesn't live inside
+          the dashboard grid. Carbon Modal v11 renders in-place (no portal),
+          which means the modal's position:fixed overlay is a child of the
+          dashboard panel's flex layout. In stretch-to-fill fullscreen mode,
+          this inflates the grid container's measured height and causes a
+          layout shift when the modal opens/closes. */}
+      {createPortal(
+        <Modal
+          open={!!selectedReview}
+          onRequestClose={handleClose}
+          onRequestSubmit={handleMarkReviewed}
+          modalHeading={selectedReview ? `${selectedReview.camera} — ${formatTime(selectedReview.start_time)}` : ''}
+          primaryButtonText={marking ? 'Marking…' : 'Mark Reviewed'}
+          secondaryButtonText="Close"
+          primaryButtonDisabled={marking}
+          size="lg"
+          className="frigate-alerts-grid__modal"
+        >
+          {selectedReview && (() => {
+            const clipUrl = apiClient.getFrigateReviewClipUrl(connectionId, selectedReview);
+            const hasClip = !!clipUrl && !clipError;
+            return (
+              <div className="frigate-alerts-grid__player">
+                {hasClip ? (
+                  <video
+                    key={selectedReview.id}
+                    src={clipUrl}
+                    controls
+                    autoPlay
+                    muted
+                    playsInline
+                    onError={() => setClipError(true)}
+                    className="frigate-alerts-grid__video"
+                  />
+                ) : (
+                  <img
+                    src={apiClient.getFrigateReviewThumbnailUrl(connectionId, selectedReview.id, selectedReview.camera)}
+                    alt="Review thumbnail"
+                    className="frigate-alerts-grid__modal-image"
+                  />
+                )}
+                {selectedReview?.data?.objects?.length > 0 && (
+                  <div className="frigate-alerts-grid__modal-tags">
+                    {selectedReview.data.objects.map((obj) => (
+                      <Tag key={obj} type="red" size="md">{obj}</Tag>
+                    ))}
+                  </div>
+                )}
+                {markError && (
+                  <InlineNotification
+                    kind="error"
+                    title="Couldn't mark as reviewed"
+                    subtitle={markError}
+                    hideCloseButton
+                    lowContrast
+                    className="frigate-alerts-grid__mark-error"
+                  />
+                )}
+              </div>
+            );
+          })()}
+        </Modal>,
+        document.body
+      )}
     </div>
   );
 }

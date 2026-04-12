@@ -158,30 +158,55 @@
     }
   }
 
+  // Modal layout for the review-clip player. The entire modal — header,
+  // body, footer — must fit the viewport at the smallest supported kiosk
+  // dimension (1366×768) without scrolling, because the only payload is a
+  // 16:9 video clip that should letterbox-fit the remaining space. We let
+  // Carbon's size="lg" handle horizontal sizing and only constrain height
+  // so the Mark Reviewed footer is always visible.
+  //
+  // Carbon's modal portal centers vertically against the full viewport,
+  // which is unaware of our 48px-tall fixed app header. We push the
+  // centering region down by 48px so the modal can never slide beneath
+  // the header, and constrain the container height to match.
   &__modal {
+    top: 48px;
+
     .cds--modal-container {
-      max-width: 80vw;
+      max-height: calc(100vh - 48px - 2rem);
+    }
+
+    // Make the modal body a flex column so the video element below can
+    // soak up whatever vertical space is left after header/tags/footer
+    // and letterbox-fit to the remaining area.
+    .cds--modal-content {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding-bottom: spacing.$spacing-03;
     }
   }
 
   &__player {
     display: flex;
     flex-direction: column;
-    gap: spacing.$spacing-04;
+    gap: spacing.$spacing-03;
     align-items: center;
+    min-height: 0;
+    flex: 1 1 auto;
+    width: 100%;
   }
 
-  &__video {
+  // Video and image both take whatever vertical space is left after the
+  // header, tags row, and footer. object-fit:contain letterboxes the clip
+  // to preserve the native aspect ratio.
+  &__video,
+  &__modal-image {
+    flex: 1 1 auto;
+    min-height: 0;
     width: 100%;
     max-width: 100%;
-    max-height: 60vh;
-    background: #000;
-    display: block;
-  }
-
-  &__modal-image {
-    width: 100%;
-    max-height: 60vh;
+    max-height: 100%;
     object-fit: contain;
     background: #000;
     display: block;
@@ -192,10 +217,12 @@
     flex-wrap: wrap;
     gap: spacing.$spacing-02;
     justify-content: center;
+    flex: 0 0 auto;
   }
 
   &__mark-error {
     width: 100%;
     margin-top: spacing.$spacing-02;
+    flex: 0 0 auto;
   }
 }

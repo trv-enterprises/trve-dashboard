@@ -16,7 +16,8 @@ import {
   mdiPowerPlug,
   mdiLightbulbOn,
   mdiFormatText,
-  mdiGarage
+  mdiGarage,
+  mdiSend
 } from '@mdi/js';
 
 // Control type constants - must match backend models.ControlType* constants
@@ -31,6 +32,7 @@ export const CONTROL_TYPES = {
   TILE_SWITCH: 'tile_switch',
   TILE_DIMMER: 'tile_dimmer',
   TILE_GARAGE_DOOR: 'tile_garage_door',
+  MQTT_PUBLISH: 'mqtt_publish',
   TEXT_LABEL: 'text_label'
 };
 
@@ -170,6 +172,19 @@ export const CONTROL_TYPE_INFO = {
     defaultUIConfig: {
       label: 'Garage',
       state_field: 'contact'
+    }
+  },
+  [CONTROL_TYPES.MQTT_PUBLISH]: {
+    label: 'MQTT Publish',
+    description: 'Fire-and-forget button that publishes a static JSON payload to an MQTT topic when pressed. No device type needed.',
+    icon: mdiSend,
+    category: 'carbon',
+    canWrite: true,
+    canRead: false,
+    defaultUIConfig: {
+      label: 'Publish',
+      kind: 'primary',
+      payload: {}
     }
   },
   [CONTROL_TYPES.TEXT_LABEL]: {

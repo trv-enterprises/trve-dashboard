@@ -211,7 +211,23 @@ func (h *CommandHandler) ExecuteControlCommand(c *gin.Context) {
 	var cmd registry.Command
 	controlConfig := chart.ControlConfig
 
-	if controlConfig.DeviceTypeID != "" {
+	if controlConfig.ControlType == models.ControlTypeMqttPublish {
+		// mqtt_publish: raw topic + payload, no device type needed
+		if controlConfig.Target == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "mqtt_publish control has no topic (target) configured"})
+			return
+		}
+		payload, _ := controlConfig.UIConfig["payload"].(map[string]interface{})
+		if payload == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "mqtt_publish control has no payload configured in ui_config"})
+			return
+		}
+		cmd = registry.Command{
+			Action:  "publish",
+			Target:  controlConfig.Target,
+			Payload: payload,
+		}
+	} else if controlConfig.DeviceTypeID != "" {
 		// Device type-based control
 		cmd, err = h.buildCommandFromDeviceType(c, controlConfig, req.Value)
 		if err != nil {

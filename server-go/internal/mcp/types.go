@@ -72,11 +72,16 @@ type Capabilities struct {
 	Tools map[string]interface{} `json:"tools,omitempty"`
 }
 
-// InitializeResult represents the result of initialize method
+// InitializeResult represents the result of initialize method. The
+// Instructions field is an MCP spec feature that clients (notably Claude
+// Desktop) surface to the model before the first turn — we use it to
+// preload the unified type catalog so agents don't have to discover
+// chart/control/connection types via tool calls on every session.
 type InitializeResult struct {
 	ProtocolVersion string       `json:"protocolVersion"`
 	ServerInfo      ServerInfo   `json:"serverInfo"`
 	Capabilities    Capabilities `json:"capabilities"`
+	Instructions    string       `json:"instructions,omitempty"`
 }
 
 // ToolsListResult represents the result of tools/list method

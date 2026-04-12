@@ -332,14 +332,24 @@ function DashboardViewerPage({ canDesign = false }) {
     ? Math.max(gridRows, panelExtentRow)
     : (isEditMode ? Math.max(panelExtentRow, 24) : (panelExtentRow || 60));
 
-  // Track container size for fit-to-screen scale calculation
+  // Track container size for fit-to-screen scale calculation.
+  // The resize handler is guarded: it only updates state when the measured
+  // dimensions actually change. This prevents Carbon Modal's body-overflow
+  // toggle from triggering a spurious resize → re-measure → re-scale cycle
+  // that shifts the dashboard grid (especially visible in stretch-to-fill
+  // mode during fullscreen).
   const hasPanels = panels && panels.length > 0;
+  const lastSizeRef = useRef({ width: 0, height: 0 });
   useEffect(() => {
     if (!hasPanels) return;
     const measure = () => {
       const el = containerRef.current;
-      if (el) {
-        setContainerSize({ width: el.clientWidth, height: el.clientHeight });
+      if (!el) return;
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      if (w !== lastSizeRef.current.width || h !== lastSizeRef.current.height) {
+        lastSizeRef.current = { width: w, height: h };
+        setContainerSize({ width: w, height: h });
       }
     };
     // Double rAF ensures CSS class changes (overflow: hidden) have been painted

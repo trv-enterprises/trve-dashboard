@@ -19,6 +19,7 @@ export { default as ControlGarageDoor } from './ControlGarageDoor';
 export { default as TilePlug } from './TilePlug';
 export { default as TileDimmer } from './TileDimmer';
 export { default as TileGarageDoor } from './TileGarageDoor';
+export { default as ControlMqttPublish } from './ControlMqttPublish';
 export { default as ControlTextLabel } from './ControlTextLabel';
 export { default as ControlRenderer } from './ControlRenderer';
 export { default as GarageDoorSVG, GARAGE_DOOR_STATES } from './GarageDoorSVG';

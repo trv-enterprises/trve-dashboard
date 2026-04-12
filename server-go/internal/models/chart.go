@@ -42,6 +42,7 @@ const (
 	ControlTypeTileDimmer     = "tile_dimmer"      // Compact tile dimmer
 	ControlTypeTileGarageDoor = "tile_garage_door"  // Compact garage door status tile
 	ControlTypeTextLabel      = "text_label"        // Static text/label display
+	ControlTypeMqttPublish    = "mqtt_publish"      // Fire-and-forget MQTT JSON publish
 )
 
 // ControlConfig defines configuration for control components

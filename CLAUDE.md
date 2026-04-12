@@ -388,9 +388,17 @@ dashboard/
 | PUT | `/api/config/system` | Update system config |
 | GET | `/api/config/user/:user_id` | Get user preferences |
 | PUT | `/api/config/user/:user_id` | Update user preferences (merges keys) |
-| **MCP** |||
-| GET | `/mcp/sse` | SSE connection for MCP |
-| POST | `/mcp/message` | Send MCP message |
+| **Registry (type catalog)** |||
+| GET | `/api/registry/connections` | List connection types from adapter registry |
+| GET | `/api/registry/connections/:typeId` | Get a single connection type |
+| GET | `/api/registry/categories` | List connection-type categories |
+| GET | `/api/registry/components` | List component subtypes (filter `?category=chart\|control\|display`) |
+| GET | `/api/registry/components/:typeId` | Get a single component subtype |
+| GET | `/api/registry/catalog` | Unified catalog: connections + components + device types |
+| GET | `/api/registry/catalog.md` | Same catalog rendered as markdown for LLM prompts |
+| **MCP (external agent SSE bridge)** |||
+| GET | `/mcp/sse` | SSE connection for MCP — used with [`mcp-proxy`](https://github.com/sparfenyuk/mcp-proxy) by Claude Desktop |
+| POST | `/mcp/message` | JSON-RPC message endpoint |
 
 ## Settings & Configuration
 

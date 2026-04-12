@@ -35,11 +35,11 @@ Your dashboard will be available at:
 │                    GO SERVER (Port 3001)                         │
 │  - REST API, WebSocket, AI sessions                             │
 └─────────────────────────────────────────────────────────────────┘
-                    │                       │
-                    ▼                       ▼
-            ┌──────────────┐        ┌──────────────┐
-            │   MongoDB    │        │    Redis     │
-            └──────────────┘        └──────────────┘
+                                │
+                                ▼
+                        ┌──────────────┐
+                        │   MongoDB    │
+                        └──────────────┘
 ```
 
 ---
@@ -61,7 +61,6 @@ Your dashboard will be available at:
 | `DASHBOARD_SERVER_MODE` | `release` | Gin mode (release/debug) |
 | `DASHBOARD_MONGODB_URI` | `mongodb://mongodb:27017` | MongoDB connection string |
 | `DASHBOARD_MONGODB_DATABASE` | `dashboard` | Database name |
-| `DASHBOARD_REDIS_ADDR` | `redis:6379` | Redis address |
 
 ---
 
@@ -131,7 +130,7 @@ Create `/etc/systemd/system/dashboard.service`:
 ```ini
 [Unit]
 Description=Dashboard API Server
-After=network.target mongodb.service redis.service
+After=network.target mongodb.service
 
 [Service]
 Type=simple
@@ -141,7 +140,6 @@ ExecStart=/opt/dashboard/server
 Restart=always
 Environment=DASHBOARD_SERVER_MODE=release
 Environment=DASHBOARD_MONGODB_URI=mongodb://localhost:27017
-Environment=DASHBOARD_REDIS_ADDR=localhost:6379
 
 [Install]
 WantedBy=multi-user.target
@@ -267,8 +265,6 @@ If Caddy fails to obtain certificates:
 # Test MongoDB
 docker compose -f docker-compose.prod.yml exec mongodb mongosh --eval "db.runCommand('ping')"
 
-# Test Redis
-docker compose -f docker-compose.prod.yml exec redis redis-cli ping
 ```
 
 ---
@@ -277,7 +273,6 @@ docker compose -f docker-compose.prod.yml exec redis redis-cli ping
 
 1. **Firewall**: Only expose ports 80, 443 publicly
 2. **MongoDB**: Not exposed externally by default (good)
-3. **Redis**: Not exposed externally by default (good)
 4. **API Key**: Never commit `.env` to version control
 5. **Updates**: Regularly update base images for security patches
 

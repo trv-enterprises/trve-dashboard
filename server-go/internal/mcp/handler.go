@@ -5,15 +5,18 @@
 package mcp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/trv-enterprises/trve-dashboard/internal/registry"
 )
 
 // Handler handles MCP SSE connections and messages
@@ -77,7 +80,7 @@ func (h *Handler) SSEConnect(c *gin.Context) {
 		Params: map[string]interface{}{
 			"clientId": clientID,
 			"serverInfo": map[string]interface{}{
-				"name":    "GiVi-Solution MCP Server",
+				"name":    "trve-dashboard-mcp",
 				"version": "1.0.0",
 				"capabilities": map[string]interface{}{
 					"tools":       true,
@@ -177,18 +180,84 @@ func (h *Handler) HandleMessage(c *gin.Context) {
 	})
 }
 
-// handleInitialize handles the initialize method
+// handleInitialize handles the initialize method. We preload the unified
+// type catalog into the `instructions` field so every agent session starts
+// with full knowledge of connection types, chart/control/display subtypes,
+// and user-defined device types without having to burn a tool round-trip.
+// The catalog is a snapshot taken at initialize time — the preamble tells
+// the agent to re-fetch via get_type_catalog if it suspects staleness.
 func (h *Handler) handleInitialize(params map[string]interface{}) InitializeResult {
 	return InitializeResult{
 		ProtocolVersion: "2024-11-05",
 		ServerInfo: ServerInfo{
-			Name:    "GiVi-Solution MCP Server",
+			Name:    "trve-dashboard-mcp",
 			Version: "1.0.0",
 		},
 		Capabilities: Capabilities{
 			Tools: map[string]interface{}{},
 		},
+		Instructions: h.buildInstructions(),
 	}
+}
+
+// buildInstructions assembles the session preamble + rendered type catalog.
+// Runs once per MCP session at initialize time. Safe to call even if the
+// catalog can't be built (device-type service unavailable) — we degrade to
+// a catalog without device types rather than failing the handshake.
+func (h *Handler) buildInstructions() string {
+	var sb strings.Builder
+
+	sb.WriteString(`You are connected to a trve-dashboard backend via MCP. This server
+exposes tools for managing **connections** (external data sources like SQL,
+MQTT, EdgeLake, Prometheus, REST APIs), **components** (charts, controls,
+and displays — all stored in one collection, discriminated by component_type),
+and **dashboards** (a name plus a 12-column panel grid where each panel
+references a component or carries inline text).
+
+# Workflow hints
+
+When the user asks you to build a dashboard:
+
+1. Start by reading the type catalog below to understand what's available.
+2. Call ` + "`list_connections`" + ` to see what data sources already exist.
+3. For each connection you plan to use, call ` + "`get_connection_schema`" + ` (for SQL
+   or Prometheus) or ` + "`list_mqtt_topics`" + ` / ` + "`sample_mqtt_topic`" + ` (for MQTT) /
+   ` + "`list_edgelake_databases`" + ` → ` + "`list_edgelake_tables`" + ` →
+   ` + "`get_edgelake_table_schema`" + ` (for EdgeLake) to learn the data shape.
+4. Create components with ` + "`create_component`" + ` — pass component_type=chart,
+   control, or display and the matching sub-config (query_config+data_mapping
+   for charts, control_config for controls, display_config for displays).
+5. Create the dashboard with ` + "`create_dashboard`" + ` passing a panels array that
+   references the component IDs via chart_id. Grid is 12 columns wide.
+
+The ` + "`chart.custom`" + ` subtype is the escape hatch for anything outside the
+canonical chart types: pass use_custom_code=true and provide component_code
+with React source that renders your visualization.
+
+# Staleness
+
+The catalog below is a snapshot taken when this MCP session was established.
+It covers stable type metadata — chart subtypes, control subtypes, connection
+adapter capabilities, registered device types. If you add a new device type
+mid-session or suspect something has changed, call ` + "`get_type_catalog`" + ` to
+refetch.
+
+Connection *instances* (the actual configured SQL/MQTT/API connections) and
+component *instances* (the actual charts, controls, dashboards) are NOT in
+this preamble — call the list tools for those, they change constantly.
+
+# Type catalog (snapshot)
+
+`)
+
+	cat, err := registry.BuildCatalog(context.Background(), h.registry.deviceTypeLister())
+	if err != nil {
+		log.Printf("[MCP] Failed to build catalog for initialize instructions: %v", err)
+		sb.WriteString("_(catalog render failed — call get_type_catalog for fresh data)_\n")
+		return sb.String()
+	}
+	sb.WriteString(cat.RenderMarkdown())
+	return sb.String()
 }
 
 // handleToolsList handles the tools/list method

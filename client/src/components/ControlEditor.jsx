@@ -66,6 +66,41 @@ export { TILE_ICONS };
  * Editor for configuring control components (buttons, toggles, sliders, text inputs).
  * Used within ChartEditor when component_type="control".
  */
+
+function PayloadEditor({ payload, onChange }) {
+  const [raw, setRaw] = useState(JSON.stringify(payload || {}, null, 2));
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setRaw(JSON.stringify(payload || {}, null, 2));
+  }, [payload]);
+
+  const handleBlur = () => {
+    try {
+      const parsed = JSON.parse(raw);
+      setError(null);
+      onChange(parsed);
+    } catch (err) {
+      setError('Invalid JSON');
+    }
+  };
+
+  return (
+    <TextArea
+      id="ui-payload"
+      labelText="JSON Payload"
+      value={raw}
+      onChange={(e) => { setRaw(e.target.value); setError(null); }}
+      onBlur={handleBlur}
+      placeholder='{"type": "alert", "camera": "front_door"}'
+      helperText={error || 'Static JSON payload to publish when the button is pressed'}
+      invalid={!!error}
+      invalidText={error}
+      rows={6}
+    />
+  );
+}
+
 function ControlEditor({
   controlConfig,
   connectionId,
@@ -175,10 +210,16 @@ function ControlEditor({
     fetchMQTTTopics();
   }, [connectionId, isMQTT]);
 
-  // Derive selected state topic from controlConfig.target (strip /set suffix)
-  const selectedStateTopic = controlConfig?.target?.endsWith('/set')
-    ? controlConfig.target.slice(0, -4)
-    : controlConfig?.target || '';
+  // Derive selected state topic from controlConfig.target for the ComboBox.
+  // For standard writable controls, target ends in /set — strip it to show
+  // the base device topic. For mqtt_publish and read-only controls, target
+  // IS the topic (no /set suffix).
+  const usesRawTopic = controlType === CONTROL_TYPES.MQTT_PUBLISH || !typeInfo?.canWrite;
+  const selectedStateTopic = usesRawTopic
+    ? (controlConfig?.target || '')
+    : controlConfig?.target?.endsWith('/set')
+      ? controlConfig.target.slice(0, -4)
+      : controlConfig?.target || '';
 
   // Handle MQTT topic selection — sets target but does NOT auto-assign a device type
   const handleTopicSelect = (topic) => {
@@ -190,14 +231,14 @@ function ControlEditor({
       onControlConfigChange(newConfig);
       return;
     }
-    // Default to topic/set, but user can edit the target below
-    const commandTopic = `${topic}/set`;
+    // For mqtt_publish and read-only controls, use the topic directly.
+    // For standard writable controls, append /set (Zigbee2MQTT convention).
+    const target = usesRawTopic ? topic : `${topic}/set`;
     const newConfig = {
       ...controlConfig,
-      target: commandTopic,
+      target,
       command_config: null
     };
-    // Don't force a device type — keep existing if set, or leave empty
     onControlConfigChange(newConfig);
   };
 
@@ -415,7 +456,9 @@ function ControlEditor({
                 onChange={({ selectedItem }) => handleTopicSelect(selectedItem)}
                 placeholder={loadingTopics ? 'Loading topics...' : 'Select a device topic...'}
                 disabled={loadingTopics}
-                helperText="Select a device state topic to auto-fill the command target"
+                helperText={usesRawTopic
+                  ? 'Select a topic to pre-fill the publish topic below'
+                  : 'Select a device state topic to auto-fill the command target'}
               />
             </Column>
             <Column lg={1} md={1} sm={1}>
@@ -430,31 +473,33 @@ function ControlEditor({
                 </IconButton>
               </div>
             </Column>
-            <Column lg={3} md={2} sm={4}>
-              <Select
-                id="mqtt-device-type-select"
-                labelText="Device Type"
-                value={controlConfig?.device_type_id || ''}
-                onChange={(e) => handleDeviceTypeSelect(e.target.value || null)}
-                helperText="Optional — defines payload format"
-              >
-                <SelectItem value="" text="None (manual payload)" />
-                {mqttDeviceTypes.map(dt => (
-                  <SelectItem key={dt.id} value={dt.id} text={dt.name} />
-                ))}
-              </Select>
-            </Column>
+            {!usesRawTopic && (
+              <Column lg={3} md={2} sm={4}>
+                <Select
+                  id="mqtt-device-type-select"
+                  labelText="Device Type"
+                  value={controlConfig?.device_type_id || ''}
+                  onChange={(e) => handleDeviceTypeSelect(e.target.value || null)}
+                  helperText="Optional — defines payload format"
+                >
+                  <SelectItem value="" text="None (manual payload)" />
+                  {mqttDeviceTypes.map(dt => (
+                    <SelectItem key={dt.id} value={dt.id} text={dt.name} />
+                  ))}
+                </Select>
+              </Column>
+            )}
             <Column lg={12} md={8} sm={4}>
               <TextInput
                 id="mqtt-command-target"
-                labelText="Command Target (topic)"
+                labelText={usesRawTopic ? 'Publish Topic' : 'Command Target (topic)'}
                 value={controlConfig?.target || ''}
                 onChange={(e) => updateConfig('target', e.target.value)}
-                placeholder="e.g., zigbee2mqtt/device/set or caseta/device"
-                helperText="MQTT topic to publish commands to"
+                placeholder={usesRawTopic ? 'e.g., zigbee2mqtt/Small Garage Door' : 'e.g., zigbee2mqtt/device/set or caseta/device'}
+                helperText={usesRawTopic ? 'MQTT topic to publish to — edit freely after selecting from above' : 'MQTT topic to publish commands to'}
               />
             </Column>
-            {controlConfig?.device_type_id && (() => {
+            {controlType !== CONTROL_TYPES.MQTT_PUBLISH && controlConfig?.device_type_id && (() => {
               const previews = getPayloadPreview();
               if (!previews) return null;
               return (
@@ -522,6 +567,40 @@ function ControlEditor({
       <div className="ui-config-section">
         <h4>UI Configuration</h4>
         <Grid narrow>
+          {/* MQTT Publish UI Config */}
+          {controlType === CONTROL_TYPES.MQTT_PUBLISH && (
+            <>
+              <Column lg={6} md={4} sm={4}>
+                <TextInput
+                  id="ui-label"
+                  labelText="Button Label"
+                  value={uiConfig.label || ''}
+                  onChange={(e) => updateUIConfig('label', e.target.value)}
+                  placeholder="Publish"
+                />
+              </Column>
+              <Column lg={6} md={4} sm={4}>
+                <Select
+                  id="ui-kind"
+                  labelText="Button Style"
+                  value={uiConfig.kind || 'primary'}
+                  onChange={(e) => updateUIConfig('kind', e.target.value)}
+                >
+                  <SelectItem value="primary" text="Primary (Blue)" />
+                  <SelectItem value="secondary" text="Secondary (Gray)" />
+                  <SelectItem value="danger" text="Danger (Red)" />
+                  <SelectItem value="ghost" text="Ghost (Transparent)" />
+                </Select>
+              </Column>
+              <Column lg={12} md={8} sm={4}>
+                <PayloadEditor
+                  payload={uiConfig.payload}
+                  onChange={(parsed) => updateUIConfig('payload', parsed)}
+                />
+              </Column>
+            </>
+          )}
+
           {/* Button UI Config */}
           {controlType === CONTROL_TYPES.BUTTON && (
             <>

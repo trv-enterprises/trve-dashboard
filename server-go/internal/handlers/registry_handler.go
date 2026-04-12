@@ -5,18 +5,65 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/trv-enterprises/trve-dashboard/internal/models"
 	"github.com/trv-enterprises/trve-dashboard/internal/registry"
+	"github.com/trv-enterprises/trve-dashboard/internal/service"
 )
 
-// RegistryHandler handles registry-related endpoints
-type RegistryHandler struct{}
+// RegistryHandler handles registry-related endpoints. It owns the unified
+// type catalog (connection types, chart/control/display subtypes, and
+// device types), which is what the AI builder and MCP server consume as
+// their single source of truth.
+type RegistryHandler struct {
+	deviceTypes *service.DeviceTypeService
+}
 
-// NewRegistryHandler creates a new registry handler
-func NewRegistryHandler() *RegistryHandler {
-	return &RegistryHandler{}
+// NewRegistryHandler creates a new registry handler. deviceTypes may be nil
+// (the catalog endpoint will omit device types if so).
+func NewRegistryHandler(deviceTypes *service.DeviceTypeService) *RegistryHandler {
+	return &RegistryHandler{deviceTypes: deviceTypes}
+}
+
+// deviceTypeListerAdapter adapts DeviceTypeService to registry.DeviceTypeLister
+// so the registry package stays free of service/models imports.
+type deviceTypeListerAdapter struct {
+	svc *service.DeviceTypeService
+}
+
+func (a *deviceTypeListerAdapter) ListDeviceTypesForCatalog(ctx context.Context) ([]registry.DeviceTypeSummary, error) {
+	if a.svc == nil {
+		return nil, nil
+	}
+	resp, err := a.svc.ListDeviceTypes(ctx, &models.DeviceTypeQueryParams{Page: 1, PageSize: 500})
+	if err != nil {
+		return nil, err
+	}
+	summaries := make([]registry.DeviceTypeSummary, 0, len(resp.DeviceTypes))
+	for _, dt := range resp.DeviceTypes {
+		summaries = append(summaries, registry.DeviceTypeSummary{
+			ID:             dt.ID,
+			Name:           dt.Name,
+			Description:    dt.Description,
+			Category:       dt.Category,
+			Protocol:       dt.Protocol,
+			SupportedTypes: dt.SupportedTypes,
+			IsBuiltIn:      dt.IsBuiltIn,
+		})
+	}
+	return summaries, nil
+}
+
+// deviceTypeLister returns a lister backed by the handler's service, or nil
+// if no service was supplied.
+func (h *RegistryHandler) deviceTypeLister() registry.DeviceTypeLister {
+	if h.deviceTypes == nil {
+		return nil
+	}
+	return &deviceTypeListerAdapter{svc: h.deviceTypes}
 }
 
 // ListConnectionTypesResponse represents the response for listing connection types
@@ -122,4 +169,81 @@ func (h *RegistryHandler) ListCategories(c *gin.Context) {
 	c.JSON(http.StatusOK, ListCategoriesResponse{
 		Categories: categoryInfos,
 	})
+}
+
+// ListComponentTypesResponse wraps component type listings.
+type ListComponentTypesResponse struct {
+	Types []registry.ComponentTypeInfo `json:"types"`
+	Count int                          `json:"count"`
+}
+
+// ListComponentTypes godoc
+// @Summary List component subtypes (chart/control/display)
+// @Description Returns registered component types. Pass ?category=chart, ?category=control, or ?category=display to filter; omit for all. Hidden types are included so legacy editors still work.
+// @Tags registry
+// @Produce json
+// @Param category query string false "Filter: chart, control, display"
+// @Success 200 {object} ListComponentTypesResponse
+// @Router /api/registry/components [get]
+func (h *RegistryHandler) ListComponentTypes(c *gin.Context) {
+	category := c.Query("category")
+	types := registry.ListComponentTypes(category)
+	c.JSON(http.StatusOK, ListComponentTypesResponse{
+		Types: types,
+		Count: len(types),
+	})
+}
+
+// GetComponentType godoc
+// @Summary Get a single component type by ID
+// @Description Returns metadata for a single component subtype like "chart.bar" or "control.toggle".
+// @Tags registry
+// @Produce json
+// @Param typeId path string true "Component type ID"
+// @Success 200 {object} registry.ComponentTypeInfo
+// @Failure 404 {object} map[string]interface{}
+// @Router /api/registry/components/{typeId} [get]
+func (h *RegistryHandler) GetComponentType(c *gin.Context) {
+	typeID := c.Param("typeId")
+	info, ok := registry.GetComponentType(typeID)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "component type not found",
+			"type_id": typeID,
+		})
+		return
+	}
+	c.JSON(http.StatusOK, info)
+}
+
+// GetCatalog godoc
+// @Summary Unified type catalog (single source of truth)
+// @Description Returns connection types, chart/control/display subtypes, and device types in one payload. This is what the AI builder and MCP server consume so they never duplicate enum lists.
+// @Tags registry
+// @Produce json
+// @Success 200 {object} registry.Catalog
+// @Router /api/registry/catalog [get]
+func (h *RegistryHandler) GetCatalog(c *gin.Context) {
+	cat, err := registry.BuildCatalog(c.Request.Context(), h.deviceTypeLister())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, cat)
+}
+
+// GetCatalogMarkdown godoc
+// @Summary Catalog rendered as markdown
+// @Description Same data as /catalog but formatted as a markdown document. Useful for embedding directly in an LLM system prompt or pasting into chat.
+// @Tags registry
+// @Produce text/plain
+// @Success 200 {string} string "Markdown document"
+// @Router /api/registry/catalog.md [get]
+func (h *RegistryHandler) GetCatalogMarkdown(c *gin.Context) {
+	cat, err := registry.BuildCatalog(c.Request.Context(), h.deviceTypeLister())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(cat.RenderMarkdown()))
 }

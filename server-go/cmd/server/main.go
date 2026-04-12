@@ -243,7 +243,7 @@ func main() {
 	settingsHandler := handlers.NewSettingsHandler(settingsService)
 	commandHandler := handlers.NewCommandHandler(datasourceService, chartService, deviceTypeService)
 	frigateHandler := handlers.NewFrigateHandler(datasourceService)
-	registryHandler := handlers.NewRegistryHandler()
+	registryHandler := handlers.NewRegistryHandler(deviceTypeService)
 	deviceTypeHandler := handlers.NewDeviceTypeHandler(deviceTypeService)
 	deviceHandler := handlers.NewDeviceHandler(deviceService, deviceDiscoveryService)
 	statusHandler := handlers.NewStatusHandler(mongodb, streamManager)
@@ -253,7 +253,7 @@ func main() {
 	authMiddleware := middleware.NewAuthMiddleware(userService)
 
 	// Initialize MCP
-	mcpRegistry := mcp.NewToolRegistry(datasourceService, dashboardService, chartService)
+	mcpRegistry := mcp.NewToolRegistry(datasourceService, dashboardService, chartService, deviceTypeService)
 	mcpHandler := mcp.NewHandler(mcpRegistry)
 
 	// Public API routes (no authentication required)
@@ -340,12 +340,18 @@ func main() {
 			datasources.POST("/:id/command", commandHandler.ExecuteCommand)                     // Bidirectional command execution
 		}
 
-		// Registry routes - list available connection types
+		// Registry routes - unified type catalog (connection types, component
+		// subtypes, device types). This is the single source of truth that
+		// the AI builder and MCP server both read from.
 		registry := api.Group("/registry")
 		{
 			registry.GET("/connections", registryHandler.ListConnectionTypes)
 			registry.GET("/connections/:typeId", registryHandler.GetConnectionType)
 			registry.GET("/categories", registryHandler.ListCategories)
+			registry.GET("/components", registryHandler.ListComponentTypes)
+			registry.GET("/components/:typeId", registryHandler.GetComponentType)
+			registry.GET("/catalog", registryHandler.GetCatalog)
+			registry.GET("/catalog.md", registryHandler.GetCatalogMarkdown)
 		}
 
 		// Chart routes
