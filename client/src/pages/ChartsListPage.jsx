@@ -64,8 +64,8 @@ function ChartsListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState(savedFilters.search || '');
-  const [sortKey, setSortKey] = useState(savedFilters.sortKey || 'name');
-  const [sortDirection, setSortDirection] = useState(savedFilters.sortDir || 'asc');
+  const [sortKey, setSortKey] = useState(savedFilters.sortKey || 'updated');
+  const [sortDirection, setSortDirection] = useState(savedFilters.sortDir || 'desc');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [chartToDelete, setChartToDelete] = useState(null);
   const [viewMode, setViewMode] = useState(savedFilters.view || 'list'); // 'list' or 'tile'
@@ -543,7 +543,7 @@ function ChartsListPage() {
     id: chart.id,
     name: chart.name,
     component_type: chart.component_type || 'chart',
-    chart_type: chart.chart_type,
+    chart_type: chart.chart_type || chart.control_config?.control_type || chart.display_config?.display_type || '',
     connection: connections[chart.connection_id || chart.datasource_id] || 'None',
     dashboards: dashboardCounts[chart.id] || 0,
     status: chart.status || 'draft',

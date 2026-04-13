@@ -79,6 +79,9 @@
       display: flex;
       align-items: center;
       gap: spacing.$spacing-03;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
 
       .dashboard-info {
         h1 {
@@ -86,6 +89,9 @@
           font-size: 2rem;
           font-weight: 600;
           margin: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         p {
@@ -100,6 +106,25 @@
       display: flex;
       align-items: center;
       gap: spacing.$spacing-03;
+      flex-shrink: 0;
+
+      .dashboard-nav-buttons {
+        display: flex;
+        align-items: center;
+        gap: 0;
+
+        .cds--btn--icon-only {
+          color: #c6c6c6;
+
+          &:hover:not(:disabled) {
+            color: #f4f4f4;
+          }
+
+          &:disabled {
+            color: #525252;
+          }
+        }
+      }
 
       .cds--tag {
         display: flex;
@@ -174,7 +199,10 @@
     .toolbar-right {
       display: flex;
       align-items: center;
+      justify-content: flex-end;
       gap: spacing.$spacing-03;
+      flex: 1;
+      min-width: 0;
 
       .last-refresh {
         color: #6f6f6f;

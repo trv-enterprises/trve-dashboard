@@ -45,6 +45,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
 
   // Datasource type detection
   const [datasourceType, setDatasourceType] = useState(null);
+  const [datasourceTransport, setDatasourceTransport] = useState(null); // e.g., "rest" or "streaming" for tsstore
   const [typeLoading, setTypeLoading] = useState(true);
 
   // Refs for cleanup
@@ -73,6 +74,10 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
         const ds = await apiClient.getDatasource(datasourceId);
         if (!cancelled && mountedRef.current) {
           setDatasourceType(ds.type);
+          // Extract transport for tsstore (determines REST vs streaming)
+          if (ds.type === 'tsstore') {
+            setDatasourceTransport(ds.config?.tsstore?.transport || 'rest');
+          }
           setTypeLoading(false);
         }
       } catch (err) {
@@ -93,7 +98,9 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
   }, [datasourceId]);
 
   // Streaming datasource types use SSE instead of polling
-  const isStreamingType = datasourceType === 'socket' || datasourceType === 'mqtt' || datasourceType === 'tsstore';
+  // TSStore only streams when transport is explicitly set to "streaming"
+  const isStreamingType = datasourceType === 'socket' || datasourceType === 'mqtt'
+    || (datasourceType === 'tsstore' && datasourceTransport === 'streaming');
 
   // === STREAMING LOGIC (for streaming datasources) ===
   const processStreamRecord = useCallback((record) => {
@@ -364,7 +371,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
         eventSourceRef.current = null;
       }
     };
-  }, [datasourceId, datasourceType, typeLoading, processStreamRecord, useAggregated, timeBucketKey, handleConnectionError, handleConnectionSuccess]);
+  }, [datasourceId, datasourceType, datasourceTransport, typeLoading, processStreamRecord, useAggregated, timeBucketKey, handleConnectionError, handleConnectionSuccess]);
 
   // === POLLING LOGIC (for non-socket datasources) ===
   // isInitialFetch tracks whether this is the first load (shows loading state)
@@ -428,7 +435,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
     return () => {
       mountedRef.current = false;
     };
-  }, [datasourceId, queryKey, datasourceType, typeLoading, fetchData]);
+  }, [datasourceId, queryKey, datasourceType, datasourceTransport, typeLoading, fetchData]);
 
   // Auto-refresh interval for non-socket datasources
   useEffect(() => {
@@ -447,7 +454,7 @@ export function useData({ datasourceId, query, refreshInterval = null, useCache 
         }
       };
     }
-  }, [refreshInterval, fetchData, datasourceType, typeLoading]);
+  }, [refreshInterval, fetchData, datasourceType, datasourceTransport, typeLoading]);
 
   // Refetch function (bypasses cache for polling, clears buffer for streaming)
   // showLoading: if true, shows loading spinner during refetch (default: false for seamless updates)

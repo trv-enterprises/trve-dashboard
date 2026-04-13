@@ -3,6 +3,7 @@
 // See LICENSE file for details.
 
 import { useState, useEffect, useMemo, useImperativeHandle, forwardRef, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import html2canvas from 'html2canvas';
 import {
   TextInput,
@@ -20,9 +21,10 @@ import {
   Button,
   NumberInput,
   IconButton,
-  Slider
+  Slider,
+  Modal
 } from '@carbon/react';
-import { Play, Add, TrashCan, ChartBar, Code, TableSplit } from '@carbon/icons-react';
+import { Play, Add, TrashCan, ChartBar, ChartLine, ChartArea, ChartPie, ChartScatter, Meter, Code, TableSplit } from '@carbon/icons-react';
 import DynamicComponentLoader from './DynamicComponentLoader';
 import { API_BASE } from '../api/client';
 import SQLQueryBuilder from './SQLQueryBuilder';
@@ -39,14 +41,14 @@ import './ChartEditor.scss';
 
 // Chart types available
 const CHART_TYPES = [
-  { id: 'bar', label: 'Bar Chart' },
-  { id: 'line', label: 'Line Chart' },
-  { id: 'area', label: 'Area Chart' },
-  { id: 'pie', label: 'Pie Chart' },
-  { id: 'scatter', label: 'Scatter Plot' },
-  { id: 'gauge', label: 'Gauge' },
-  { id: 'dataview', label: 'Data Table' },
-  { id: 'custom', label: 'Custom Component' }
+  { id: 'bar', label: 'Bar Chart', description: 'Compare values across categories', icon: ChartBar },
+  { id: 'line', label: 'Line Chart', description: 'Show trends over time', icon: ChartLine },
+  { id: 'area', label: 'Area Chart', description: 'Line chart with filled area beneath', icon: ChartArea },
+  { id: 'pie', label: 'Pie Chart', description: 'Show proportions of a whole', icon: ChartPie },
+  { id: 'scatter', label: 'Scatter Plot', description: 'Plot data points on two axes', icon: ChartScatter },
+  { id: 'gauge', label: 'Gauge', description: 'Display a single value on a dial', icon: Meter },
+  { id: 'dataview', label: 'Data Table', description: 'Tabular view of raw data', icon: TableSplit },
+  { id: 'custom', label: 'Custom Component', description: 'Write custom React/ECharts code', icon: Code }
 ];
 
 // Filter operators
@@ -213,6 +215,7 @@ const ChartEditor = forwardRef(function ChartEditor({
   const [tags, setTags] = useState([]);
   const [componentType, setComponentType] = useState('chart'); // 'chart', 'control', or 'display'
   const [chartType, setChartType] = useState('bar');
+  const [chartTypeModalOpen, setChartTypeModalOpen] = useState(false);
 
   // Control configuration (when componentType === 'control')
   const [controlConfig, setControlConfig] = useState(null);
@@ -566,6 +569,7 @@ const ChartEditor = forwardRef(function ChartEditor({
 
   // Derived datasource type flags (used in multiple places)
   const isTSStore = selectedDatasource?.type === 'tsstore';
+  const isTSStoreStreaming = isTSStore && selectedDatasource?.config?.tsstore?.transport === 'streaming';
   const isSocket = selectedDatasource?.type === 'socket';
   const isMQTT = selectedDatasource?.type === 'mqtt';
   const isAPI = selectedDatasource?.type === 'api';
@@ -614,11 +618,16 @@ const ChartEditor = forwardRef(function ChartEditor({
           case 'tsstore':
             setQueryType('tsstore');
             setQueryMode('raw');
-            // Set default query for tsstore
-            setQueryRaw('newest');
-            setTsstoreQueryType('newest');
-            setTsstoreLimit(100);
-            setTsstoreSinceDuration('1h');
+            if (ds.config?.tsstore?.transport === 'streaming') {
+              // Streaming transport — no REST query needed
+              setQueryRaw('');
+            } else {
+              // REST transport — set default query
+              setQueryRaw('newest');
+              setTsstoreQueryType('newest');
+              setTsstoreLimit(100);
+              setTsstoreSinceDuration('1h');
+            }
             break;
           case 'edgelake':
             setQueryType('edgelake');
@@ -751,8 +760,8 @@ const ChartEditor = forwardRef(function ChartEditor({
       let queryParams = {};
       let rawQuery = queryRaw;
 
-      if (isSocket) {
-        rawQuery = ''; // Socket doesn't need a query string
+      if (isSocket || isTSStoreStreaming) {
+        rawQuery = ''; // Streaming doesn't need a query string — fetch newest for schema discovery
       } else if (isTSStore) {
         // Build TSStore query: 'newest', 'oldest', or 'since:DURATION'
         if (tsstoreQueryType === 'since') {
@@ -818,7 +827,11 @@ const ChartEditor = forwardRef(function ChartEditor({
     // Build queryParams based on datasource type (same logic as fetchPreview)
     let queryParams = {};
     let rawQuery = queryRaw;
-    if (isTSStore) {
+    if (isTSStoreStreaming) {
+      // Streaming TS-STORE — no query needed, data arrives via SSE
+      rawQuery = '';
+      queryParams = {};
+    } else if (isTSStore) {
       if (tsstoreQueryType === 'since') {
         // For 'since' queries, don't limit - fetch all data in time window
         rawQuery = `since:${tsstoreSinceDuration}`;
@@ -844,8 +857,8 @@ const ChartEditor = forwardRef(function ChartEditor({
       chartName: name || ''
     };
 
-    return getDataDrivenChartCode(chartType, selectedDatasourceId, rawQuery, queryType, xAxisColumn, yAxisColumns, transforms, chartOptions, queryParams, seriesColumn, columnAliases);
-  }, [chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, xAxisLabel, xAxisFormat, yAxisColumns, yAxisLabel, filters, aggregation, sortBy, sortOrder, limitRows, showCustomCode, componentCode, name, chartOptions, selectedDatasource, tsstoreLimit, tsstoreQueryType, tsstoreSinceDuration, seriesColumn, edgelakeDatabase, columnAliases]);
+    return getDataDrivenChartCode(chartType, selectedDatasourceId, rawQuery, queryType, xAxisColumn, yAxisColumns, transforms, chartOptions, queryParams, seriesColumn, columnAliases, isTSStoreStreaming);
+  }, [chartType, selectedDatasourceId, queryRaw, queryType, xAxisColumn, xAxisLabel, xAxisFormat, yAxisColumns, yAxisLabel, filters, aggregation, sortBy, sortOrder, limitRows, showCustomCode, componentCode, name, chartOptions, selectedDatasource, tsstoreLimit, tsstoreQueryType, tsstoreSinceDuration, seriesColumn, edgelakeDatabase, columnAliases, isTSStoreStreaming]);
 
   const filteredPreviewData = useMemo(() => {
     if (!previewData) return null;
@@ -1106,21 +1119,6 @@ const ChartEditor = forwardRef(function ChartEditor({
             invalid={!!nameError}
             invalidText={nameError}
           />
-          {componentType === 'chart' && (
-            <Select
-              id="chart-type"
-              labelText="Chart Type"
-              value={chartType}
-              onChange={(e) => {
-                handleChartTypeChange(e.target.value);
-                setShowCustomCode(e.target.value === 'custom');
-              }}
-            >
-              {CHART_TYPES.map(type => (
-                <SelectItem key={type.id} value={type.id} text={type.label} />
-              ))}
-            </Select>
-          )}
         </div>
         <div className="metadata-row">
           <TextInput
@@ -1148,6 +1146,64 @@ const ChartEditor = forwardRef(function ChartEditor({
           />
         </div>
       </div>
+
+      {/* Chart Type card — shown when componentType is 'chart' */}
+      {componentType === 'chart' && (() => {
+        const currentChartType = CHART_TYPES.find(t => t.id === chartType) || CHART_TYPES[0];
+        const TypeIcon = currentChartType.icon;
+        return (
+          <div className="type-card-section">
+            <h4>Chart Type</h4>
+            <div className="type-card-current" onClick={() => setChartTypeModalOpen(true)}>
+              <Button kind="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setChartTypeModalOpen(true); }}>
+                Change
+              </Button>
+              {TypeIcon && <TypeIcon size={20} />}
+              <div className="type-card-info">
+                <span className="type-card-label">{currentChartType.label}</span>
+                <span className="type-card-description">{currentChartType.description}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Chart Type Selection Modal — portaled to body to escape parent modal */}
+      {chartTypeModalOpen && createPortal(
+        <Modal
+          open
+          onRequestClose={() => setChartTypeModalOpen(false)}
+          onRequestSubmit={() => setChartTypeModalOpen(false)}
+          modalHeading="Select Chart Type"
+          primaryButtonText="Close"
+          size="sm"
+          className="type-selection-modal"
+        >
+          <div className="type-selection-grid">
+            {CHART_TYPES.map(type => {
+              const TypeIcon = type.icon;
+              return (
+                <div
+                  key={type.id}
+                  className={`type-selection-item ${chartType === type.id ? 'selected' : ''}`}
+                  onClick={() => {
+                    handleChartTypeChange(type.id);
+                    setShowCustomCode(type.id === 'custom');
+                    setChartTypeModalOpen(false);
+                  }}
+                >
+                  {TypeIcon && <TypeIcon size={24} />}
+                  <div className="type-selection-info">
+                    <span className="type-selection-label">{type.label}</span>
+                    <span className="type-selection-description">{type.description}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Modal>,
+        document.body
+      )}
 
       {/* Control Editor - shown when componentType is 'control' */}
       {componentType === 'control' && (
@@ -1265,7 +1321,7 @@ const ChartEditor = forwardRef(function ChartEditor({
                           <Switch name="raw" text="Raw SQL" />
                         </ContentSwitcher>
                       )}
-                      {selectedDatasource.type === 'socket' ? (
+                      {selectedDatasource.type === 'socket' || isTSStoreStreaming ? (
                         <Button
                           kind="tertiary"
                           size="sm"
@@ -1275,7 +1331,7 @@ const ChartEditor = forwardRef(function ChartEditor({
                         >
                           {previewLoading ? 'Capturing...' : 'Capture Sample (5s)'}
                         </Button>
-                      ) : selectedDatasource.type === 'tsstore' ? (
+                      ) : isTSStore ? (
                         <Button
                           kind="tertiary"
                           size="sm"
@@ -1299,8 +1355,8 @@ const ChartEditor = forwardRef(function ChartEditor({
                     </div>
                   </div>
 
-                  {/* Socket datasource - show info message instead of unused filter field */}
-                  {selectedDatasource.type === 'socket' ? (
+                  {/* Socket/streaming datasource - show info message instead of unused filter field */}
+                  {selectedDatasource.type === 'socket' || isTSStoreStreaming ? (
                     <div className="socket-capture-info">
                       <InlineNotification
                         kind="info"
@@ -1310,7 +1366,7 @@ const ChartEditor = forwardRef(function ChartEditor({
                         lowContrast
                       />
                     </div>
-                  ) : selectedDatasource.type === 'tsstore' ? (
+                  ) : isTSStore ? (
                     <div className="tsstore-query-section">
                       <Grid narrow>
                         <Column lg={6} md={4} sm={4}>
@@ -2647,9 +2703,11 @@ function getStaticChartCode(chartType) {
   return templates[chartType] || templates.bar;
 }
 
-function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xAxisCol, yAxisCols, transforms = {}, chartOptions = {}, queryParams = {}, seriesCol = '', columnAliases = {}) {
+function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xAxisCol, yAxisCols, transforms = {}, chartOptions = {}, queryParams = {}, seriesCol = '', columnAliases = {}, isStreaming = false) {
   const yAxisStr = yAxisCols.length > 0 ? yAxisCols.map(c => `'${c}'`).join(', ') : "'value'";
   const { filters = [], aggregation = null, sortBy = '', sortOrder = 'desc', limit = 0, xAxisFormat = 'chart', xAxisLabel = '', yAxisLabel = '', chartName = '' } = transforms;
+  // Streaming connections don't need refreshInterval — data arrives via SSE
+  const refreshLine = isStreaming ? '' : '\n    refreshInterval: 30000';
 
   const hasTransforms = filters.length > 0 || aggregation?.type || sortBy || limit > 0;
   const transformsConfig = hasTransforms ? `
@@ -2731,8 +2789,7 @@ function getDataDrivenChartCode(chartType, datasourceId, queryRaw, queryType, xA
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
       params: ${JSON.stringify(queryParams)}
-    },
-    refreshInterval: 30000
+    },${refreshLine}
   });
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>;
@@ -2775,8 +2832,7 @@ ${xAxisFormatCode}
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
       params: ${JSON.stringify(queryParams)}
-    },
-    refreshInterval: 30000
+    },${refreshLine}
   });
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>;
@@ -2904,8 +2960,7 @@ ${transformsConfig}
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
       params: ${JSON.stringify(queryParams)}
-    },
-    refreshInterval: 30000
+    },${refreshLine}
   });
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>;
@@ -2994,8 +3049,7 @@ ${transformsConfig}
       raw: \`${queryRaw.replace(/`/g, '\\`')}\`,
       type: '${queryType}',
       params: ${JSON.stringify(queryParams)}
-    },
-    refreshInterval: 30000
+    },${refreshLine}
   });
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>Loading...</div>;

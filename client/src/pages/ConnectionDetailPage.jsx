@@ -178,6 +178,7 @@ function ConnectionDetailPage() {
       case 'tsstore':
         return {
           tsstore: {
+            transport: 'rest',
             protocol: 'http',
             host: '',
             port: 21080,
@@ -885,18 +886,35 @@ function ConnectionDetailPage() {
 
   const renderTSStoreConfig = () => {
     const tsstoreConfig = config.tsstore || {};
+    const isStreamingTransport = tsstoreConfig.transport === 'streaming';
     return (
       <div className="config-form">
         <div className="form-row">
+          <Select
+            id="tsstore-transport"
+            labelText="Transport"
+            value={tsstoreConfig.transport || 'rest'}
+            onChange={(e) => {
+              updateConfig('tsstore.transport', e.target.value);
+              // Clear push config when switching to REST
+              if (e.target.value === 'rest') {
+                updateConfig('tsstore.push', undefined);
+              }
+            }}
+            helperText="REST for periodic queries, Streaming for real-time WebSocket push"
+          >
+            <SelectItem value="rest" text="REST (HTTP)" />
+            <SelectItem value="streaming" text="Streaming (WebSocket Push)" />
+          </Select>
           <Select
             id="tsstore-protocol"
             labelText="Protocol"
             value={tsstoreConfig.protocol || 'http'}
             onChange={(e) => updateConfig('tsstore.protocol', e.target.value)}
-            helperText="HTTP/WS for unencrypted, HTTPS/WSS for encrypted"
+            helperText={isStreamingTransport ? 'WS for unencrypted, WSS for encrypted' : 'HTTP for unencrypted, HTTPS for encrypted'}
           >
-            <SelectItem value="http" text="HTTP / WS" />
-            <SelectItem value="https" text="HTTPS / WSS" />
+            <SelectItem value="http" text={isStreamingTransport ? 'WS (unencrypted)' : 'HTTP (unencrypted)'} />
+            <SelectItem value="https" text={isStreamingTransport ? 'WSS (encrypted)' : 'HTTPS (encrypted)'} />
           </Select>
         </div>
 
@@ -949,9 +967,10 @@ function ConnectionDetailPage() {
           helperText="Request timeout in seconds"
         />
 
-        {/* Streaming/Push Configuration */}
+        {/* Streaming/Push Configuration — only shown for streaming transport */}
+        {isStreamingTransport && (<>
         <h4 style={{ marginTop: '1.5rem', marginBottom: '0.5rem', color: 'var(--cds-text-secondary)' }}>
-          Streaming Configuration (Optional)
+          Streaming Configuration
         </h4>
         <p style={{ fontSize: '0.875rem', color: 'var(--cds-text-helper)', marginBottom: '1rem' }}>
           Configure how data is pushed from ts-store to the dashboard. These settings affect all charts using this connection.
@@ -1152,6 +1171,7 @@ function ConnectionDetailPage() {
             </div>
           )}
         </div>
+        </>)}
       </div>
     );
   };

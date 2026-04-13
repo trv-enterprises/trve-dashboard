@@ -998,6 +998,17 @@ func parseDatasourceConfig(dsType models.DatasourceType, configMap map[string]in
 			URL:      getString(configMap, "url"),
 			Protocol: getString(configMap, "protocol"),
 		}
+	case models.DatasourceTypeTSStore:
+		config.TSStore = &models.TSStoreConfig{
+			Transport: models.TSStoreTransport(getString(configMap, "transport")),
+			Protocol:  models.TSStoreProtocol(getString(configMap, "protocol")),
+			Host:      getString(configMap, "host"),
+			Port:      getInt(configMap, "port"),
+			StoreName: getString(configMap, "store_name"),
+			DataType:  models.TSStoreDataType(getString(configMap, "data_type")),
+			APIKey:    getString(configMap, "api_key"),
+			Timeout:   getInt(configMap, "timeout"),
+		}
 	}
 	return config
 }

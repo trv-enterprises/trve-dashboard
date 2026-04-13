@@ -315,7 +315,8 @@ func (m *Manager) Stop() {
 	log.Println("[StreamManager] Stopped")
 }
 
-// IsStreamingDatasource checks if a datasource supports streaming (socket or tsstore)
+// IsStreamingDatasource checks if a datasource supports streaming
+// Socket and MQTT are always streaming; TSStore only when transport is "streaming"
 func (m *Manager) IsStreamingDatasource(ctx context.Context, datasourceID string) (bool, error) {
 	ds, err := m.repo.FindByID(ctx, datasourceID)
 	if err != nil {
@@ -324,5 +325,12 @@ func (m *Manager) IsStreamingDatasource(ctx context.Context, datasourceID string
 	if ds == nil {
 		return false, fmt.Errorf("datasource not found")
 	}
-	return ds.Type == models.DatasourceTypeSocket || ds.Type == models.DatasourceTypeTSStore || ds.Type == models.DatasourceTypeMQTT, nil
+	switch ds.Type {
+	case models.DatasourceTypeSocket, models.DatasourceTypeMQTT:
+		return true, nil
+	case models.DatasourceTypeTSStore:
+		return ds.Config.TSStore != nil && ds.Config.TSStore.IsStreaming(), nil
+	default:
+		return false, nil
+	}
 }

@@ -53,8 +53,8 @@ function DashboardsListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState(savedFilters.search || '');
-  const [sortKey, setSortKey] = useState(savedFilters.sortKey || 'name');
-  const [sortDirection, setSortDirection] = useState(savedFilters.sortDir || 'asc');
+  const [sortKey, setSortKey] = useState(savedFilters.sortKey || 'updated');
+  const [sortDirection, setSortDirection] = useState(savedFilters.sortDir || 'desc');
   const [viewMode, setViewMode] = useState(savedFilters.view || 'list'); // 'list' or 'tile'
   const [tagFilter, setTagFilter] = useState(savedFilters.tags || []); // array of tag names
 

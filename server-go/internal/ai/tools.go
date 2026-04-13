@@ -235,7 +235,8 @@ Returns:
 
 For SQL and EdgeLake: Returns tables with columns
 For Prometheus: Returns metrics and labels
-For API/CSV/Socket/TSStore: Infers schema from sample data
+For API/CSV/Socket: Infers schema from sample data
+For TSStore: Infers schema from sample data (works with both rest and streaming transport modes)
 
 Use this BEFORE configuring data mapping to understand the data structure.`),
 			InputSchema: anthropic.ToolInputSchemaParam{

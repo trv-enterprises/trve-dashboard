@@ -216,6 +216,7 @@ func (d *Datasource) GetEffectiveConfig() map[string]interface{} {
 		}
 	case DatasourceTypeTSStore:
 		if d.Config.TSStore != nil {
+			config["transport"] = string(d.Config.TSStore.Transport)
 			config["protocol"] = string(d.Config.TSStore.Protocol)
 			config["host"] = d.Config.TSStore.Host
 			config["port"] = d.Config.TSStore.Port
@@ -375,10 +376,19 @@ const (
 	TSStoreProtocolHTTPS TSStoreProtocol = "https" // HTTPS/WSS (encrypted)
 )
 
+// TSStoreTransport represents the transport mode for TSStore connections
+type TSStoreTransport string
+
+const (
+	TSStoreTransportREST      TSStoreTransport = "rest"      // HTTP polling (default)
+	TSStoreTransportStreaming  TSStoreTransport = "streaming" // WebSocket push (real-time)
+)
+
 // TSStoreConfig represents configuration for TSStore (timeseries store) data sources
 // TSStore stores arbitrary objects at timestamps, using a block-based storage system.
 // Data does not have a predefined schema - schema is inferred from the first N records.
 type TSStoreConfig struct {
+	Transport TSStoreTransport  `json:"transport,omitempty" bson:"transport,omitempty"`                // Transport mode: "rest" (default) or "streaming"
 	Protocol  TSStoreProtocol   `json:"protocol" bson:"protocol" binding:"required,oneof=http https"` // Protocol: "http" (HTTP/WS) or "https" (HTTPS/WSS)
 	Host      string            `json:"host" bson:"host" binding:"required"`                          // Hostname or IP address
 	Port      int               `json:"port" bson:"port" binding:"required"`                          // Port number
@@ -388,10 +398,15 @@ type TSStoreConfig struct {
 	Headers   map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`                   // Additional HTTP headers
 	Timeout   int               `json:"timeout,omitempty" bson:"timeout,omitempty"`                   // Request timeout in seconds (default: 30)
 
-	// Push connection configuration for streaming (ts-store v0.2.2+)
-	// When streaming is enabled, dashboard calls ts-store API to create a push connection
-	// and ts-store dials out to dashboard's inbound WebSocket endpoint
+	// Push connection configuration for streaming transport (ts-store v0.2.2+)
+	// Only used when Transport is "streaming". Dashboard calls ts-store API to create
+	// a push connection and ts-store dials out to dashboard's inbound WebSocket endpoint.
 	Push *TSStorePushConfig `json:"push,omitempty" bson:"push,omitempty"`
+}
+
+// IsStreaming returns true if this TSStore connection uses WebSocket push transport
+func (c *TSStoreConfig) IsStreaming() bool {
+	return c.Transport == TSStoreTransportStreaming
 }
 
 // TSStorePushConfig configures the outbound WebSocket push from ts-store to dashboard

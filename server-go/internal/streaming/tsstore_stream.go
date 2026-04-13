@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -115,7 +116,7 @@ func (ts *TSStoreStream) createPushConnection(ctx context.Context) error {
 	}
 
 	if pushConfig != nil {
-		req.From = pushConfig.From
+		req.From = -1 // Always start from now (realtime only)
 		req.Format = pushConfig.Format
 		req.Filter = pushConfig.Filter
 		req.FilterIgnoreCase = pushConfig.FilterIgnoreCase
@@ -225,10 +226,12 @@ func (ts *TSStoreStream) deletePushConnection(ctx context.Context) error {
 }
 
 // getDashboardHost returns the dashboard host address for the inbound WebSocket URL
-// This should be configured based on how ts-store can reach the dashboard
+// Reads from DASHBOARD_HOST environment variable, falling back to localhost:3001.
+// Set DASHBOARD_HOST to the address reachable by ts-store (e.g., Tailscale IP).
 func (ts *TSStoreStream) getDashboardHost() string {
-	// TODO: Make this configurable via environment variable or system config
-	// For now, use localhost:3001 which works for local development
+	if host := os.Getenv("DASHBOARD_HOST"); host != "" {
+		return host
+	}
 	return "localhost:3001"
 }
 

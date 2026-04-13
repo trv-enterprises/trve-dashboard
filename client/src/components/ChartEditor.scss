@@ -29,6 +29,16 @@
   // Max-width container for content (excluding header in page context)
   --chart-editor-max-width: 1200px;
 
+  // Section headers — consistent uppercase pattern (matches ControlEditor)
+  h4 {
+    color: var(--cds-text-primary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0 0 spacing.$spacing-04 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
   // Form elements
   .cds--label {
     color: #c6c6c6;
@@ -60,21 +70,72 @@
   .chart-metadata-section {
     margin-bottom: spacing.$spacing-05;
     padding-bottom: spacing.$spacing-05;
-    max-width: 800px;
 
     .metadata-row {
-      display: grid;
-      grid-template-columns: 3fr 1fr; // 75% name, 25% type
+      display: flex;
+      flex-direction: column;
       gap: spacing.$spacing-05;
       margin-bottom: spacing.$spacing-05;
+    }
+  }
 
-      @media (max-width: 672px) {
-        grid-template-columns: 1fr;
+  // Metadata, type cards, and sub-editors share a consistent max-width
+  // Chart configuration sections (switcher, connection, preview, code) are full-width
+  > .chart-metadata-section,
+  > .type-card-section,
+  > .display-editor,
+  > .control-editor {
+    max-width: 800px;
+  }
+
+  .display-editor__section {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-05;
+
+    h4 {
+      margin-bottom: 0; // gap handles spacing, no extra margin after header
+    }
+  }
+
+  // Type card — shared pattern for Chart Type and Display Type (mirrors Control Type card)
+  .type-card-section {
+    margin-bottom: spacing.$spacing-05;
+
+    .type-card-current {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-04;
+      padding: spacing.$spacing-04;
+      background-color: var(--cds-layer-01);
+      border-radius: 4px;
+      cursor: pointer;
+
+      &:hover {
+        background-color: var(--cds-layer-hover-01);
       }
 
-      &.description-row {
-        grid-template-columns: 1fr; // Full width for description
-        margin-bottom: 0;
+      svg {
+        color: var(--cds-icon-secondary);
+        flex-shrink: 0;
+      }
+
+      .type-card-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        .type-card-label {
+          color: var(--cds-text-primary);
+          font-size: 0.875rem;
+          font-weight: 600;
+        }
+
+        .type-card-description {
+          color: var(--cds-text-secondary);
+          font-size: 0.75rem;
+        }
       }
     }
   }
@@ -929,5 +990,57 @@
     margin-top: spacing.$spacing-05;
     padding-top: spacing.$spacing-05;
     border-top: 1px solid var(--cds-border-subtle-01);
+  }
+}
+
+// Type selection modal — shared for Chart Type and Display Type
+.type-selection-modal {
+  .type-selection-grid {
+    display: flex;
+    flex-direction: column;
+    gap: spacing.$spacing-03;
+
+    .type-selection-item {
+      display: flex;
+      align-items: center;
+      gap: spacing.$spacing-04;
+      padding: spacing.$spacing-04;
+      background-color: var(--cds-layer-01);
+      border-radius: 4px;
+      border: 2px solid transparent;
+      cursor: pointer;
+
+      &:hover {
+        background-color: var(--cds-layer-hover-01);
+      }
+
+      &.selected {
+        border-color: var(--cds-interactive);
+        background-color: var(--cds-layer-selected-01);
+      }
+
+      svg {
+        color: var(--cds-icon-secondary);
+        flex-shrink: 0;
+      }
+
+      .type-selection-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        .type-selection-label {
+          color: var(--cds-text-primary);
+          font-size: 0.875rem;
+          font-weight: 600;
+        }
+
+        .type-selection-description {
+          color: var(--cds-text-secondary);
+          font-size: 0.75rem;
+        }
+      }
+    }
   }
 }

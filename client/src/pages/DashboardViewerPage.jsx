@@ -38,7 +38,10 @@ import {
   Add,
   ZoomIn,
   ZoomOut,
-  Settings
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  Home
 } from '@carbon/icons-react';
 import html2canvas from 'html2canvas';
 import DynamicComponentLoader from '../components/DynamicComponentLoader';
@@ -139,6 +142,7 @@ function DashboardViewerPage({ canDesign = false }) {
   const [selectedChart, setSelectedChart] = useState(null);
   const [configRefreshInterval, setConfigRefreshInterval] = useState(120);
   const [isDefaultDashboard, setIsDefaultDashboard] = useState(false);
+  const [defaultDashboardId, setDefaultDashboardId] = useState(null);
 
   // Dashboard switching state
   const [dashboardList, setDashboardList] = useState([]);
@@ -478,6 +482,38 @@ function DashboardViewerPage({ canDesign = false }) {
     switchTimerRef.current = setTimeout(() => setSwitchIndicator(null), 2000);
   }, []);
 
+  // Dashboard navigation helpers
+  const currentDashboardIndex = useMemo(() => {
+    return dashboardList.findIndex(d => d.id === id);
+  }, [dashboardList, id]);
+
+  const canGoPrev = currentDashboardIndex > 0;
+  const canGoNext = currentDashboardIndex >= 0 && currentDashboardIndex < dashboardList.length - 1;
+
+  const goToPrevDashboard = useCallback(() => {
+    if (!canGoPrev) return;
+    const prev = dashboardList[currentDashboardIndex - 1];
+    showSwitchIndicator(prev.name, currentDashboardIndex, dashboardList.length);
+    navigate(`/view/dashboards/${prev.id}`);
+  }, [canGoPrev, dashboardList, currentDashboardIndex, showSwitchIndicator, navigate]);
+
+  const goToNextDashboard = useCallback(() => {
+    if (!canGoNext) return;
+    const next = dashboardList[currentDashboardIndex + 1];
+    showSwitchIndicator(next.name, currentDashboardIndex + 2, dashboardList.length);
+    navigate(`/view/dashboards/${next.id}`);
+  }, [canGoNext, dashboardList, currentDashboardIndex, showSwitchIndicator, navigate]);
+
+  const goToDefaultDashboard = useCallback(() => {
+    if (!defaultDashboardId || defaultDashboardId === id) return;
+    const def = dashboardList.find(d => d.id === defaultDashboardId);
+    if (def) {
+      const defIndex = dashboardList.indexOf(def);
+      showSwitchIndicator(def.name, defIndex + 1, dashboardList.length);
+    }
+    navigate(`/view/dashboards/${defaultDashboardId}`);
+  }, [defaultDashboardId, id, dashboardList, showSwitchIndicator, navigate]);
+
   // Keyboard navigation: Alt+Left/Right to switch dashboards (disabled in edit mode)
   useEffect(() => {
     if (dashboardList.length < 2 || isEditMode) return;
@@ -542,7 +578,9 @@ function DashboardViewerPage({ canDesign = false }) {
       if (!userGuid || !id) return;
       try {
         const config = await apiClient.getUserConfig(userGuid);
-        setIsDefaultDashboard(config.settings?.default_dashboard_id === id);
+        const defId = config.settings?.default_dashboard_id || null;
+        setDefaultDashboardId(defId);
+        setIsDefaultDashboard(defId === id);
       } catch {
         // User may not have config yet
       }
@@ -1164,11 +1202,39 @@ function DashboardViewerPage({ canDesign = false }) {
         </div>
 
         <div className="toolbar-center">
-          {!isEditMode && dashboard?.settings?.refresh_interval > 0 && (
-            <Tag type="green" size="sm">
-              <Time size={12} />
-              Data refresh: {dashboard.settings.refresh_interval}s
-            </Tag>
+          {!isEditMode && dashboardList.length > 1 && (
+            <div className="dashboard-nav-buttons">
+              <IconButton
+                kind="ghost"
+                size="sm"
+                label="Previous dashboard"
+                align="bottom"
+                onClick={goToPrevDashboard}
+                disabled={!canGoPrev}
+              >
+                <ChevronLeft size={20} />
+              </IconButton>
+              <IconButton
+                kind="ghost"
+                size="sm"
+                label={isDefaultDashboard ? 'This is the default dashboard' : 'Go to default dashboard'}
+                align="bottom"
+                onClick={goToDefaultDashboard}
+                disabled={isDefaultDashboard || !defaultDashboardId}
+              >
+                <Home size={16} />
+              </IconButton>
+              <IconButton
+                kind="ghost"
+                size="sm"
+                label="Next dashboard"
+                align="bottom"
+                onClick={goToNextDashboard}
+                disabled={!canGoNext}
+              >
+                <ChevronRight size={20} />
+              </IconButton>
+            </div>
           )}
           {isEditMode && dimensions.length > 0 && (
             <div className="dimension-selector">
@@ -1228,6 +1294,12 @@ function DashboardViewerPage({ canDesign = false }) {
         </div>
 
         <div className="toolbar-right">
+          {!isEditMode && dashboard?.settings?.refresh_interval > 0 && (
+            <Tag type="green" size="sm">
+              <Time size={12} />
+              Data refresh: {dashboard.settings.refresh_interval}s
+            </Tag>
+          )}
           {isEditMode ? (
             <>
               <Button

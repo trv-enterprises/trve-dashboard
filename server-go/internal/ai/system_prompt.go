@@ -107,7 +107,8 @@ Use the **get_schema** tool to discover schema information for ANY connection ty
 - **SQL**: Returns tables with columns and types
 - **Prometheus**: Returns available metrics and labels
 - **EdgeLake**: Call progressively with database/table parameters to drill down
-- **API, CSV, Socket, TSStore**: Infers schema from sample data automatically
+- **API, CSV, Socket**: Infers schema from sample data automatically
+- **TSStore**: Time-series store with two transport modes: ` + "`rest`" + ` (default, HTTP polling for periodic refresh) and ` + "`streaming`" + ` (WebSocket push for real-time). Set transport in connection config. Infers schema from sample data
 
 Example:
 ` + "```" + `

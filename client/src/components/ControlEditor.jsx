@@ -210,19 +210,23 @@ function ControlEditor({
     fetchMQTTTopics();
   }, [connectionId, isMQTT]);
 
-  // Derive selected state topic from controlConfig.target for the ComboBox.
-  // For standard writable controls, target ends in /set — strip it to show
-  // the base device topic. For mqtt_publish and read-only controls, target
-  // IS the topic (no /set suffix).
+  // Whether this control type uses the raw topic (no /set suffix)
   const usesRawTopic = controlType === CONTROL_TYPES.MQTT_PUBLISH || !typeInfo?.canWrite;
-  const selectedStateTopic = usesRawTopic
-    ? (controlConfig?.target || '')
-    : controlConfig?.target?.endsWith('/set')
-      ? controlConfig.target.slice(0, -4)
-      : controlConfig?.target || '';
 
-  // Handle MQTT topic selection — sets target but does NOT auto-assign a device type
+  // Track the ComboBox selection independently from the target field.
+  // This prevents circular updates when manually editing the Command Target.
+  const [comboBoxTopic, setComboBoxTopic] = useState(() => {
+    // Initialize from existing target on mount
+    const target = controlConfig?.target || '';
+    if (!target) return null;
+    if (usesRawTopic) return mqttTopics.includes(target) ? target : null;
+    const base = target.endsWith('/set') ? target.slice(0, -4) : target;
+    return mqttTopics.includes(base) ? base : null;
+  });
+
+  // Handle MQTT topic selection from ComboBox — sets target
   const handleTopicSelect = (topic) => {
+    setComboBoxTopic(topic || null);
     if (!topic) {
       const newConfig = { ...controlConfig };
       delete newConfig.target;
@@ -452,7 +456,7 @@ function ControlEditor({
                 titleText="Device Topic"
                 items={mqttTopics}
                 itemToString={(item) => item || ''}
-                selectedItem={selectedStateTopic || null}
+                selectedItem={comboBoxTopic}
                 onChange={({ selectedItem }) => handleTopicSelect(selectedItem)}
                 placeholder={loadingTopics ? 'Loading topics...' : 'Select a device topic...'}
                 disabled={loadingTopics}

@@ -35,6 +35,7 @@ func init() {
 // tsstoreConfigSchema returns configuration fields for TSStore adapter
 func tsstoreConfigSchema() []registry.ConfigField {
 	return []registry.ConfigField{
+		{Name: "transport", Type: "string", Required: false, Options: []string{"rest", "streaming"}, Default: "rest", Description: "Transport mode: rest (HTTP polling) or streaming (WebSocket push)"},
 		{Name: "protocol", Type: "string", Required: true, Options: []string{"http", "https"}, Description: "Protocol (http or https)"},
 		{Name: "host", Type: "string", Required: true, Description: "TSStore host"},
 		{Name: "port", Type: "int", Required: true, Description: "TSStore port"},
@@ -56,6 +57,9 @@ type TSStoreAdapter struct {
 func newTSStoreAdapterFromConfig(config map[string]interface{}) (*TSStoreAdapter, error) {
 	tsConfig := &models.TSStoreConfig{}
 
+	if transport, ok := config["transport"].(string); ok {
+		tsConfig.Transport = models.TSStoreTransport(transport)
+	}
 	if protocol, ok := config["protocol"].(string); ok {
 		tsConfig.Protocol = models.TSStoreProtocol(protocol)
 	}
